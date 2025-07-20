@@ -36,3 +36,6 @@ coverage/
 .cache/
 .temp/
 api_keys.txt
+
+
+telemetry/

@@ -343,7 +343,8 @@ export class ExecutionEngine {
 
           // ── 1. Call LLM with streaming ───────────────────────────────────────
           const { accumulatedText } = await this.processLlmStream(messages, adaptedCallbacks);
-
+          console.log('accumulatedText',accumulatedText);
+          
           // Check for cancellation after LLM response
           if (this.errorHandler.isExecutionCancelled()) break;
 

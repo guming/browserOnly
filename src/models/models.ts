@@ -137,6 +137,22 @@ export const openaiModels = {
   },
 };
 
+//DeepSeek
+export type DeepSeekModelId = keyof typeof deepseekModels;
+export const deepseekDefaultModelId: DeepSeekModelId = "deepseek-chat";
+export const deepseekModels = {
+  "deepseek-chat": {
+    name: "deepseek-chat",
+    inputPrice: 0.28,
+    outputPrice: 1.09,
+    maxTokens: 4096,
+    contextWindow: 128000,
+    supportsImages: true,
+    supportsPromptCache: true,
+    cacheReadsPrice: 1.25,
+  },
+};
+
 // Gemini Models
 export type GeminiModelId = keyof typeof geminiModels;
 export const geminiDefaultModelId: GeminiModelId = "gemini-2.5-flash-preview-05-20";

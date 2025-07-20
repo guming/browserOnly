@@ -1,5 +1,5 @@
 import { ConfigManager } from "../background/configManager";
-import { anthropicModels, openaiModels, geminiModels, ollamaModels } from "../models/models";
+import { anthropicModels, openaiModels, geminiModels, ollamaModels, deepseekModels } from "../models/models";
 
 export interface TokenUsage {
   inputTokens: number;
@@ -111,6 +111,13 @@ export class TokenTrackingService {
       case 'openai':
         if (this.currentModelId && this.currentModelId in openaiModels) {
           const model = openaiModels[this.currentModelId as keyof typeof openaiModels];
+          inputPrice = model.inputPrice;
+          outputPrice = model.outputPrice;
+        }
+        break;
+      case 'deepseek':
+        if (this.currentModelId && this.currentModelId in deepseekModels) {
+          const model = deepseekModels[this.currentModelId as keyof typeof deepseekModels];
           inputPrice = model.inputPrice;
           outputPrice = model.outputPrice;
         }

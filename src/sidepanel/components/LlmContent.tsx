@@ -75,7 +75,7 @@ export const LlmContent: React.FC<LlmContentProps> = ({ content }) => {
                 ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-2" {...props} />,
                 ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-2" {...props} />,
                 li: ({node, ...props}) => <li className="mb-1" {...props} />,
-                a: ({node, ...props}) => <a className="text-primary underline" {...props} />,
+                a: ({node, ...props}) => <a className="text-primary underline" {...props} target= "_blank"/>,
                 code: ({node, className, children, ...props}) => {
                   const match = /language-(\w+)/.exec(className || '');
                   const isInline = !match && !className;

@@ -332,5 +332,163 @@
       ],
       "createdAt": 1747496427408,
       "id": 40
+    },
+    {
+      "domain": "libgen.li",
+      "taskDescription": "search books base on user request ",
+      "toolSequence": [
+        "browser_navigate | https://libgen.is/",
+        "browser_click | input[name=\"req\"]",
+        "browser_keyboard_type | [search term]",
+        "browser_press_key | Enter",
+        "browser_wait_for_navigation | ",
+        "browser_click | a[href=\"]",
+        "browser_wait_for_navigation | ",
+        "browser_query | table table-striped "
+      ],
+      "createdAt": 1747496235578,
+      "id": 42
+    },
+    {
+      "domain": "1lou.pro",
+      "taskDescription": "search movies seed base on user request",
+      "toolSequence": [
+        "browser_navigate | https://1lou.pro/",
+        "browser_click | input[name=\"keyword\"]",
+        "browser_keyboard_type | [search term]",
+        "browser_press_key | Enter",
+        "browser_wait_for_navigation | ",
+        "browser_query | ul[class=\"list-unstyled threadlist mb-0\"]"
+      ],
+      "createdAt": 1747496235578,
+      "id": 43
+    },
+    {
+      "domain": "iyf.tv",
+      "taskDescription": "search online movies base on user request",
+      "toolSequence": [
+        "browser_navigate | https://iyf.tv/",
+        "browser_click | input[id=\"search-input\"]",
+        "browser_keyboard_type | [search term]",
+        "browser_press_key | Enter",
+        "browser_wait_for_navigation | ",
+        "browser_click | a[class=\"result-nav-link\"]",
+        "browser_wait_for_navigation | ",
+        "browser_click | a[class=\"episode-ctn\"]",
+        "browser_wait_for_navigation | "
+      ],
+      "createdAt": 1747496235578,
+      "id": 44
+    },
+    {
+      "domain": "88zhibo.tv",
+      "taskDescription": "search sports live stream and videos base on user request",
+      "toolSequence": [
+        "browser_navigate | http://88zhibo.tv",
+        "browser_query | div[class=\"col-md-3 pay-btn text-right\"]"
+      ],
+      "createdAt": 1747496235578,
+      "id": 45
+    },
+    {
+      "domain": "arxiv.org",
+      "taskDescription": "search paper on Arxiv.org, base on the user request ",
+      "toolSequence": [ 
+        "browser_navigate | https://arxiv.org/",
+        "browser_click | input[name=\"query\"]",
+        "browser_keyboard_type | [search term]",
+        "browser_press_key | Enter",
+        "browser_wait_for_navigation | ",
+        "browser_select | select[id=\"order\"]",
+        "browser_press_key | Enter",
+        "browser_wait_for_navigation | ",
+        "browser_query | ol[class=\"breathe-horizontal\"]"
+      ],
+      "createdAt": 1747496235578,
+      "id": 46
+    },
+    {
+      "domain": "missav.ai",
+      "taskDescription": "search av stream and videos base on user request",
+      "toolSequence": [
+        "browser_navigate | https://missav.ai/",
+        "browser_click | input[x-ref=\"homeSearch\"]",
+        "browser_keyboard_type | [search term]",
+        "browser_press_key | Enter",
+        "browser_wait_for_navigation | ",
+        "browser_query | div[class=\"relative aspect-w-16 aspect-h-9 rounded overflow-hidden shadow-lg\"]"
+      ],
+      "createdAt": 1747496235578,
+      "id": 47
+    },
+    {
+      "domain": "jd.com",
+      "taskDescription": "search product on jd.com ,and you also can put these products to the cart ",
+      "toolSequence": [
+        "browser_navigate | https://jd.com/",
+        "browser_click | input[aria-label=\"搜索\"]",
+        "browser_keyboard_type | [search term]",
+        "browser_press_key | Enter",
+        "browser_wait_for_navigation | ",
+        "browser_click | \"京东物流\"",
+        "browser_query | div[id=\"J_goodsList\"]",
+        "browser_click | a[class=\"p-o-btn addcart\"]"
+      ],
+      "createdAt": 1747496235578,
+      "id": 48
+    },
+    {
+      "domain": "search.jd.com",
+      "taskDescription": "add product to the JD cart ",
+      "toolSequence": [
+        "browser_click | \"京东物流\"",
+        "browser_query | div[id=\"J_goodsList\"]",
+        "browser_click | a[class=\"p-o-btn addcart\"]"
+      ],
+      "createdAt": 1747496235578,
+      "id": 49
+    },
+    {
+      "domain": "order.jd.com",
+      "taskDescription": "search products on order.jd.com ",
+      "toolSequence": [
+        "browser_navigate | https://order.jd.com/center/list.action",
+        "browser_query | div[class=\"td-void order-tb\"]"
+      ],
+      "createdAt": 1747496235578,
+      "id": 50
+    },
+    {
+      "domain": "dianping.com",
+      "taskDescription": "Find restaurants and other entertainment options on dingping.com ",
+      "toolSequence": [
+        "browser_navigate | https://www.dianping.com/citylist",
+        "browser_wait_for_navigation | ",
+        "browser_click | [select city]",
+        "browser_wait_for_navigation | ",
+        "browser_click | input[class=\"J-search-input\"]",
+        "browser_keyboard_type | [search term]",
+        "browser_press_key | Enter",
+        "browser_wait_for_navigation | ",
+        "browser_query | div[class=\"shop-list J_shop-list shop-all-list\"]"
+
+      ],
+      "createdAt": 1747496235578,
+      "id": 51
+    },
+    {
+      "domain": "notion.so",
+      "taskDescription": "Save the summarized information or webpage content to Notion.so base on user request. The general steps are: open Notion.so, create a new page, and input the title and main content.",
+      "toolSequence": [
+        "browser_navigate | https://notion.so",
+        "browser_click | div[aria-label=\"New page\"]",
+        "browser_keyboard_type | [input title]",
+        "browser_press_key | Enter",
+        "browser_keyboard_type_and_press | [input content]",
+        "browser_press_key | Enter"
+      ],
+      "createdAt": 1747496235578,
+      "id": 52
     }
+
 ]

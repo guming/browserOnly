@@ -3,15 +3,18 @@ import { GeminiProvider } from '../models/providers/gemini';
 import { OllamaProvider, OllamaProviderOptions } from '../models/providers/ollama';
 import { OpenAIProvider } from '../models/providers/openai';
 import { OpenAICompatibleProvider } from '../models/providers/openai-compatible';
+import { DeepSeekProvider } from '../models/providers/deepseek';
 
 export interface ProviderConfig {
-  provider: 'anthropic' | 'openai' | 'gemini' | 'ollama' | 'openai-compatible';
+  provider: 'anthropic' | 'openai' | 'gemini' | 'ollama' | 'openai-compatible' | 'deepseek';
   apiKey: string;
   apiModelId?: string;
   baseUrl?: string;
   thinkingBudgetTokens?: number;
   // openai-compatible only
   openaiCompatibleModels?: Array<{ id: string; name: string; isReasoningModel?: boolean }>;
+  connectionEndpoint?: string;
+  connectionKey?: string; 
 }
 
 export class ConfigManager {
@@ -41,12 +44,17 @@ export class ConfigManager {
       ollamaApiKey: '',
       ollamaModelId: '',
       ollamaBaseUrl: '',
+      deepseekApiKey: '',
+      deepseekModelId: 'deepseek-chat',
+      deepseekBaseUrl: '',
       thinkingBudgetTokens: 0,
       // openai-compatible
       openaiCompatibleApiKey: '',
       openaiCompatibleModelId: '',
       openaiCompatibleBaseUrl: '',
       openaiCompatibleModels: [],
+      connectionEndpoint: '',
+      connectionKey: '',
     });
     
     // Return provider-specific configuration
@@ -58,6 +66,8 @@ export class ConfigManager {
           apiModelId: result.anthropicModelId,
           baseUrl: result.anthropicBaseUrl,
           thinkingBudgetTokens: result.thinkingBudgetTokens,
+          connectionEndpoint: result.connectionEndpoint,
+          connectionKey: result.connectionKey,
         };
       case 'openai':
         return {
@@ -65,6 +75,8 @@ export class ConfigManager {
           apiKey: result.openaiApiKey,
           apiModelId: result.openaiModelId,
           baseUrl: result.openaiBaseUrl,
+          connectionEndpoint: result.connectionEndpoint,
+          connectionKey: result.connectionKey,
         };
       case 'gemini':
         return {
@@ -72,6 +84,8 @@ export class ConfigManager {
           apiKey: result.geminiApiKey,
           apiModelId: result.geminiModelId,
           baseUrl: result.geminiBaseUrl,
+          connectionEndpoint: result.connectionEndpoint,
+          connectionKey: result.connectionKey,
         };
       case 'ollama':
         return {
@@ -79,14 +93,17 @@ export class ConfigManager {
           apiKey: result.ollamaApiKey,
           apiModelId: result.ollamaModelId,
           baseUrl: result.ollamaBaseUrl,
+          connectionEndpoint: result.connectionEndpoint,
+          connectionKey: result.connectionKey,
         };
-      case 'openai-compatible':
+      case 'deepseek':
         return {
-          provider: 'openai-compatible',
-          apiKey: result.openaiCompatibleApiKey,
-          apiModelId: result.openaiCompatibleModelId,
-          baseUrl: result.openaiCompatibleBaseUrl,
-          openaiCompatibleModels: result.openaiCompatibleModels || [],
+          provider: 'deepseek',
+          apiKey: result.deepseekApiKey,
+          apiModelId: result.deepseekModelId,
+          baseUrl: result.deepseekBaseUrl,
+          connectionEndpoint: result.connectionEndpoint,
+          connectionKey: result.connectionKey,
         };
       default:
         throw new Error(`Provider ${result.provider} not supported`);
@@ -107,14 +124,14 @@ export class ConfigManager {
       openaiApiKey: '',
       geminiApiKey: '',
       ollamaApiKey: '',
-      openaiCompatibleApiKey: '',
-      openaiCompatibleModels: [],
+      deepseekApiKey: '',
     });
     
     const providers = [];
     if (result.anthropicApiKey) providers.push('anthropic');
     if (result.openaiApiKey) providers.push('openai');
     if (result.geminiApiKey) providers.push('gemini');
+    if (result.deepseekApiKey) providers.push('deepseek');
     
     // For Ollama, check if the base URL is configured AND at least one model exists
     const ollamaBaseUrl = await this.getOllamaBaseUrl();
@@ -139,15 +156,10 @@ export class ConfigManager {
         return OpenAIProvider.getAvailableModels();
       case 'gemini':
         return GeminiProvider.getAvailableModels();
-      case 'ollama': {
-        const result = await chrome.storage.sync.get({ ollamaCustomModels: [] });
-        const models = OllamaProvider.getAvailableModels({ ollamaCustomModels: result.ollamaCustomModels } as OllamaProviderOptions);
-        return models;
-      }
-      case 'openai-compatible': {
-        const result = await chrome.storage.sync.get({ openaiCompatibleModels: [] });
-        return OpenAICompatibleProvider.getAvailableModels({ openaiCompatibleModels: result.openaiCompatibleModels || [] } as any);
-      }
+      case 'ollama':
+        return OllamaProvider.getAvailableModels();
+      case 'deepseek':
+        return DeepSeekProvider.getAvailableModels();
       default:
         return [];
     }
@@ -171,6 +183,7 @@ export class ConfigManager {
       openaiModelId: 'gpt-4o',
       geminiModelId: 'gemini-1.5-pro',
       ollamaModelId: 'llama3.1',
+      deepseekModelId: 'deepseek-chat',
     });
     
     // Update provider
@@ -189,6 +202,9 @@ export class ConfigManager {
         break;
       case 'ollama':
         await chrome.storage.sync.set({ ollamaModelId: modelId });
+        break;
+      case 'deepseek':
+        await chrome.storage.sync.set({ deepseekModelId: modelId });
         break;
     }
   }

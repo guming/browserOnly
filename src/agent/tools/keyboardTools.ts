@@ -41,3 +41,30 @@ export const browserKeyboardType: ToolFactory = (page: Page) =>
       }
     },
   });
+
+  export const browserKeyboardTypeAndPress: ToolFactory = (page: Page) =>
+    new DynamicTool({
+      name: "browser_keyboard_type_and_press",
+      description:
+        "Type arbitrary text at the current focus location. Input is the literal text to type and press.",
+      func: async (text: string) => {
+        try {
+          return await withActivePage(page, async (activePage) => {
+            for (const char of text) {
+              if (char === '\n') {
+                await activePage.keyboard.press('Enter');
+              } else if (char === ' ') {
+                await activePage.keyboard.press('Space');
+              } else {
+                await activePage.keyboard.type(char);
+              }
+            }
+            return `Typed ${text.length} characters`;
+          });
+        } catch (err) {
+          return `Error typing text: ${
+            err instanceof Error ? err.message : String(err)
+          }`;
+        }
+      },
+    });

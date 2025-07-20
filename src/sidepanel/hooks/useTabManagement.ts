@@ -79,8 +79,8 @@ export const useTabManagement = () => {
 
         // Update the tab ID and title
         setTabId(message.newTabId);
-        setTabTitle(message.title || "New BrowserBee Tab");
-
+        setTabTitle(message.title || "New BrowserOnly Tab");
+        
         sendResponse({ received: true });
         return true;
       }

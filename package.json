@@ -1,7 +1,7 @@
 {
-  "name": "browserbee",
+  "name": "browserOnly",
   "description": "Control your browser with natural language",
-  "version": "0.2.0",
+  "version": "0.1.0",
   "type": "module",
   "keywords": [
     "browser-automation",
@@ -10,7 +10,7 @@
     "claude",
     "playwright"
   ],
-  "author": "BrowserBee Contributors",
+  "author": "BrowserOnly Contributors",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -38,6 +38,8 @@
     "@langchain/anthropic": "^0.3.18",
     "@langchain/core": "^0.3.45",
     "@langchain/langgraph": "^0.2.64",
+    "@notionhq/client": "^3.1.3",
+    "jsdom": "^26.1.0",
     "langchain": "^0.3.22",
     "ollama": "^0.5.15",
     "openai": "^4.28.0",
@@ -46,7 +48,12 @@
     "react-dom": "^18.2.0",
     "react-markdown": "^10.1.0",
     "react-textarea-autosize": "^8.5.9",
+    "rehype-parse": "^9.0.1",
+    "rehype-remark": "^10.0.1",
     "remark-gfm": "^4.0.1",
+    "remark-stringify": "^11.0.0",
+    "unified": "^11.0.5",
+    "vite-plugin-node-polyfills": "^0.24.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {

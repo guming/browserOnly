@@ -56,6 +56,8 @@ import {
 } from "./tabTools";
 import { ToolFactory } from "./types";
 
+import { startExtract } from "./subAgentAsTools";
+
 // Export all tools
 export {
   // Navigation tools
@@ -102,7 +104,9 @@ export {
   lookupMemories,
   getAllMemories,
   deleteMemory,
-  clearAllMemories
+  clearAllMemories,
+  // Extract tools
+  startExtract
 };
 
 // Function to get all tools as an array
@@ -152,7 +156,10 @@ export function getAllTools(page: Page) {
     lookupMemories(page),
     getAllMemories(page),
     deleteMemory(page),
-    clearAllMemories(page)
+    clearAllMemories(page),
+
+    // Extract tools
+    startExtract(page)
   ];
   
   return tools;

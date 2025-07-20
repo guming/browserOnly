@@ -589,7 +589,7 @@ export async function executePrompt(prompt: string, tabId?: number, isReflection
         const currentTitle = await updatedTabState.page.title();
         
         // Add a more explicit system message about the current page
-        const pageContextMessage = `Current page: ${currentUrl} (${currentTitle}) - Consider this context when executing commands. If asked to summarize, create tables, or analyze options without specific references, assume the request refers to content on this page.`;
+        const pageContextMessage = `Current page: ${currentUrl} (${currentTitle}) - Consider this context when executing commands. If asked to summarize, read content, create tables, or analyze options without specific references, assume the request refers to content on this page.`;
         
         sendUIMessage('updateOutput', {
           type: 'system',

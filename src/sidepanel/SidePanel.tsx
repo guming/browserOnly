@@ -286,8 +286,8 @@ export function SidePanel() {
     <div className="flex flex-col h-screen p-4 bg-base-200">
       <header className="mb-4">
         <div className="flex justify-between items-center">
-          <h1 className="text-xl font-bold text-primary">BrowserBee 🐝</h1>
-        <TabStatusBar
+          <h1 className="text-xl font-bold text-primary">BrowserOnly 🐝</h1>
+        <TabStatusBar 
           tabId={tabId}
           tabTitle={tabTitle}
           tabStatus={tabStatus}
@@ -349,7 +349,7 @@ export function SidePanel() {
           <div className="text-center mb-6">
             <h2 className="text-xl font-semibold mb-2">No LLM provider configured</h2>
             <p className="text-gray-600 mb-4">
-              You need to configure an LLM provider before you can use BrowserBee.
+              You need to configure an LLM provider before you can use BrowserOnly.
             </p>
             <button
               onClick={navigateToOptions}

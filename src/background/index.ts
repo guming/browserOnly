@@ -7,8 +7,8 @@ import { logWithTimestamp } from './utils';
  * Initialize the extension
  */
 function initializeExtension(): void {
-  logWithTimestamp('BrowserBee 🐝 extension initialized');
-
+  logWithTimestamp('BrowserOnly 🐝 extension initialized');
+  
   // Set up message listeners
   setupMessageListeners();
 
@@ -55,8 +55,8 @@ function setupEventListeners(): void {
 
   // Open options page when the extension is first installed
   chrome.runtime.onInstalled.addListener((details) => {
-    logWithTimestamp('BrowserBee 🐝 extension installed');
-
+    logWithTimestamp('BrowserOnly 🐝 extension installed');
+    
     if (details.reason === 'install') {
       chrome.runtime.openOptionsPage();
     }

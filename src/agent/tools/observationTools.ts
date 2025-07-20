@@ -290,6 +290,7 @@ export const browserQuery: ToolFactory = (page: Page) =>
     },
   });
 
+
 export const browserAccessibleTree: ToolFactory = (page: Page) =>
   new DynamicTool({
     name: "browser_accessible_tree",
@@ -345,6 +346,61 @@ export const browserReadText: ToolFactory = (page: Page) =>
       }
     },
   });
+
+
+export const browserReadPage: ToolFactory = (page: Page) =>
+    new DynamicTool({
+      name: "browser_read_page",
+      description:
+        "Return all visible text and image on the page, concatenated in DOM order.",
+      func: async () => {
+        try {
+          return await withActivePage(page, async (activePage) => {
+            const text = await activePage.evaluate(() => {
+              const walker = document.createTreeWalker(
+                document.body,
+                NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+                {
+                  acceptNode: (node) => {
+                    const isVisible =
+                    node.nodeType === Node.TEXT_NODE
+                    ? node.parentElement && node.parentElement.offsetParent !== null && node.textContent!.trim()
+                    : node.nodeType === Node.ELEMENT_NODE &&
+                      (node as HTMLElement).offsetParent !== null &&
+                      (node as HTMLElement).tagName === 'IMG';
+                    return isVisible ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+                  }
+                }
+              );
+              const out: string[] = [];
+              while (walker.nextNode()) {
+                const node = walker.currentNode;
+                if (node.nodeType === Node.TEXT_NODE) {
+                  const text = node.textContent!.trim();
+                  if (text) out.push(text);
+                } else if (
+                  node.nodeType === Node.ELEMENT_NODE &&
+                  (node as HTMLElement).tagName === 'IMG'
+                ) {
+                  const img = node as HTMLImageElement;
+                  const alt = img.alt || '';
+                  const src = img.src || '';
+                  if (src) {
+                    out.push(`![${alt}](${src})`);
+                  }
+                }
+                return out.join("\n");
+              }
+            });
+            return truncate(text as string);
+          });
+        } catch (err) {
+          return `Error extracting page content: ${
+            err instanceof Error ? err.message : String(err)
+          }`;
+        }
+      },
+});
 
 export const browserScreenshot: ToolFactory = (page: Page) =>
   new DynamicTool({

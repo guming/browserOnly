@@ -28,6 +28,10 @@ function isDynamicTool(obj: any): obj is DynamicTool {
     typeof obj.func === 'function'
   );
 }
+import { LLMProvider } from "../models/providers/types";
+import { createProvider } from "../models/providers/factory";
+import { ConfigManager, ProviderConfig } from "../background/configManager";
+import { SubAgent, createSubAgent } from "./SubAgent";
 
 /**
  * BrowserAgent is the main class for the browser automation agent.
@@ -155,7 +159,7 @@ export class BrowserAgent {
     prompt: string,
     callbacks: ExecutionCallbacks,
     initialMessages: any[] = []
-  ): Promise<void> {
+  ): Promise<void> {  
     return this.executionEngine.executePrompt(
       prompt,
       callbacks,

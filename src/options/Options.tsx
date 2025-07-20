@@ -7,7 +7,9 @@ import {
   anthropicDefaultModelId,
   openaiDefaultModelId,
   geminiDefaultModelId,
-  ollamaDefaultModelId
+  ollamaDefaultModelId,
+  deepseekModels,
+  deepseekDefaultModelId
 } from '../models/models';
 
 // Import components
@@ -24,6 +26,9 @@ export function Options() {
       })),
       ...Object.entries(openaiModels).map(([id, model]) => ({ 
         id, provider: 'OpenAI', ...model 
+      })),
+      ...Object.entries(deepseekModels).map(([id, model]) => ({ 
+        id, provider: 'DeepSeek', ...model 
       })),
       ...Object.entries(geminiModels).map(([id, model]) => ({ 
         id, provider: 'Google', ...model 
@@ -56,6 +61,10 @@ export function Options() {
   // OpenAI settings
   const [openaiApiKey, setOpenaiApiKey] = useState('');
   const [openaiBaseUrl, setOpenaiBaseUrl] = useState('');
+
+  // DeepSeek settings
+  const [deepseekApiKey, setDeepseekApiKey] = useState('');
+  const [deepseekBaseUrl, setDeepseekBaseUrl] = useState('');
   
   // Gemini settings
   const [geminiApiKey, setGeminiApiKey] = useState('');
@@ -72,6 +81,7 @@ export function Options() {
   const [openaiModelId, setOpenaiModelId] = useState(openaiDefaultModelId);
   const [geminiModelId, setGeminiModelId] = useState(geminiDefaultModelId);
   const [ollamaModelId, setOllamaModelId] = useState(ollamaDefaultModelId);
+  const [deepseekModelId, setDeepseekModelId] = useState(deepseekDefaultModelId);
   
   // Common settings
   const [thinkingBudgetTokens, setThinkingBudgetTokens] = useState(0);
@@ -97,6 +107,9 @@ export function Options() {
       openaiApiKey: '',
       openaiModelId: openaiDefaultModelId,
       openaiBaseUrl: '',
+      deepseekApiKey: '',
+      deepseekModelId: deepseekDefaultModelId,
+      deepseekBaseUrl: '',
       geminiApiKey: '',
       geminiModelId: geminiDefaultModelId,
       geminiBaseUrl: '',
@@ -118,6 +131,9 @@ export function Options() {
       setOpenaiApiKey(result.openaiApiKey);
       setOpenaiModelId(result.openaiModelId);
       setOpenaiBaseUrl(result.openaiBaseUrl);
+      setDeepseekApiKey(result.openaiApiKey);
+      setDeepseekModelId(result.deepseekModelId);
+      setDeepseekBaseUrl(result.deepseekBaseUrl);
       setGeminiApiKey(result.geminiApiKey);
       setGeminiModelId(result.geminiModelId);
       setGeminiBaseUrl(result.geminiBaseUrl);
@@ -133,6 +149,21 @@ export function Options() {
     });
   }, []);
 
+  const handleSaveConnection = () => {
+    setIsSavingConnection(true);
+    setSaveConnectionStatus('');
+    chrome.storage.sync.set({
+      notionApiKey,
+    }, () => {
+      setIsSavingConnection(false);
+      setSaveConnectionStatus('Connection saved successfully!');
+      
+      // Clear status message after 3 seconds
+      setTimeout(() => {
+        setSaveConnectionStatus('');
+      }, 3000);
+    });
+  }
   const handleSave = () => {
     setIsSaving(true);
     setSaveStatus('');
@@ -146,6 +177,9 @@ export function Options() {
       openaiApiKey,
       openaiModelId,
       openaiBaseUrl,
+      deepseekApiKey,
+      deepseekModelId,
+      deepseekBaseUrl,
       geminiApiKey,
       geminiModelId,
       geminiBaseUrl,

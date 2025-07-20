@@ -26,6 +26,30 @@ export const browserClick: ToolFactory = (page: Page) =>
     },
   });
 
+  export const browser_select: ToolFactory = (page: Page) =>
+    new DynamicTool({
+      name: "browser_select",
+      description:
+        "click the select  and choose the option base on the input item. Input may be a CSS selector or literal text to match on the page.",
+      func: async (input: string) => {
+        try {
+          console.log("browser_select input",input);
+          return await withActivePage(page, async (activePage) => {
+            if (/[#.\[]/.test(input)) {
+              await activePage.selectOption(input,'Relevance');
+              return `Clicked selector: ${input}`;
+            }
+            await activePage.selectOption(input,'-submitted_date');
+            return `Clicked element containing text: ${input}`;
+          });
+        } catch (error) {
+          return `Error clicking '${input}': ${
+            error instanceof Error ? error.message : String(error)
+          }`;
+        }
+      },
+    });
+
 export const browserType: ToolFactory = (page: Page) =>
   new DynamicTool({
     name: "browser_type",
