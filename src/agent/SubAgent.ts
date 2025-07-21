@@ -1,4 +1,4 @@
-import { LLMProvider, StreamChunk } from "../models/providers/types";
+import { LLMProvider } from "../models/providers/types";
 
 /**
  * Callback interface for SubAgent execution
@@ -54,6 +54,7 @@ class SubAgentCallbackAdapter {
 import { createProvider } from "../models/providers/factory";
 import { ConfigManager, ProviderConfig } from "../background/configManager";
 import { logWithTimestamp } from "../background/utils";
+import { Page } from "playwright-crx";
 
 /**
  * SubAgent is a simplified agent focused on content extraction tasks
@@ -64,15 +65,9 @@ export class SubAgent {
   /**
    * Create a new ExtractAgent
    */
-  constructor(config: ProviderConfig) {
+    constructor(config: ProviderConfig, provider: LLMProvider) {
     // Initialize LLM provider with the provided configuration
-    this.llmProvider = createProvider(config.provider, {
-      apiKey: config.apiKey,
-      apiModelId: config.apiModelId,
-      baseUrl: config.baseUrl,
-      thinkingBudgetTokens: config.thinkingBudgetTokens,
-      dangerouslyAllowBrowser: true,
-    });
+     this.llmProvider = provider;
   }
 
   /**
@@ -118,34 +113,17 @@ export class SubAgent {
  * Create a new SubAgent
  */
 export async function createSubAgent(
-  apiKey: string
+  providerConfig: ProviderConfig
 ): Promise<SubAgent> {
-  // Get provider configuration
-  const configManager = ConfigManager.getInstance();
-  let providerConfig: ProviderConfig;
   
-  try {
-    providerConfig = await configManager.getProviderConfig();
-  } catch (error) {
-    logWithTimestamp(`Failed to get provider configuration ${error instanceof Error ? error.message : String(error)}`);
-    providerConfig = {
-      provider: 'anthropic',
-      apiKey,
-      apiModelId: 'claude-3-7-sonnet-20250219',
-    };
-  }
+  // Create the provider with the configuration
+  const provider = await createProvider(providerConfig.provider, {
+    apiKey: providerConfig.apiKey,
+    apiModelId: providerConfig.apiModelId,
+    baseUrl: providerConfig.baseUrl,
+    thinkingBudgetTokens: providerConfig.thinkingBudgetTokens,
+    dangerouslyAllowBrowser: true,
+  });
   
-  // Special case for Ollama: it doesn't require an API key
-  if (providerConfig.provider === 'ollama') {
-    if (!providerConfig.apiKey) {
-      providerConfig.apiKey = 'dummy-key';
-    }
-  }
-  
-  // Use the provided API key as a fallback if the stored one is empty
-  if (!providerConfig.apiKey) {
-    providerConfig.apiKey = apiKey;
-  }
-  
-  return new SubAgent(providerConfig);
+  return new SubAgent(providerConfig,provider);
 }

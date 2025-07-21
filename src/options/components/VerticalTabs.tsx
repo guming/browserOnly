@@ -23,6 +23,12 @@ interface VerticalTabsProps {
   setOpenaiApiKey: (key: string) => void;
   openaiBaseUrl: string;
   setOpenaiBaseUrl: (url: string) => void;
+
+  // DeepSeek settings
+  deepseekApiKey: string;
+  setDeepseekApiKey: (key: string) => void;
+  deepseekBaseUrl: string;
+  setDeepseekBaseUrl: (url: string) => void;
   
   // Gemini settings
   geminiApiKey: string;
@@ -99,6 +105,10 @@ export function VerticalTabs(props: VerticalTabsProps) {
             setOpenaiApiKey={props.setOpenaiApiKey}
             openaiBaseUrl={props.openaiBaseUrl}
             setOpenaiBaseUrl={props.setOpenaiBaseUrl}
+            deepseekApiKey={props.deepseekApiKey}
+            setDeepseekApiKey={props.setDeepseekApiKey}
+            deepseekBaseUrl={props.deepseekBaseUrl}
+            setDeepseekBaseUrl={props.setDeepseekBaseUrl}
             geminiApiKey={props.geminiApiKey}
             setGeminiApiKey={props.setGeminiApiKey}
             geminiBaseUrl={props.geminiBaseUrl}

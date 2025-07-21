@@ -53,8 +53,6 @@ export class ConfigManager {
       openaiCompatibleModelId: '',
       openaiCompatibleBaseUrl: '',
       openaiCompatibleModels: [],
-      connectionEndpoint: '',
-      connectionKey: '',
     });
     
     // Return provider-specific configuration
@@ -66,8 +64,6 @@ export class ConfigManager {
           apiModelId: result.anthropicModelId,
           baseUrl: result.anthropicBaseUrl,
           thinkingBudgetTokens: result.thinkingBudgetTokens,
-          connectionEndpoint: result.connectionEndpoint,
-          connectionKey: result.connectionKey,
         };
       case 'openai':
         return {
@@ -75,8 +71,6 @@ export class ConfigManager {
           apiKey: result.openaiApiKey,
           apiModelId: result.openaiModelId,
           baseUrl: result.openaiBaseUrl,
-          connectionEndpoint: result.connectionEndpoint,
-          connectionKey: result.connectionKey,
         };
       case 'gemini':
         return {
@@ -84,8 +78,6 @@ export class ConfigManager {
           apiKey: result.geminiApiKey,
           apiModelId: result.geminiModelId,
           baseUrl: result.geminiBaseUrl,
-          connectionEndpoint: result.connectionEndpoint,
-          connectionKey: result.connectionKey,
         };
       case 'ollama':
         return {
@@ -93,8 +85,6 @@ export class ConfigManager {
           apiKey: result.ollamaApiKey,
           apiModelId: result.ollamaModelId,
           baseUrl: result.ollamaBaseUrl,
-          connectionEndpoint: result.connectionEndpoint,
-          connectionKey: result.connectionKey,
         };
       case 'deepseek':
         return {
@@ -102,8 +92,14 @@ export class ConfigManager {
           apiKey: result.deepseekApiKey,
           apiModelId: result.deepseekModelId,
           baseUrl: result.deepseekBaseUrl,
-          connectionEndpoint: result.connectionEndpoint,
-          connectionKey: result.connectionKey,
+        };
+      case 'openai-compatible':
+        return {
+          provider: 'openai-compatible',
+          apiKey: result.openaiCompatibleApiKey,
+          apiModelId: result.openaiCompatibleModelId,
+          baseUrl: result.openaiCompatibleBaseUrl,
+          openaiCompatibleModels: result.openaiCompatibleModels || [],
         };
       default:
         throw new Error(`Provider ${result.provider} not supported`);
@@ -125,6 +121,8 @@ export class ConfigManager {
       geminiApiKey: '',
       ollamaApiKey: '',
       deepseekApiKey: '',
+      openaiCompatibleApiKey: '',
+      openaiCompatibleModels: [],
     });
     
     const providers = [];
@@ -156,10 +154,17 @@ export class ConfigManager {
         return OpenAIProvider.getAvailableModels();
       case 'gemini':
         return GeminiProvider.getAvailableModels();
-      case 'ollama':
-        return OllamaProvider.getAvailableModels();
+      case 'ollama': {
+        const result = await chrome.storage.sync.get({ ollamaCustomModels: [] });
+        const models = OllamaProvider.getAvailableModels({ ollamaCustomModels: result.ollamaCustomModels } as OllamaProviderOptions);
+        return models;
+      }
       case 'deepseek':
         return DeepSeekProvider.getAvailableModels();
+      case 'openai-compatible': {
+        const result = await chrome.storage.sync.get({ openaiCompatibleModels: [] });
+        return OpenAICompatibleProvider.getAvailableModels({ openaiCompatibleModels: result.openaiCompatibleModels || [] } as any);
+      }
       default:
         return [];
     }

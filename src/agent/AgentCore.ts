@@ -1,7 +1,4 @@
 import type { Page } from "playwright-crx";
-import { ConfigManager, ProviderConfig } from "../background/configManager";
-import { createProvider } from "../models/providers/factory";
-import { LLMProvider } from "../models/providers/types";
 import { ErrorHandler } from "./ErrorHandler";
 import { ExecutionEngine, ExecutionCallbacks } from "./ExecutionEngine";
 import { MemoryManager } from "./MemoryManager";

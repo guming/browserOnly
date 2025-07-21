@@ -18,6 +18,7 @@ export function ProviderSelector({ provider, setProvider }: ProviderSelectorProp
       >
         <option value="anthropic">Anthropic (Claude)</option>
         <option value="openai">OpenAI (GPT)</option>
+        <option value="deepseek">DeepSeek</option>
         <option value="gemini">Google (Gemini)</option>
         <option value="ollama">Ollama</option>
         <option value="openai-compatible">OpenAI Compatible</option>

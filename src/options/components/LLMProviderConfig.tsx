@@ -23,6 +23,12 @@ interface LLMProviderConfigProps {
   setOpenaiApiKey: (key: string) => void;
   openaiBaseUrl: string;
   setOpenaiBaseUrl: (url: string) => void;
+
+  // Deepseek settings
+  deepseekApiKey: string;
+  setDeepseekApiKey: (key: string) => void;
+  deepseekBaseUrl: string;
+  setDeepseekBaseUrl: (url: string) => void;
   
   // Gemini settings
   geminiApiKey: string;
@@ -86,7 +92,12 @@ export function LLMProviderConfig({
   setOpenaiApiKey,
   openaiBaseUrl,
   setOpenaiBaseUrl,
-  
+  // DeepSeek settings
+  deepseekApiKey,
+  setDeepseekApiKey,
+  deepseekBaseUrl,
+  setDeepseekBaseUrl,
+
   // Gemini settings
   geminiApiKey,
   setGeminiApiKey,
@@ -157,6 +168,11 @@ export function LLMProviderConfig({
           setOpenaiApiKey={setOpenaiApiKey}
           openaiBaseUrl={openaiBaseUrl}
           setOpenaiBaseUrl={setOpenaiBaseUrl}
+          // Deepseek
+          deepseekApiKey={deepseekApiKey}
+          setDeepseekApiKey={setDeepseekApiKey}
+          deepseekBaseUrl={deepseekBaseUrl}
+          setDeepseekBaseUrl={setDeepseekBaseUrl}
           // Gemini
           geminiApiKey={geminiApiKey}
           setGeminiApiKey={setGeminiApiKey}
@@ -199,6 +215,7 @@ export function LLMProviderConfig({
           isDisabled={
             (provider === 'anthropic' && !anthropicApiKey.trim()) ||
             (provider === 'openai' && !openaiApiKey.trim()) ||
+            (provider === 'deepseek' && !deepseekApiKey.trim()) ||
             (provider === 'gemini' && !geminiApiKey.trim())
           }
         />

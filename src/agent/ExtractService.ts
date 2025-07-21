@@ -1,6 +1,6 @@
 import { logWithTimestamp } from '../background/utils';
 import { ConfigManager } from '../background/configManager';
-import { SubAgent } from './SubAgent';
+import { createSubAgent, SubAgent } from './SubAgent';
 
 export type ExtractResult = {
   id?: number;
@@ -203,7 +203,7 @@ ${userInstruction}
 `;
 
       const providerConfig = await this.configManager.getProviderConfig();
-      const subAgent = new SubAgent(providerConfig);
+      const subAgent = createSubAgent(providerConfig);
       // const returnValue = await subAgent.executPrompt(finalPrompt);
       
       logWithTimestamp(`✅ extract content finished: ${url}`);

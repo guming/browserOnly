@@ -6,6 +6,7 @@ import { OllamaModel } from './OllamaModelList';
 import { OllamaSettings } from './OllamaSettings';
 import { OpenAICompatibleSettings } from './OpenAICompatibleSettings';
 import { OpenAISettings } from './OpenAISettings';
+import { DeepSeekSettings } from './DeepSeekSettings';
 
 interface ProviderSettingsProps {
   provider: string;
@@ -22,6 +23,12 @@ interface ProviderSettingsProps {
   setOpenaiApiKey: (key: string) => void;
   openaiBaseUrl: string;
   setOpenaiBaseUrl: (url: string) => void;
+
+  // Deepseek settings
+  deepseekApiKey: string;
+  setDeepseekApiKey: (key: string) => void;
+  deepseekBaseUrl: string;
+  setDeepseekBaseUrl: (url: string) => void;
   
   // Gemini settings
   geminiApiKey: string;
@@ -74,6 +81,11 @@ export function ProviderSettings({
   setOpenaiApiKey,
   openaiBaseUrl,
   setOpenaiBaseUrl,
+  // DeepSeek
+  deepseekApiKey,
+  setDeepseekApiKey,
+  deepseekBaseUrl,
+  setDeepseekBaseUrl,
   // Gemini
   geminiApiKey,
   setGeminiApiKey,
@@ -127,6 +139,15 @@ export function ProviderSettings({
           setOpenaiApiKey={setOpenaiApiKey}
           openaiBaseUrl={openaiBaseUrl}
           setOpenaiBaseUrl={setOpenaiBaseUrl}
+        />
+      )}
+
+      {provider === 'deepseek' && (
+        <DeepSeekSettings 
+          deepseekApiKey={deepseekApiKey}
+          setDeepseekApiKey={setDeepseekApiKey}
+          deepseekBaseUrl={deepseekBaseUrl}
+          setDeepseekBaseUrl={setDeepseekBaseUrl}
         />
       )}
       

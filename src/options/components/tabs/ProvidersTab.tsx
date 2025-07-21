@@ -24,6 +24,12 @@ interface ProvidersTabProps {
   setOpenaiApiKey: (key: string) => void;
   openaiBaseUrl: string;
   setOpenaiBaseUrl: (url: string) => void;
+
+   // DeepSeek settings
+  deepseekApiKey: string;
+  setDeepseekApiKey: (key: string) => void;
+  deepseekBaseUrl: string;
+  setDeepseekBaseUrl: (url: string) => void;
   
   // Gemini settings
   geminiApiKey: string;
@@ -90,6 +96,12 @@ export function ProvidersTab({
   setOpenaiApiKey,
   openaiBaseUrl,
   setOpenaiBaseUrl,
+
+  // DeepSeek settings
+  deepseekApiKey,
+  setDeepseekApiKey,
+  deepseekBaseUrl,
+  setDeepseekBaseUrl,
   
   // Gemini settings
   geminiApiKey,
@@ -165,6 +177,11 @@ export function ProvidersTab({
             setOpenaiApiKey={setOpenaiApiKey}
             openaiBaseUrl={openaiBaseUrl}
             setOpenaiBaseUrl={setOpenaiBaseUrl}
+            // DeepSeek
+            deepseekApiKey={deepseekApiKey}
+            setDeepseekApiKey={setDeepseekApiKey}
+            deepseekBaseUrl={deepseekBaseUrl}
+            setDeepseekBaseUrl={setDeepseekBaseUrl}
             // Gemini
             geminiApiKey={geminiApiKey}
             setGeminiApiKey={setGeminiApiKey}

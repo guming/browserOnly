@@ -131,7 +131,7 @@ export function Options() {
       setOpenaiApiKey(result.openaiApiKey);
       setOpenaiModelId(result.openaiModelId);
       setOpenaiBaseUrl(result.openaiBaseUrl);
-      setDeepseekApiKey(result.openaiApiKey);
+      setDeepseekApiKey(result.deepseekApiKey);
       setDeepseekModelId(result.deepseekModelId);
       setDeepseekBaseUrl(result.deepseekBaseUrl);
       setGeminiApiKey(result.geminiApiKey);
@@ -149,21 +149,6 @@ export function Options() {
     });
   }, []);
 
-  const handleSaveConnection = () => {
-    setIsSavingConnection(true);
-    setSaveConnectionStatus('');
-    chrome.storage.sync.set({
-      notionApiKey,
-    }, () => {
-      setIsSavingConnection(false);
-      setSaveConnectionStatus('Connection saved successfully!');
-      
-      // Clear status message after 3 seconds
-      setTimeout(() => {
-        setSaveConnectionStatus('');
-      }, 3000);
-    });
-  }
   const handleSave = () => {
     setIsSaving(true);
     setSaveStatus('');
@@ -276,6 +261,11 @@ export function Options() {
       setOpenaiApiKey={setOpenaiApiKey}
       openaiBaseUrl={openaiBaseUrl}
       setOpenaiBaseUrl={setOpenaiBaseUrl}
+      // DeepSeek settings
+      deepseekApiKey={deepseekApiKey}
+      setDeepseekApiKey={setDeepseekApiKey}
+      deepseekBaseUrl={deepseekBaseUrl}
+      setDeepseekBaseUrl={setDeepseekBaseUrl}
       // Gemini settings
       geminiApiKey={geminiApiKey}
       setGeminiApiKey={setGeminiApiKey}
