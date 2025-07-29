@@ -1,6 +1,6 @@
 // Import provider-specific types
 import Anthropic from "@anthropic-ai/sdk";
-import { BrowserAgent, createBrowserAgent, executePromptWithFallback, needsReinitialization } from "../agent/AgentCore";
+import { createBrowserAgent, executePromptWithFallback, needsReinitialization } from "../agent/AgentCore";
 import { ExecutionCallbacks } from "../agent/ExecutionEngine";
 import { contextTokenCount } from "../agent/TokenManager";
 import { ScreenshotManager } from "../tracking/screenshotManager";
@@ -22,11 +22,9 @@ import {
 import { 
   getCurrentTabId, 
   getTabState, 
-  setTabState, 
   getWindowForTab, 
   getAgentForWindow, 
   setAgentForWindow,
-  getAgentForTab,
   isConnectionHealthy
 } from "./tabManager";
 import { ProviderType, AgentStatus, AgentStatusInfo } from "./types";
@@ -460,7 +458,7 @@ export function cancelExecution(tabId?: number): void {
  * @param tabId Optional tab ID to execute the prompt for
  * @param isReflectionPrompt Optional flag to indicate if this is a reflection prompt
  */
-export async function executePrompt(prompt: string, tabId?: number, isReflectionPrompt: boolean = false): Promise<void> {
+export async function executePrompt(prompt: string, tabId?: number, isReflectionPrompt: boolean = false, role:string = 'operator'): Promise<void> {
   try {
     // Get provider configuration from ConfigManager
     const configManager = ConfigManager.getInstance();
@@ -882,11 +880,13 @@ export async function executePrompt(prompt: string, tabId?: number, isReflection
     
     // Execute the prompt with the agent
     const messageHistory = await getMessageHistory(targetTabId);
+    console.log("role in controller is ",role);
     await executePromptWithFallback(
       agent, 
       prompt, 
       callbacks, 
-      messageHistory
+      messageHistory,
+      role
     );
   } catch (error) {
     const errorMessage = handleError(error, 'executing prompt');

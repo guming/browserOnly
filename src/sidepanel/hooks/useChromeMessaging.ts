@@ -226,13 +226,14 @@ export const useChromeMessaging = ({
     onAgentStatusUpdate
   ]);
 
-  const executePrompt = (prompt: string) => {
+  const executePrompt = (prompt: string, role: string) => {
     return new Promise<void>((resolve, reject) => {
       try {
         // Send message to background script with tab ID
         chrome.runtime.sendMessage({
           action: 'executePrompt',
           prompt,
+          role,
           tabId,
           windowId
         }, () => {

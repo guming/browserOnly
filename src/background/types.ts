@@ -24,6 +24,7 @@ export interface ExecutePromptMessage {
   prompt: string;
   tabId?: number;
   windowId?: number;
+  role?: string;
 }
 
 export interface CancelExecutionMessage {
@@ -202,6 +203,14 @@ export interface AgentStatusUpdateMessage {
   windowId?: number;
 }
 
+export interface DownloadMarkdownMessage {
+  action: 'download-markdown';
+  content: string;
+  filename: string;
+  tabId?: number;
+  windowId?: number;
+}
+
 export type BackgroundMessage = 
   | ExecutePromptMessage
   | CancelExecutionMessage
@@ -216,7 +225,8 @@ export type BackgroundMessage =
   | ProviderConfigChangedMessage
   | ForceResetPlaywrightMessage
   | RequestApprovalMessage
-  | CheckAgentStatusMessage;
+  | CheckAgentStatusMessage
+  | DownloadMarkdownMessage;
 
 // New message types for enhanced tab management
 export interface TabStatusChangedMessage {

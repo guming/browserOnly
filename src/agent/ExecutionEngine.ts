@@ -105,14 +105,15 @@ export class ExecutionEngine {
   async executePromptWithFallback(
     prompt: string,
     callbacks: ExecutionCallbacks,
-    initialMessages: any[] = []
+    initialMessages: any[] = [],
+    role: string = 'operator'
   ): Promise<void> {
     const streamingSupported = await this.errorHandler.isStreamingSupported();
     const isStreaming = streamingSupported && callbacks.onLlmChunk !== undefined;
 
     try {
       // Use the execution method with appropriate streaming mode
-      await this.executePrompt(prompt, callbacks, initialMessages, isStreaming);
+      await this.executePrompt(prompt, callbacks, initialMessages, isStreaming, role);
     } catch (error) {
       console.warn("Execution failed, attempting fallback:", error);
 
@@ -131,7 +132,7 @@ export class ExecutionEngine {
       }
 
       // Continue with fallback using non-streaming mode
-      await this.executePrompt(prompt, callbacks, initialMessages, false);
+      await this.executePrompt(prompt, callbacks, initialMessages, false, role);
     }
   }
 
@@ -217,7 +218,8 @@ export class ExecutionEngine {
    */
   private async processLlmStream(
     messages: any[],
-    adaptedCallbacks: ExecutionCallbacks
+    adaptedCallbacks: ExecutionCallbacks,
+    role:string
   ): Promise<{ accumulatedText: string, toolCallDetected: boolean }> {
     let accumulatedText = "";
     let streamBuffer = "";
@@ -228,7 +230,7 @@ export class ExecutionEngine {
 
     // Use provider interface instead of direct Anthropic API
     const stream = this.llmProvider.createMessage(
-      this.promptManager.getSystemPrompt(),
+      this.promptManager.getSystemPrompt(role),
       messages,
       tools
     );
@@ -256,7 +258,7 @@ export class ExecutionEngine {
 
         // Only look for complete tool calls with all three required tags
         const completeToolCallRegex = /(```(?:xml|bash)\s*)?<tool>(.*?)<\/tool>\s*<input>([\s\S]*?)<\/input>\s*<requires_approval>(.*?)<\/requires_approval>(\s*```)?/;
-
+        
         // Try to match the complete tool call pattern
         const completeToolCallMatch = streamBuffer.match(completeToolCallRegex);
 
@@ -321,7 +323,8 @@ export class ExecutionEngine {
     prompt: string,
     callbacks: ExecutionCallbacks,
     initialMessages: any[] = [],
-    isStreaming: boolean
+    isStreaming: boolean,
+    role:string
   ): Promise<void> {
     // Create adapter to handle streaming vs non-streaming
     const adapter = new CallbackAdapter(callbacks, isStreaming);
@@ -342,7 +345,7 @@ export class ExecutionEngine {
           if (this.errorHandler.isExecutionCancelled()) break;
 
           // ── 1. Call LLM with streaming ───────────────────────────────────────
-          const { accumulatedText } = await this.processLlmStream(messages, adaptedCallbacks);
+          const { accumulatedText } = await this.processLlmStream(messages, adaptedCallbacks,role);
           console.log('accumulatedText',accumulatedText);
           
           // Check for cancellation after LLM response
@@ -546,6 +549,7 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
           } else {
             // No approval required, execute the tool normally
             result = await tool.func(toolInput);
+            console.log("tool func result: " ,result)
           }
 
           // Signal that tool execution is complete
@@ -643,7 +647,7 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
           (err as any).retryAttempt = retryAttempt + 1;
 
           // Recursive retry with the same parameters
-          return this.executePrompt(prompt, callbacks, initialMessages, isStreaming);
+          return this.executePrompt(prompt, callbacks, initialMessages, isStreaming, role);
         } else if (retryAttempt >= MAX_RETRY_ATTEMPTS) {
           // We've exceeded the maximum number of retry attempts
           adaptedCallbacks.onLlmOutput(

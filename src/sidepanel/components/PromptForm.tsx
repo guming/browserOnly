@@ -1,10 +1,10 @@
-import { faPaperPlane, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { faCircleUser, faGamepad, faPaperPlane, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useState } from 'react';
 import TextareaAutosize from 'react-textarea-autosize';
 
 interface PromptFormProps {
-  onSubmit: (prompt: string) => void;
+  onSubmit: (prompt: string, role: string) => void;
   onCancel: () => void;
   isProcessing: boolean;
   tabStatus: 'attached' | 'detached' | 'unknown' | 'running' | 'idle' | 'error';
@@ -17,17 +17,35 @@ export const PromptForm: React.FC<PromptFormProps> = ({
   tabStatus
 }) => {
   const [prompt, setPrompt] = useState('');
+  const [role, setRole] = useState('operator');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim() || isProcessing || tabStatus === 'detached') return;
-    onSubmit(prompt);
+    console.log("role is ", role);
+    onSubmit(prompt, role);
     setPrompt(''); // Clear the prompt after submission
   };
 
   return (
     <form onSubmit={handleSubmit} className="mt-4 relative">
       <div className="w-full">
+        <FontAwesomeIcon icon={faCircleUser} className="text-gray-500 hover:text-gray-700" />
+        <select
+          className="select select-ghost select-xs select-bordered w-auto focus:outline-none focus:ring-0 pl-0"
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+          disabled={isProcessing || tabStatus === 'detached'}
+        >
+          <option value="operator">Operator</option>
+          <option value="researcher">Researcher</option>
+          <option value="lawyer">Lawyer</option>
+          <option value="trader">Trader</option>
+          <option value="math">Math Assistant</option>
+          <option value="qa">TestCase Writer</option>
+          <option value="code">Code</option>
+          <option value="health">Health Assistant</option>
+        </select>
         <TextareaAutosize
           className="textarea textarea-bordered w-full pr-12"
           value={prompt}

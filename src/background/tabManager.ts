@@ -10,7 +10,6 @@ const tabToWindowMap = new Map<number, number>();
 
 // Track agents by window ID
 const windowToAgentMap = new Map<number, BrowserAgent>();
-
 // Current tab ID
 let currentTabId: number | null = null;
 

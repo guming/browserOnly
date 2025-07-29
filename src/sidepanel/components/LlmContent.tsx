@@ -1,7 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-
 interface LlmContentProps {
   content: string;
 }
@@ -56,11 +55,13 @@ export const LlmContent: React.FC<LlmContentProps> = ({ content }) => {
       content: content
     });
   }
+
   
   return (
     <>
       {parts.map((part, index) => {
         if (part.type === 'text') {
+          
           // Render regular text with markdown
           return (
             <ReactMarkdown 
@@ -77,11 +78,34 @@ export const LlmContent: React.FC<LlmContentProps> = ({ content }) => {
                 li: ({node, ...props}) => <li className="mb-1" {...props} />,
                 a: ({node, ...props}) => <a className="text-primary underline" {...props} target= "_blank"/>,
                 code: ({node, className, children, ...props}) => {
+                  console.log('className', className);
                   const match = /language-(\w+)/.exec(className || '');
+                  const codeText = String(children).trim();
+                  const copyToClipboard = () => {
+                    navigator.clipboard.writeText(codeText).catch((err) => {
+                      console.error('Copy failed', err);
+                    });
+                  };
+                  if (match?.[1] === 'mermaid') {
+                    useEffect(() => {
+                        const elements = document.querySelectorAll('.mermaid');
+                        if ((window as any).mermaid && elements.length > 0) {
+                          (window as any).mermaid.init(undefined, elements);
+                        }
+                      
+                    }, [part.content]);
+                    return <div className='mermaid'>{codeText}</div>
+                  }
                   const isInline = !match && !className;
                   return isInline 
                     ? <code className="bg-base-300 px-1 rounded text-sm" {...props}>{children}</code>
-                    : <pre className="bg-base-300 p-2 rounded text-sm overflow-auto my-2"><code {...props}>{children}</code></pre>;
+                    : 
+                              <><button
+                      onClick={copyToClipboard}
+                      className="text-xs bg-primary text-white px-2 py-1 rounded hover:bg-primary/80"
+                    >
+                      Copy
+                    </button><pre className="bg-base-300 p-2 rounded text-sm overflow-auto my-2"><code {...props}>{children}</code></pre></>;
                 },
                 blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-base-300 pl-4 italic my-2" {...props} />,
                 table: ({node, ...props}) => <table className="border-collapse table-auto w-full my-2" {...props} />,

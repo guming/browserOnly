@@ -22,7 +22,6 @@ export class DeepSeekProvider implements LLMProvider {
     async *createMessage(systemPrompt: string, messages: any[], tools?: any[]): ApiStream {
         const model = this.getModel();
         const modelId = model.id;
-
         // Process messages to filter out system instructions
         const filteredMessages = messages.filter(message => 
         !(message.role === "user" && 

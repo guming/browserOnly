@@ -158,6 +158,8 @@ function setupEventListeners(): void {
     }
   });
 
+
+
   // Try to listen for side panel events if available
   try {
     // @ts-expect-error - These events might not be in the type definitions yet

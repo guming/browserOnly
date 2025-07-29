@@ -2,7 +2,8 @@ import { logWithTimestamp } from '../../background/utils';
 import { Page } from 'playwright-crx';
 import { ToolFactory } from './types';
 import { DynamicTool } from 'langchain/tools';
-import { withActivePage } from './utils';
+import { getCurrentTabId, withActivePage } from './utils';
+
 
 export const startExtract : ToolFactory = (page: Page) =>
   
@@ -13,10 +14,11 @@ export const startExtract : ToolFactory = (page: Page) =>
       try {
         
         return await withActivePage(page, async (activePage) => {
+
           // await page.addScriptTag({ path: path.resolve(__dirname, 'turndown.js') });
-          // @ts-ignore: 使用页面中的 Turndown
-          
-          const markdownFromPage: string = await page.evaluate(() => {
+          const tabId = await getCurrentTabId(activePage);
+          const title = await activePage.title();
+          const markdownFromPage: string = await page.evaluate(async () => {
               const MAX_DEPTH = 20;
 
               const tagsToRemove = [
@@ -117,7 +119,6 @@ export const startExtract : ToolFactory = (page: Page) =>
                         markdownRows.push(rowLine);
                       }
                     });
-
                     return markdownRows.join('\n') + '\n\n';
                   }
 
@@ -131,11 +132,21 @@ export const startExtract : ToolFactory = (page: Page) =>
 
                 return walker(dom, 0).trim();
               };
-
+            
+             
               return domToMarkdown(document.body);
           });
+           if (tabId) {
+              chrome.runtime.sendMessage({
+                action: 'download-markdown',
+                tabId: tabId,
+                content: markdownFromPage,
+                filename: 'page.md'
+              });
+              console.log(`Sent markdown message for tab ${tabId} with title "${title}" from start_extract`);
+            }
           console.log('markdown',markdownFromPage);
-          return markdownFromPage;
+          return `scrape page finished`;
         });
       } catch (error) {
         console.log(`Error parsing '${input}': ${
@@ -146,6 +157,7 @@ export const startExtract : ToolFactory = (page: Page) =>
       }
     },
 });
+
 
 
 

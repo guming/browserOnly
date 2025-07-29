@@ -11,6 +11,7 @@ import { TokenUsageDisplay } from './components/TokenUsageDisplay';
 import { useChromeMessaging } from './hooks/useChromeMessaging';
 import { useMessageManagement } from './hooks/useMessageManagement';
 import { useTabManagement } from './hooks/useTabManagement';
+import { DownloadMarkdownMessage } from '../background/types';
 
 export function SidePanel() {
   // State for tab status
@@ -34,13 +35,27 @@ export function SidePanel() {
       const providers = await configManager.getConfiguredProviders();
       setHasConfiguredProviders(providers.length > 0);
     };
+   
 
     checkProviders();
+
+    const handleDownloadMarkdown = (message: DownloadMarkdownMessage) =>{
+        const blob = new Blob([message.content], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        chrome.downloads.download({
+          url,
+          filename: message.filename,
+          saveAs: true,
+        });
+    }
 
     // Listen for provider configuration changes
     const handleMessage = (message: any) => {
       if (message.action === 'providerConfigChanged') {
         checkProviders();
+      }
+      if (message.action === 'download-markdown') {
+        handleDownloadMarkdown(message);
       }
     };
 
@@ -213,16 +228,16 @@ export function SidePanel() {
   });
 
   // Handle form submission
-  const handleSubmit = async (prompt: string) => {
+  const handleSubmit = async (prompt: string, role: string) => {
     setIsProcessing(true);
     // Update the tab status to running
     setTabStatus('running');
 
     // Add a system message to indicate a new prompt
-    addSystemMessage(`New prompt: "${prompt}"`);
+    addSystemMessage(`New ${role} prompt: "${prompt}"`);
 
     try {
-      await executePrompt(prompt);
+      await executePrompt(prompt, role);
     } catch (error) {
       console.error('Error:', error);
       addSystemMessage('Error: ' + (error instanceof Error ? error.message : String(error)));

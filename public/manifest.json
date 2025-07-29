@@ -19,11 +19,16 @@
       "128": "icons/icon128.png"
     }
   },
+  "web_accessible_resources": [
+  {
+    "resources": ["mermaid.min.js","initMermaid.js"],
+    "matches": ["<all_urls>"]
+  }],
   "side_panel": {
     "default_path": "sidepanel.html"
   },
   "options_page": "options.html",
-  "permissions": ["debugger", "tabs", "sidePanel", "storage", "activeTab", "commands"],
+  "permissions": ["debugger", "tabs", "sidePanel", "storage", "activeTab", "commands", "downloads"],
   "host_permissions": ["<all_urls>"],
   "commands": {
     "_execute_action": {

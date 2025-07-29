@@ -1,6 +1,5 @@
 import { logWithTimestamp } from '../background/utils';
 import { ConfigManager } from '../background/configManager';
-import { createSubAgent, SubAgent } from './SubAgent';
 
 export type ExtractResult = {
   id?: number;
@@ -14,7 +13,7 @@ export type ExtractResult = {
 
 // const callbacks : SubAgentCallbacks = {};
 
-const userInstruction = '只提取title和主要内容部分, 忽略目录和引用资料';
+const userInstruction = '只提取title和主要内容部分, 以及引用资料';
 
 export const promptTemplate = `
 Your task is to filter and convert HTML content into clean, focused markdown that's optimized for use with LLMs and information retrieval systems.
@@ -203,7 +202,7 @@ ${userInstruction}
 `;
 
       const providerConfig = await this.configManager.getProviderConfig();
-      const subAgent = createSubAgent(providerConfig);
+      // const subAgent = createSubAgent(providerConfig);
       // const returnValue = await subAgent.executPrompt(finalPrompt);
       
       logWithTimestamp(`✅ extract content finished: ${url}`);

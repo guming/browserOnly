@@ -6,7 +6,7 @@ import { clearMessageHistory } from './agentController';
 import { initializeAgent } from './agentController';
 import { triggerReflection } from './reflectionController';
 import { attachToTab, getTabState, getWindowForTab, forceResetPlaywright } from './tabManager';
-import { BackgroundMessage } from './types';
+import { BackgroundMessage, DownloadMarkdownMessage } from './types';
 import { logWithTimestamp, handleError } from './utils';
 
 /**
@@ -116,7 +116,11 @@ export function handleMessage(
             sendResponse({ success: false, error: errorMessage });
           });
         return true; // Keep the message channel open for async response
-
+      case 'download-markdown': 
+          console.log('download message is', message.filename)
+          handleDownloadMarkdown(message);
+          return true;
+       
       default:
         // This should never happen due to the type guard, but TypeScript requires it
         logWithTimestamp(`Unhandled message action: ${(message as any).action}`, 'warn');
@@ -129,6 +133,22 @@ export function handleMessage(
     sendResponse({ success: false, error: errorMessage });
     return false;
   }
+}
+
+function handleDownloadMarkdown(message: DownloadMarkdownMessage) {
+  try {
+    const blob = new Blob([message.content], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    chrome.downloads.download({
+      url,
+      filename: message.filename,
+      saveAs: true,
+    });
+  } catch (error) {
+    const errorMessage = handleError(error, 'handleDownloadMarkdown message');
+    logWithTimestamp(`Error handleDownloadMarkdown message: ${errorMessage}`, 'error');
+  }
+  
 }
 
 /**
@@ -163,7 +183,8 @@ function isBackgroundMessage(message: any): message is BackgroundMessage {
       message.action === 'pageError' ||
       message.action === 'forceResetPlaywright' ||
       message.action === 'requestApproval' ||  // Add support for request approval messages
-      message.action === 'checkAgentStatus'  // Add support for agent status check
+      message.action === 'checkAgentStatus' || // Add support for agent status check
+      message.action === 'download-markdown' 
     )
   );
 }
@@ -179,7 +200,7 @@ function handleExecutePrompt(
 ): void {
   // Use the tabId from the message if available
   if (message.tabId) {
-    executePrompt(message.prompt, message.tabId);
+    executePrompt(message.prompt, message.tabId,false,message.role);
   } else {
     executePrompt(message.prompt);
   }
