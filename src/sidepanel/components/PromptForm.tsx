@@ -1,14 +1,37 @@
-import { faCircleUser, faGamepad, faPaperPlane, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { faCircleUser, faPaperPlane, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { 
+  faUserTie, 
+  faSearch, 
+  faBalanceScale, 
+  faChartLine, 
+  faCalculator, 
+  faVial, 
+  faCode, 
+  faHeartbeat 
+} from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useState } from 'react';
 import TextareaAutosize from 'react-textarea-autosize';
-
 interface PromptFormProps {
   onSubmit: (prompt: string, role: string) => void;
   onCancel: () => void;
   isProcessing: boolean;
   tabStatus: 'attached' | 'detached' | 'unknown' | 'running' | 'idle' | 'error';
 }
+
+// 定义角色类型
+type RoleType = 'operator' | 'researcher' | 'lawyer' | 'trader' | 'math' | 'qa' | 'code' | 'health';
+
+const roleIcons: Record<RoleType, any> = {
+    operator: faUserTie,
+    researcher: faSearch,
+    lawyer: faBalanceScale,
+    trader: faChartLine,
+    math: faCalculator,
+    qa: faVial,
+    code: faCode,
+    health: faHeartbeat
+  };
 
 export const PromptForm: React.FC<PromptFormProps> = ({
   onSubmit,
@@ -17,34 +40,35 @@ export const PromptForm: React.FC<PromptFormProps> = ({
   tabStatus
 }) => {
   const [prompt, setPrompt] = useState('');
-  const [role, setRole] = useState('operator');
+   const [role, setRole] = useState<RoleType>('operator');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim() || isProcessing || tabStatus === 'detached') return;
-    console.log("role is ", role);
+    console.log("the exec role is ", role);
     onSubmit(prompt, role);
     setPrompt(''); // Clear the prompt after submission
   };
 
+
+
   return (
     <form onSubmit={handleSubmit} className="mt-4 relative">
       <div className="w-full">
-        <FontAwesomeIcon icon={faCircleUser} className="text-gray-500 hover:text-gray-700" />
         <select
           className="select select-ghost select-xs select-bordered w-auto focus:outline-none focus:ring-0 pl-0"
           value={role}
-          onChange={(e) => setRole(e.target.value)}
+          onChange={(e) => setRole(e.target.value as RoleType)}
           disabled={isProcessing || tabStatus === 'detached'}
         >
-          <option value="operator">Operator</option>
-          <option value="researcher">Researcher</option>
-          <option value="lawyer">Lawyer</option>
-          <option value="trader">Trader</option>
-          <option value="math">Math Assistant</option>
-          <option value="qa">TestCase Writer</option>
-          <option value="code">Code</option>
-          <option value="health">Health Assistant</option>
+          <option value="operator">👤 Browser Operator</option>
+          <option value="researcher">🔍 Research Analyst</option>
+          <option value="lawyer">⚖️ Legal Advisor</option>
+          <option value="trader">📈 Trading Specialist</option>
+          <option value="math">🧮 Mathematics Expert</option>
+          <option value="code">💻 Code Developer</option>
+          <option value="qa">🧪 TestCase Writer</option>
+          <option value="health">❤️ Medical Consultant</option>
         </select>
         <TextareaAutosize
           className="textarea textarea-bordered w-full pr-12"
