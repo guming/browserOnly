@@ -4,15 +4,15 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
 // With JSDoc @type annotations, IDEs can provide config autocompletion
 /** @type {import('@docusaurus/types').DocusaurusConfig} */
 (module.exports = {
-  title: 'BrowserBee Docs',
+  title: 'BrowserOnly Docs',
   tagline: 'Control your browser with natural language',
   url: 'https://parsaghaffari.github.io',
-  baseUrl: '/browserbee/',
+  baseUrl: '/BrowserOnly/',
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
   favicon: 'img/favicon.ico',
   organizationName: 'parsaghaffari', // Usually your GitHub org/user name.
-  projectName: 'browserbee', // Usually your repo name.
+  projectName: 'BrowserOnly', // Usually your repo name.
 
   presets: [
     [
@@ -22,13 +22,13 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
         docs: {
           sidebarPath: require.resolve('./sidebars.js'),
           // Please change this to your repo.
-          editUrl: 'https://github.com/parsaghaffari/browserbee/edit/main/docs/',
+          editUrl: 'https://github.com/parsaghaffari/BrowserOnly/edit/main/docs/',
         },
         blog: {
           showReadingTime: true,
           // Please change this to your repo.
           editUrl:
-            'https://github.com/parsaghaffari/browserbee/edit/main/docs/blog/',
+            'https://github.com/parsaghaffari/BrowserOnly/edit/main/docs/blog/',
         },
         theme: {
           customCss: require.resolve('./src/css/custom.css'),
@@ -41,9 +41,9 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       navbar: {
-        title: 'BrowserBee Docs',
+        title: 'BrowserOnly Docs',
         logo: {
-          alt: 'BrowserBee Logo',
+          alt: 'BrowserOnly Logo',
           src: 'img/logo.svg',
         },
         items: [
@@ -66,7 +66,7 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
             label: 'Privacy Policy',
           },
           {
-            href: 'https://github.com/parsaghaffari/browserbee',
+            href: 'https://github.com/parsaghaffari/BrowserOnly',
             label: 'GitHub',
             position: 'right',
           },
@@ -101,11 +101,11 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
             items: [
               {
                 label: 'GitHub Discussions',
-                href: 'https://github.com/parsaghaffari/browserbee/discussions',
+                href: 'https://github.com/parsaghaffari/BrowserOnly/discussions',
               },
               {
                 label: 'GitHub Issues',
-                href: 'https://github.com/parsaghaffari/browserbee/issues',
+                href: 'https://github.com/parsaghaffari/BrowserOnly/issues',
               },
             ],
           },
@@ -114,7 +114,7 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
             items: [
               {
                 label: 'GitHub',
-                href: 'https://github.com/parsaghaffari/browserbee',
+                href: 'https://github.com/parsaghaffari/BrowserOnly',
               },
               {
                 label: 'Privacy Policy',
@@ -123,7 +123,7 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
             ],
           },
         ],
-        copyright: `Copyright © ${new Date().getFullYear()} BrowserBee Contributors. Built with Docusaurus.`,
+        copyright: `Copyright © ${new Date().getFullYear()} BrowserOnly Contributors. Built with Docusaurus.`,
       },
       prism: {
         theme: lightCodeTheme,

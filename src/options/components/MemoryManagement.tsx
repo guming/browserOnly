@@ -33,7 +33,7 @@ export function MemoryManagement() {
       const url = URL.createObjectURL(blob);
       
       const date = new Date().toISOString().split('T')[0];
-      const filename = `browserbee-memories-${date}.json`;
+      const filename = `BrowserOnly-memories-${date}.json`;
       
       const a = document.createElement('a');
       a.href = url;
@@ -126,7 +126,7 @@ export function MemoryManagement() {
       <div className="card-body">
         <h2 className="card-title text-xl">Memory Management</h2>
         <p className="mb-4">
-          BrowserBee stores memories of successful interactions with websites to help improve future interactions.
+          BrowserOnly stores memories of successful interactions with websites to help improve future interactions.
           You can export these memories for backup or transfer to another device, and import them back later.
         </p>
         

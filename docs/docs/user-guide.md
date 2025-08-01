@@ -4,14 +4,14 @@ sidebar_position: 3
 
 # User Guide
 
-This guide will help you get started with BrowserBee and show you how to use it effectively for your daily tasks.
+This guide will help you get started with BrowserOnly and show you how to use it effectively for your daily tasks.
 
 ## Installation
 
 1. Clone the repository
    ```bash
-   git clone https://github.com/parsaghaffari/browserbee.git
-   cd browserbee
+   git clone https://github.com/parsaghaffari/BrowserOnly.git
+   cd BrowserOnly
    ```
 
 2. Install dependencies
@@ -28,30 +28,30 @@ This guide will help you get started with BrowserBee and show you how to use it 
    - Go to `chrome://extensions/`
    - Enable "Developer mode" in the top-right corner
    - Click "Load unpacked" and select the `dist` directory
-   - The BrowserBee options page should pop up automatically
+   - The BrowserOnly options page should pop up automatically
 
 ## Setting Up Your LLM Provider
 
-BrowserBee supports multiple LLM providers. You'll need to set up at least one to use the extension:
+BrowserOnly supports multiple LLM providers. You'll need to set up at least one to use the extension:
 
 ### Anthropic Claude
 
 1. Get an API key from [Anthropic](https://console.anthropic.com/)
-2. In the BrowserBee options page, select "Anthropic" as your provider
+2. In the BrowserOnly options page, select "Anthropic" as your provider
 3. Enter your API key in the field provided
 4. Select your preferred Claude model (e.g., Claude 3 Opus, Claude 3 Sonnet)
 
 ### OpenAI
 
 1. Get an API key from [OpenAI](https://platform.openai.com/account/api-keys)
-2. In the BrowserBee options page, select "OpenAI" as your provider
+2. In the BrowserOnly options page, select "OpenAI" as your provider
 3. Enter your API key in the field provided
 4. Select your preferred model (e.g., GPT-4o)
 
 ### Google Gemini
 
 1. Get an API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. In the BrowserBee options page, select "Gemini" as your provider
+2. In the BrowserOnly options page, select "Gemini" as your provider
 3. Enter your API key in the field provided
 4. Select your preferred Gemini model
 
@@ -62,25 +62,25 @@ BrowserBee supports multiple LLM providers. You'll need to set up at least one t
    ```bash
    OLLAMA_ORIGINS=chrome-extension://YOUR_EXTENSION_ID ollama serve
    ```
-3. In the BrowserBee options page, select "Ollama" as your provider
+3. In the BrowserOnly options page, select "Ollama" as your provider
 4. Enter the Ollama server URL (usually `http://localhost:11434`)
 5. Add at least one custom model by specifying:
    - Model ID (e.g., `llama3.1`, `qwen3`)
    - Display name (e.g., `Llama 3.1`, `Qwen 3`)
    - Context window size (default: 32768)
 
-## Using BrowserBee
+## Using BrowserOnly
 
 ### Opening the Side Panel
 
-1. Click the BrowserBee icon in your Chrome toolbar
+1. Click the BrowserOnly icon in your Chrome toolbar
 2. The side panel will open on the right side of your browser window
 
 ### Your First Command
 
 1. Type a natural language instruction in the input field at the bottom of the side panel
 2. Press Enter or click the Send button
-3. Watch as BrowserBee carries out your instruction
+3. Watch as BrowserOnly carries out your instruction
 
 Example commands:
 - "Go to Google and search for 'browser automation tools'"
@@ -90,18 +90,18 @@ Example commands:
 
 ### Understanding the Interface
 
-The BrowserBee side panel consists of several components:
+The BrowserOnly side panel consists of several components:
 
 - **Input Field**: Where you type your instructions
-- **Message History**: Shows the conversation between you and BrowserBee
+- **Message History**: Shows the conversation between you and BrowserOnly
 - **Token Usage**: Displays the number of tokens used and the estimated cost
-- **Tab Status**: Shows which tab BrowserBee is currently controlling
+- **Tab Status**: Shows which tab BrowserOnly is currently controlling
 
 ### Approving Actions
 
-For certain sensitive actions (like making purchases or posting on social media), BrowserBee will ask for your explicit approval:
+For certain sensitive actions (like making purchases or posting on social media), BrowserOnly will ask for your explicit approval:
 
-1. BrowserBee will display an approval dialog
+1. BrowserOnly will display an approval dialog
 2. Review the action it wants to take
 3. Click "Approve" to allow the action or "Deny" to prevent it
 
@@ -109,7 +109,7 @@ For certain sensitive actions (like making purchases or posting on social media)
 
 ### Web Research
 
-BrowserBee excels at gathering information from multiple sources:
+BrowserOnly excels at gathering information from multiple sources:
 
 ```
 Go to Google and search for recent developments in quantum computing. Visit the top 3 results and summarize the key points from each site.
@@ -117,7 +117,7 @@ Go to Google and search for recent developments in quantum computing. Visit the 
 
 ### Social Media Management
 
-BrowserBee can help you manage your social media presence:
+BrowserOnly can help you manage your social media presence:
 
 ```
 Go to Twitter, check my notifications, and summarize any mentions or replies I've received in the past 24 hours.
@@ -125,7 +125,7 @@ Go to Twitter, check my notifications, and summarize any mentions or replies I'v
 
 ### Online Shopping
 
-BrowserBee can assist with finding products and comparing prices:
+BrowserOnly can assist with finding products and comparing prices:
 
 ```
 Search for wireless noise-canceling headphones on Amazon, find the top 5 options under $200, and compare their features and ratings.
@@ -133,7 +133,7 @@ Search for wireless noise-canceling headphones on Amazon, find the top 5 options
 
 ### Email Management
 
-BrowserBee can help you manage your email:
+BrowserOnly can help you manage your email:
 
 ```
 Go to Gmail, find all unread emails from the last week, and create a summary of each one.
@@ -143,7 +143,7 @@ Go to Gmail, find all unread emails from the last week, and create a summary of 
 
 ### Be Specific
 
-The more specific your instructions, the better BrowserBee can help you:
+The more specific your instructions, the better BrowserOnly can help you:
 
 - Instead of: "Find flights"
 - Try: "Go to Kayak and find flights from New York to London for next weekend, prioritizing morning departures"
@@ -158,7 +158,7 @@ First, go to my Google Drive. Then, find the folder named "Work Projects". Next,
 
 ### Leverage Memory
 
-BrowserBee remembers previous interactions with websites, making repeat tasks more efficient:
+BrowserOnly remembers previous interactions with websites, making repeat tasks more efficient:
 
 ```
 Go to my company's HR portal and submit my timesheet for this week, just like I did last week.
@@ -166,10 +166,10 @@ Go to my company's HR portal and submit my timesheet for this week, just like I 
 
 ## Troubleshooting
 
-### BrowserBee Can't Access a Website
+### BrowserOnly Can't Access a Website
 
 - Make sure you're logged in to the website if it requires authentication
-- Check if the website has anti-bot measures that might be blocking BrowserBee
+- Check if the website has anti-bot measures that might be blocking BrowserOnly
 - Try refreshing the page and trying again
 
 ### Commands Not Working as Expected
@@ -186,13 +186,13 @@ Go to my company's HR portal and submit my timesheet for this week, just like I 
 
 ## Privacy and Security
 
-BrowserBee is designed with privacy in mind:
+BrowserOnly is designed with privacy in mind:
 
 - Your data stays in your browser (except for what's sent to the LLM provider)
 - API keys are stored locally in your browser
-- BrowserBee can't access your browser history or other sensitive information unless you explicitly instruct it to
+- BrowserOnly can't access your browser history or other sensitive information unless you explicitly instruct it to
 
 However, be aware that:
 
 - Text sent to LLM providers is subject to their privacy policies
-- Be cautious when asking BrowserBee to interact with sensitive websites like banking portals
+- Be cautious when asking BrowserOnly to interact with sensitive websites like banking portals

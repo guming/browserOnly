@@ -14,7 +14,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/parsaghaffari/browserbee.git"
+    "url": "https://github.com/parsaghaffari/BrowserOnly.git"
   },
   "scripts": {
     "build": "tsc && vite build && node scripts/copy-static.js",

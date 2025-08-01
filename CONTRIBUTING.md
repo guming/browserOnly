@@ -1,6 +1,6 @@
-# Contributing to BrowserBee
+# Contributing to BrowserOnly
 
-Thank you for your interest in contributing to BrowserBee! This document provides guidelines and instructions for contributing to this project.
+Thank you for your interest in contributing to BrowserOnly! This document provides guidelines and instructions for contributing to this project.
 
 ## Code of Conduct
 
@@ -9,7 +9,7 @@ Please be respectful and considerate of others when contributing to this project
 ## Getting Started
 
 1. Fork the repository
-2. Clone your fork: `git clone https://github.com/yourusername/browserbee.git`
+2. Clone your fork: `git clone https://github.com/yourusername/BrowserOnly.git`
 3. Install dependencies: `npm install`
 4. Set up development environment: See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed setup instructions
 5. Create a branch for your changes: `git checkout -b feature/your-feature-name`
@@ -53,7 +53,7 @@ The project is organized into several modules:
 
 ## Testing & Quality Assurance
 
-BrowserBee has a comprehensive testing infrastructure with **548 tests** across **18 test suites** to ensure code quality and reliability.
+BrowserOnly has a comprehensive testing infrastructure with **548 tests** across **18 test suites** to ensure code quality and reliability.
 
 ### Running Tests
 
@@ -143,7 +143,7 @@ npm test && npm run lint && npx tsc --noEmit
 
 ## CI/CD Pipeline
 
-BrowserBee uses **GitHub Actions** for automated testing and quality assurance.
+BrowserOnly uses **GitHub Actions** for automated testing and quality assurance.
 
 ### Automated Checks
 

@@ -7,7 +7,7 @@ import { logWithTimestamp } from './utils';
  * Initialize the extension
  */
 function initializeExtension(): void {
-  logWithTimestamp('BrowserOnly 🐝 extension initialized');
+  logWithTimestamp('BrowserOnly 🐦 extension initialized');
   
   // Set up message listeners
   setupMessageListeners();
@@ -55,7 +55,7 @@ function setupEventListeners(): void {
 
   // Open options page when the extension is first installed
   chrome.runtime.onInstalled.addListener((details) => {
-    logWithTimestamp('BrowserOnly 🐝 extension installed');
+    logWithTimestamp('BrowserOnly 🐦 extension installed');
     
     if (details.reason === 'install') {
       chrome.runtime.openOptionsPage();
@@ -114,7 +114,7 @@ function setupEventListeners(): void {
       // Delete the memory database on uninstall/disable
       try {
         logWithTimestamp('Deleting memory database');
-        const request = indexedDB.deleteDatabase('browserbee-memories');
+        const request = indexedDB.deleteDatabase('BrowserOnly-memories');
 
         request.onsuccess = () => {
           logWithTimestamp('Memory database deleted successfully');
@@ -141,7 +141,7 @@ function setupEventListeners(): void {
       // Delete the memory database before update
       try {
         logWithTimestamp('Deleting memory database before update');
-        const request = indexedDB.deleteDatabase('browserbee-memories');
+        const request = indexedDB.deleteDatabase('BrowserOnly-memories');
 
         request.onsuccess = () => {
           logWithTimestamp('Memory database deleted successfully before update');

@@ -4,7 +4,7 @@ sidebar_position: 4
 
 # Contributing Guide
 
-Thank you for your interest in contributing to BrowserBee! This guide will help you get started with contributing to the project.
+Thank you for your interest in contributing to BrowserOnly! This guide will help you get started with contributing to the project.
 
 ## Code of Conduct
 
@@ -15,8 +15,8 @@ Please be respectful and considerate of others when contributing to this project
 1. Fork the repository
    ```bash
    # Clone your fork
-   git clone https://github.com/yourusername/browserbee.git
-   cd browserbee
+   git clone https://github.com/yourusername/BrowserOnly.git
+   cd BrowserOnly
    
    # Install dependencies
    npm install
@@ -112,4 +112,4 @@ The Models Module provides a flexible interface for multiple LLM providers:
 
 ## License
 
-By contributing to this project, you agree that your contributions will be licensed under the project's [Apache 2.0 License](https://github.com/parsaghaffari/browserbee/blob/main/LICENSE).
+By contributing to this project, you agree that your contributions will be licensed under the project's [Apache 2.0 License](https://github.com/parsaghaffari/BrowserOnly/blob/main/LICENSE).

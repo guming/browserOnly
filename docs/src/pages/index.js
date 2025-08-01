@@ -17,7 +17,7 @@ function HomepageHeader() {
           <Link
             className="button button--secondary button--lg"
             to="/docs/intro">
-            Get Started 🐝
+            Get Started 🐦
           </Link>
         </div>
       </div>
@@ -30,7 +30,7 @@ export default function Home() {
   return (
     <Layout
       title={`${siteConfig.title}`}
-      description="BrowserBee - Control your browser with natural language. A privacy-first Chrome extension for browser automation.">
+      description="BrowserOnly - Control your browser with natural language. A privacy-first Chrome extension for browser automation.">
       <HomepageHeader />
       <main>
         <HomepageFeatures />

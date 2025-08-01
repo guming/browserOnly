@@ -134,7 +134,7 @@ export function ProviderSelector({ isProcessing }: ProviderSelectorProps) {
   
   // Function to open help documentation
   const openHelpPage = () => {
-    window.open('https://parsaghaffari.github.io/browserbee/', '_blank');
+    window.open('https://parsaghaffari.github.io/BrowserOnly/', '_blank');
   };
 
   return (

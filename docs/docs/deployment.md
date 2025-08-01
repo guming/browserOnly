@@ -4,7 +4,7 @@ sidebar_position: 5
 
 # Deployment Guide
 
-This guide will walk you through the process of deploying the BrowserBee documentation to GitHub Pages.
+This guide will walk you through the process of deploying the BrowserOnly documentation to GitHub Pages.
 
 ## Prerequisites
 
@@ -13,7 +13,7 @@ Before you begin, make sure you have:
 1. A GitHub account
 2. Git installed on your local machine
 3. Node.js and npm installed
-4. Access to the BrowserBee repository
+4. Access to the BrowserOnly repository
 
 ## Setting Up GitHub Pages
 
@@ -27,9 +27,9 @@ The `docusaurus.config.js` file has already been configured for GitHub Pages dep
 module.exports = {
   // ...
   url: 'https://parsaghaffari.github.io',
-  baseUrl: '/browserbee/',
+  baseUrl: '/BrowserOnly/',
   organizationName: 'parsaghaffari', // GitHub username
-  projectName: 'browserbee', // GitHub repository name
+  projectName: 'BrowserOnly', // GitHub repository name
   // ...
 };
 ```
@@ -60,7 +60,7 @@ If you're deploying to a different GitHub account, you'll need to update these v
    - Go to your GitHub repository
    - Navigate to Settings > Pages
    - Ensure the source is set to the `gh-pages` branch
-   - Your site will be published at `https://[username].github.io/browserbee/`
+   - Your site will be published at `https://[username].github.io/BrowserOnly/`
 
 ### Automated Deployment with GitHub Actions
 

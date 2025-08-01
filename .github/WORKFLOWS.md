@@ -1,6 +1,6 @@
 # CI/CD Pipeline
 
-This directory contains the GitHub Actions workflows for the BrowserBee project.
+This directory contains the GitHub Actions workflows for the BrowserOnly project.
 
 ## Current Workflows
 
@@ -31,7 +31,7 @@ This directory contains the GitHub Actions workflows for the BrowserBee project.
 Add these to your main README.md:
 
 ```markdown
-[![CI](https://github.com/parsaghaffari/browserbee/actions/workflows/ci.yml/badge.svg)](https://github.com/parsaghaffari/browserbee/actions/workflows/ci.yml)
+[![CI](https://github.com/parsaghaffari/BrowserOnly/actions/workflows/ci.yml/badge.svg)](https://github.com/parsaghaffari/BrowserOnly/actions/workflows/ci.yml)
 ```
 
 ## Future Enhancements
