@@ -28,7 +28,7 @@
     "default_path": "sidepanel.html"
   },
   "options_page": "options.html",
-  "permissions": ["debugger", "tabs", "sidePanel", "storage", "activeTab", "commands", "downloads"],
+  "permissions": ["debugger", "tabs", "sidePanel", "storage", "activeTab", "commands", "downloads", "contextMenus"],
   "host_permissions": ["<all_urls>"],
   "commands": {
     "_execute_action": {

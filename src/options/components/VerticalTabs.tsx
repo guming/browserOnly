@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { GeneralTab } from './tabs/GeneralTab';
 import { ProvidersTab } from './tabs/ProvidersTab';
 import { MemoryTab } from './tabs/MemoryTab';
+import { ConnectionTab } from './tabs/ConnectionTab';
 import { Model } from './ModelList';
 import { OllamaModel } from './OllamaModelList';
 
@@ -83,6 +84,7 @@ export function VerticalTabs(props: VerticalTabsProps) {
   const tabs = [
     { id: 'general', label: 'General', icon: '🏠' },
     { id: 'providers', label: 'LLM Configuration', icon: '🤖' },
+    { id: 'connection', label: 'Connection', icon: '🔗' },
     { id: 'memory', label: 'Memory', icon: '🧠' },
   ];
 
@@ -145,6 +147,8 @@ export function VerticalTabs(props: VerticalTabsProps) {
             getModelPricingData={props.getModelPricingData}
           />
         );
+      case 'connection':
+        return <ConnectionTab />;
       case 'memory':
         return <MemoryTab />;
       default:

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 interface LlmContentProps {
@@ -87,15 +87,108 @@ export const LlmContent: React.FC<LlmContentProps> = ({ content }) => {
                     });
                   };
                   if (match?.[1] === 'mermaid') {
+                    // 为当前组件创建唯一引用
+                    const mermaidRef = useRef<HTMLDivElement>(null);
+                    const mermaidId = useRef(`mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
+
+                    // 优化版本：添加渲染状态管理
+                    const [isRendered, setIsRendered] = useState(false);
+
                     useEffect(() => {
-                        const elements = document.querySelectorAll('.mermaid');
-                        if ((window as any).mermaid && elements.length > 0) {
-                          (window as any).mermaid.init(undefined, elements);
+                      const renderMermaid = async () => {
+                        if (mermaidRef.current && (window as any).mermaid) {
+                          try {
+                            // 清空之前的内容
+                            mermaidRef.current.innerHTML = codeText;
+                            mermaidRef.current.className = 'mermaid mb-2';
+                            mermaidRef.current.setAttribute('data-id', mermaidId.current);
+                            
+                            await (window as any).mermaid.init(undefined, mermaidRef.current);
+                            setIsRendered(true);
+                          } catch (error) {
+                            console.error('Mermaid rendering failed:', error);
+                            setIsRendered(false);
+                          }
                         }
+                      };
                       
-                    }, [part.content]);
-                    return <div className='mermaid'>{codeText}</div>
-                  }
+                      renderMermaid();
+                    }, [part.content, codeText]);
+
+                    const exportToSVG = async () => {
+                      try {
+                        let svgData = '';
+                        
+                        // 获取当前组件的 SVG（使用 ref 精确定位）
+                        const currentSvg = mermaidRef.current?.querySelector('svg');
+                        if (currentSvg) {
+                          svgData = currentSvg.outerHTML;
+                        } else if ((window as any).mermaid.render) {
+                          // 使用 mermaid.render() API 重新渲染
+                          const { svg } = await (window as any).mermaid.render(mermaidId.current + '-export', codeText);
+                          svgData = svg;
+                        } else {
+                          console.error('No SVG available to export');
+                          return;
+                        }
+
+                        // 使用 Chrome Extension API 下载
+                        const blob = new Blob([svgData], { type: 'image/svg+xml' });
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          const dataUrl = reader.result as string;
+                          chrome.downloads.download({
+                            url: dataUrl,
+                            filename: 'mermaid-diagram.svg',
+                            saveAs: true
+                          });
+                        };
+                        reader.readAsDataURL(blob);
+                      } catch (error) {
+                        console.error('Error exporting SVG:', error);
+                        alert('Export failed. Please try again.');
+                      }
+                    };
+
+                    return (
+                      <div className="mermaid-container">
+                        <div ref={mermaidRef} className="mermaid mb-2">{codeText}</div>
+                        <div className="flex gap-2">
+                          <button
+                            className="btn btn-primary btn-sm"
+                            onClick={exportToSVG}
+                            disabled={!isRendered && !codeText}
+                          >
+                            Download SVG
+                          </button>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => {
+                              try {
+                                // 使用 Chrome Extension API 下载
+                                const blob = new Blob([codeText], { type: 'text/plain' });
+                                const reader = new FileReader();
+                                reader.onload = () => {
+                                  const dataUrl = reader.result as string;
+                                  chrome.downloads.download({
+                                    url: dataUrl,
+                                    filename: 'mermaid-diagram.mmd',
+                                    saveAs: true
+                                  });
+                                };
+                                reader.readAsDataURL(blob);
+                              } catch (error) {
+                                console.error('Error downloading source:', error);
+                                alert('Download failed. Please try again.');
+                              }
+                            }}
+                          >
+                            Download Source
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }   
                   const isInline = !match && !className;
                   return isInline 
                     ? <code className="bg-base-300 px-1 rounded text-sm" {...props}>{children}</code>

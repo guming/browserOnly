@@ -10,7 +10,7 @@ import {
   faHeartbeat 
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import TextareaAutosize from 'react-textarea-autosize';
 interface PromptFormProps {
   onSubmit: (prompt: string, role: string) => void;
@@ -49,6 +49,16 @@ export const PromptForm: React.FC<PromptFormProps> = ({
     onSubmit(prompt, role);
     setPrompt(''); // Clear the prompt after submission
   };
+
+  useEffect(() => {
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    console.log("msg.text",msg.text)
+    if (msg.type === "copyToPrompt" && msg.text) {
+      setPrompt(msg.text);
+      }
+    });
+  }, []);
+
 
 
 

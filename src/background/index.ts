@@ -158,6 +158,30 @@ function setupEventListeners(): void {
     }
   });
 
+  chrome.runtime.onInstalled.addListener(() => {
+    chrome.contextMenus.create({
+      id: "copyToPrompt",
+      title: "Copy到SidePanel",
+      contexts: ["selection"]
+    });
+  });
+
+  chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+    console.log("copyToPrompt",info)
+    if (info.menuItemId === "copyToPrompt") {
+      // 将选中的文本存入 storage
+      // await chrome.storage.local.set({ copiedText: info.selectionText });
+      chrome.runtime.sendMessage({
+        type: "copyToPrompt",
+        text: info.selectionText
+      });
+      // 打开 sidepanel
+      if(tab?.id){
+        chrome.sidePanel.open({ tabId: tab.id });
+      }
+    }
+  });
+
 
 
   // Try to listen for side panel events if available
