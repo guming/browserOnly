@@ -58,6 +58,10 @@ export function handleMessage(
       case 'switchToTab':
         handleSwitchToTab(message, sendResponse);
         return true;
+
+      case 'refreshTab':
+        handleRefreshTab(message, sendResponse);
+        return true;
         
       case 'getTokenUsage':
         handleGetTokenUsage(message, sendResponse);
@@ -309,6 +313,27 @@ function handleInitializeTab(
  */
 function handleSwitchToTab(
   message: Extract<BackgroundMessage, { action: 'switchToTab' }>,
+  sendResponse: (response?: any) => void
+): void {
+  if (message.tabId) {
+    // Get the window ID for this tab if available
+    const windowId = getWindowForTab(message.tabId);
+    
+    // Focus the window first if we have a window ID
+    if (windowId) {
+      chrome.windows.update(windowId, { focused: true });
+    }
+    
+    // Then focus the tab
+    chrome.tabs.update(message.tabId, { active: true });
+    
+    logWithTimestamp(`Switched to tab ${message.tabId} in window ${windowId || 'unknown'}`);
+  }
+  sendResponse({ success: true });
+}
+
+function handleRefreshTab(
+  message: Extract<BackgroundMessage, { action: 'refreshTab' }>,
   sendResponse: (response?: any) => void
 ): void {
   if (message.tabId) {

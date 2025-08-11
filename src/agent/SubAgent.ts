@@ -1,4 +1,7 @@
 import type { Page } from "playwright-crx";
+import { ConfigManager, ProviderConfig } from "../background/configManager";
+import { createProvider } from "../models/providers/factory";
+import { LLMProvider } from "../models/providers/types";
 import { ErrorHandler } from "./ErrorHandler";
 import { ExecutionEngine, ExecutionCallbacks } from "./ExecutionEngine";
 import { MemoryManager } from "./MemoryManager";
@@ -6,10 +9,7 @@ import { initializePageContext } from "./PageContextManager";
 import { PromptManager } from "./PromptManager";
 import { ToolManager } from "./ToolManager";
 import { getAllTools } from "./tools/index";
-import { BrowserTool, ToolExecutionContext } from "./tools/types";
-import { LLMProvider } from "../models/providers/types";
-import { ConfigManager, ProviderConfig } from "../background/configManager";
-import { createProvider } from "../models/providers/factory";
+import { BrowserTool } from "./tools/types";
 
 /**
  * SubAgent is a specialized agent for handling sub-tasks within the browser.

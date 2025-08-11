@@ -1,4 +1,4 @@
-import { faCircleUser, faPaperPlane, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { faPaperPlane, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { 
   faUserTie, 
   faSearch, 
@@ -52,7 +52,6 @@ export const PromptForm: React.FC<PromptFormProps> = ({
 
   useEffect(() => {
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-    console.log("msg.text",msg.text)
     if (msg.type === "copyToPrompt" && msg.text) {
       setPrompt(msg.text);
       }
@@ -71,14 +70,16 @@ export const PromptForm: React.FC<PromptFormProps> = ({
           onChange={(e) => setRole(e.target.value as RoleType)}
           disabled={isProcessing || tabStatus === 'detached'}
         >
-          <option value="operator">👤 Browser Operator</option>
+          <option value="operator">🧙🏾‍♂️ Browser Operator</option>
           <option value="researcher">🔍 Research Analyst</option>
           <option value="lawyer">⚖️ Legal Advisor</option>
-          <option value="trader">📈 Trading Specialist</option>
+          {/* <option value="trader">📈 Trading Specialist</option> */}
           <option value="math">🧮 Mathematics Expert</option>
           <option value="code">💻 Code Developer</option>
           <option value="qa">🧪 TestCase Writer</option>
           <option value="health">❤️ Medical Consultant</option>
+          <option value="wiki">🌊 AI Wiki </option>
+          <option value="munger">🍔 Charlie Munger(cosplay)</option>
         </select>
         <TextareaAutosize
           className="textarea textarea-bordered w-full pr-12"

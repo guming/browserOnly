@@ -2,6 +2,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createBrowserAgent, executePromptWithFallback, needsReinitialization } from "../agent/AgentCore";
 import { ExecutionCallbacks } from "../agent/ExecutionEngine";
+import { setCurrentPage } from "../agent/PageContextManager"
 import { contextTokenCount } from "../agent/TokenManager";
 import { ScreenshotManager } from "../tracking/screenshotManager";
 import { TokenTrackingService } from "../tracking/tokenTrackingService";
@@ -573,9 +574,10 @@ export async function executePrompt(prompt: string, tabId?: number, isReflection
     
     // Update PageContextManager with the new page
     try {
-      const { setCurrentPage } = await import('../agent/PageContextManager');
+      // const { setCurrentPage } = await import('../agent/PageContextManager');
+      logWithTimestamp(`Updated PageContextManager with tab state ${updatedTabState} in executePrompt start`);
       setCurrentPage(updatedTabState.page);
-      logWithTimestamp(`Updated PageContextManager with page for tab ${targetTabId} in executePrompt`);
+      logWithTimestamp(`Updated PageContextManager with page for tab ${targetTabId} in executePrompt end`);
     } catch (error) {
       logWithTimestamp(`Error updating PageContextManager in executePrompt: ${error instanceof Error ? error.message : String(error)}`, 'warn');
     }

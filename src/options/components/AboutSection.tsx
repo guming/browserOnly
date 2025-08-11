@@ -6,7 +6,7 @@ export function AboutSection() {
       <div className="card-body">
         <h2 className="card-title text-xl">About</h2>
         <p className="mb-3">
-          BrowserOnly 🐦 is a Chrome extension that allows you to control your browser using natural language.
+          BrowserOnly is a Chrome extension that allows you to control your browser using natural language.
           It supports multiple LLM providers including Anthropic, OpenAI, Google Gemini, DeepSeek, and Ollama to interpret your instructions and uses Playwright to execute them.
         </p>
         <p className="mb-3">
@@ -15,6 +15,10 @@ export function AboutSection() {
         <p>
           To use the extension, click on the extension icon to open the side panel, then enter your instructions
           in the prompt field and hit Enter.
+          
+        </p>
+        <p>
+          Special thanks to the GitHub projects: BrowserBee and Mermaid.
         </p>
       </div>
     </div>

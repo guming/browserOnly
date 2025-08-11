@@ -58,7 +58,7 @@ Since BrowserOnly runs entirely within your browser (with the exception of the L
 
 1. Click the BrowserOnly icon in your Chrome toolbar to open the side panel
 2. Type your instruction (e.g., *"Go to Google, search for Cicero, and click the first result"*)
-3. Hit Enter and watch BrowserOnly go to work 🐦
+3. Hit Enter and watch BrowserOnly go to work 🤖️
 
 ## Next Steps
 

@@ -1,4 +1,4 @@
-# BrowserOnly 🐦
+# BrowserOnly 🤖️
 *Your in-browser AI assistant. Control the web with natural language.*
 
 [![Join our Discord](https://img.shields.io/badge/Discord-Join%20Chat-7289da?logo=discord&logoColor=white&style=for-the-badge)](https://discord.gg/g42ww3wn)
@@ -194,7 +194,7 @@ BrowserOnly is now available on [Chrome Web Store](https://chromewebstore.google
 
 1. Click the BrowserOnly icon in your Chrome toolbar, or press *Alt+Shift+B*, to open the side panel  
 2. Type your instruction (e.g., *"Go to Google, search for Cicero, and click the first result"*)  
-3. Hit Enter and watch BrowserOnly go to work 🐦
+3. Hit Enter and watch BrowserOnly go to work 🤖️
 
 **Note:** 
 1. Since BrowserOnly uses Chrome DevTools Protocol (CDP) to attach to tabs, it's best to leave it attached to a base tab that you leave open throughout your session (BrowserOnly can open new tabs if needed). If you close the attached tab, use the ![reattach button](<reattach-button.png>) button to reattach to a new tab.

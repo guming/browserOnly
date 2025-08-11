@@ -1,6 +1,7 @@
 import { crx } from 'playwright-crx';
 import { BrowserAgent } from '../agent/AgentCore';
-import { TabState, WindowState } from './types';
+import { setCurrentPage, resetPageContext } from "../agent/PageContextManager"
+import { TabState } from './types';
 import { logWithTimestamp, handleError } from './utils';
 
 // Track attached tabs and their windows
@@ -384,7 +385,8 @@ export async function attachToTab(tabId: number, windowId?: number, retryCount: 
       
       // Update PageContextManager with the new page
       try {
-        const { setCurrentPage } = await import('../agent/PageContextManager');
+        // const { setCurrentPage } = await import('../agent/PageContextManager');
+        logWithTimestamp(`Updated PageContextManager with page for tab ${page} start`);
         setCurrentPage(page);
         logWithTimestamp(`Updated PageContextManager with page for tab ${tabId}`);
       } catch (error) {
@@ -697,7 +699,7 @@ export function setupTabListeners(): void {
       
       // Reset PageContextManager
       try {
-        const { resetPageContext } = await import('../agent/PageContextManager');
+        // const { resetPageContext } = await import('../agent/PageContextManager');
         resetPageContext();
         logWithTimestamp(`Reset PageContextManager for closed tab ${tabId}`);
       } catch (error) {

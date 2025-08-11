@@ -83,7 +83,7 @@ export function GeneralTab() {
           
           <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
             <a 
-              href="https://discord.gg/g42ww3wn" 
+              href="https://discord.gg/P3fu9Rhb" 
               target="_blank" 
               rel="noopener noreferrer"
               className="btn btn-primary btn-wide"

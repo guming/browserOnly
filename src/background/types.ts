@@ -51,6 +51,12 @@ export interface SwitchToTabMessage {
   windowId?: number;
 }
 
+export interface RefreshTabMessage {
+  action: 'refreshTab';
+  tabId: number;
+  windowId?: number;
+}
+
 export interface GetTokenUsageMessage {
   action: 'getTokenUsage';
   tabId?: number;
@@ -217,6 +223,7 @@ export type BackgroundMessage =
   | ClearHistoryMessage
   | InitializeTabMessage
   | SwitchToTabMessage
+  | RefreshTabMessage
   | GetTokenUsageMessage
   | ApprovalResponseMessage
   | ReflectAndLearnMessage

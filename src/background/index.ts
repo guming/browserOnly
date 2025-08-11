@@ -7,7 +7,7 @@ import { logWithTimestamp } from './utils';
  * Initialize the extension
  */
 function initializeExtension(): void {
-  logWithTimestamp('BrowserOnly 🐦 extension initialized');
+  logWithTimestamp('BrowserOnly 🤖️ extension initialized');
   
   // Set up message listeners
   setupMessageListeners();
@@ -55,7 +55,7 @@ function setupEventListeners(): void {
 
   // Open options page when the extension is first installed
   chrome.runtime.onInstalled.addListener((details) => {
-    logWithTimestamp('BrowserOnly 🐦 extension installed');
+    logWithTimestamp('BrowserOnly 🤖️ extension installed');
     
     if (details.reason === 'install') {
       chrome.runtime.openOptionsPage();
@@ -161,7 +161,7 @@ function setupEventListeners(): void {
   chrome.runtime.onInstalled.addListener(() => {
     chrome.contextMenus.create({
       id: "copyToPrompt",
-      title: "Copy到SidePanel",
+      title: "Send selection to BrowserOnly",
       contexts: ["selection"]
     });
   });
