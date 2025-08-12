@@ -27,6 +27,9 @@ export function SidePanel() {
 
   // State to track if any LLM providers are configured
   const [hasConfiguredProviders, setHasConfiguredProviders] = useState<boolean>(false);
+  
+  // State for output window expansion
+  const [isOutputExpanded, setIsOutputExpanded] = useState<boolean>(false);
 
   // Check if any providers are configured when component mounts
   useEffect(() => {
@@ -36,7 +39,6 @@ export function SidePanel() {
       setHasConfiguredProviders(providers.length > 0);
     };
    
-
     checkProviders();
 
     const handleDownloadMarkdown = (message: DownloadMarkdownMessage) =>{
@@ -156,16 +158,12 @@ export function SidePanel() {
     },
     onRateLimit: () => {
       addSystemMessage("⚠️ Rate limit reached. Retrying automatically...");
-      // Ensure the UI stays in processing mode
       setIsProcessing(true);
-      // Update the tab status to running
       setTabStatus('running');
     },
     onFallbackStarted: (message) => {
       addSystemMessage(message);
-      // Ensure the UI stays in processing mode
       setIsProcessing(true);
-      // Update the tab status to running
       setTabStatus('running');
     },
     onUpdateScreenshot: (content) => {
@@ -174,53 +172,40 @@ export function SidePanel() {
     onProcessingComplete: () => {
       setIsProcessing(false);
       completeStreaming();
-      // Also update the tab status to idle to ensure the UI indicator changes
       setTabStatus('idle');
     },
     onRequestApproval: (request) => {
-      // Add the request to the list
       setApprovalRequests(prev => [...prev, request]);
     },
     setTabTitle,
-    // New event handlers for tab events
     onTabStatusChanged: (status, _tabId) => {
-      // Update the tab status state
       setTabStatus(status);
     },
     onTargetChanged: (_tabId, _url) => {
-      // We don't need to do anything here as TabStatusBar handles this
+      // Handle target change
     },
     onActiveTabChanged: (oldTabId, newTabId, title, url) => {
-      // Update the tab title when the agent switches tabs
       console.log(`SidePanel: Active tab changed from ${oldTabId} to ${newTabId}`);
       setTabTitle(title);
-
-      // Add a system message to indicate the tab change
       addSystemMessage(`Switched to tab: ${title} (${url})`);
     },
     onPageDialog: (tabId, dialogInfo) => {
-      // Add a system message about the dialog
       addSystemMessage(`📢 Dialog: ${dialogInfo.type} - ${dialogInfo.message}`);
     },
     onPageError: (tabId, error) => {
-      // Add a system message about the error
       addSystemMessage(`❌ Page Error: ${error}`);
     },
     onAgentStatusUpdate: (status, lastHeartbeat) => {
-      // Log agent status updates for debugging
       console.log(`Agent status update: ${status}, lastHeartbeat: ${lastHeartbeat}, diff: ${Date.now() - lastHeartbeat}ms`);
 
-      // Update the tab status based on agent status
       if (status === 'running' || status === 'idle' || status === 'error') {
         setTabStatus(status);
       }
 
-      // If agent is running, ensure UI is in processing mode
       if (status === 'running') {
         setIsProcessing(true);
       }
 
-      // If agent is idle, ensure UI is not in processing mode
       if (status === 'idle') {
         setIsProcessing(false);
       }
@@ -230,10 +215,7 @@ export function SidePanel() {
   // Handle form submission
   const handleSubmit = async (prompt: string, role: string) => {
     setIsProcessing(true);
-    // Update the tab status to running
     setTabStatus('running');
-
-    // Add a system message to indicate a new prompt
     addSystemMessage(`New ${role} prompt: "${prompt}"`);
 
     try {
@@ -242,31 +224,21 @@ export function SidePanel() {
       console.error('Error:', error);
       addSystemMessage('Error: ' + (error instanceof Error ? error.message : String(error)));
       setIsProcessing(false);
-      // Update the tab status to error
       setTabStatus('error');
     }
   };
 
-  // Handle cancellation - also reject any pending approval requests
+  // Handle cancellation
   const handleCancel = () => {
-    // If there are any pending approval requests, reject them all
     if (approvalRequests.length > 0) {
-      // Add a system message to indicate that approvals were rejected due to cancellation
       addSystemMessage(`❌ Cancelled execution - all pending approval requests were automatically rejected`);
-
-      // Reject each pending approval request
       approvalRequests.forEach(req => {
         rejectRequest(req.requestId);
       });
-
-      // Clear the approval requests
       setApprovalRequests([]);
     }
 
-    // Cancel the execution
     cancelExecution();
-
-    // Update the tab status to idle
     setTabStatus('idle');
   };
 
@@ -275,20 +247,17 @@ export function SidePanel() {
     clearMessages();
     clearHistory();
 
-    // Reset token tracking
     const tokenTracker = TokenTrackingService.getInstance();
     tokenTracker.reset();
   };
 
   // Handle reflect and learn
   const handleReflectAndLearn = () => {
-    // Send message to background script to trigger reflection
     chrome.runtime.sendMessage({
       action: 'reflectAndLearn',
       tabId
     });
 
-    // Add a system message to indicate reflection is happening
     addSystemMessage("🧠 Reflecting on this session to learn useful patterns...");
   };
 
@@ -297,84 +266,236 @@ export function SidePanel() {
     chrome.runtime.openOptionsPage();
   };
 
+  // Function to toggle output expansion
+  const toggleOutputExpansion = () => {
+    setIsOutputExpanded(!isOutputExpanded);
+  };
+
+  // Get dynamic gradient based on status - now with bright colors
+  const getStatusGradient = () => {
+    switch (tabStatus) {
+      case 'running':
+        return 'from-sky-300 via-blue-300 to-indigo-300';
+      case 'error':
+        return 'from-rose-300 via-pink-300 to-red-300';
+      case 'idle':
+        return 'from-emerald-300 via-teal-300 to-cyan-300';
+      default:
+        return 'from-sky-200 via-blue-200 to-indigo-200';
+    }
+  };
+
+  // Get status accent color
+  const getStatusAccent = () => {
+    switch (tabStatus) {
+      case 'running':
+        return 'from-blue-500 to-indigo-500';
+      case 'error':
+        return 'from-rose-500 to-red-500';
+      case 'idle':
+        return 'from-emerald-500 to-teal-500';
+      default:
+        return 'from-sky-500 to-blue-500';
+    }
+  };
+
   return (
-    <div className="flex flex-col h-screen p-4 bg-base-200">
-      <header className="mb-4">
-        <div className="flex justify-between items-center">
-          <h1 className="text-xl font-bold text-primary">BrowserOnly 🤖️</h1>
-        <TabStatusBar 
-          tabId={tabId}
-          tabTitle={tabTitle}
-          tabStatus={tabStatus}
-        />
+    <div className="flex flex-col h-screen relative overflow-hidden bg-gradient-to-br from-sky-50 to-blue-100">
+      {/* Bright Animated Background */}
+      <div className={`absolute inset-0 bg-gradient-to-br ${getStatusGradient()} opacity-60 transition-all duration-1000`}>
+        <div className="absolute inset-0 bg-gradient-to-t from-white/30 to-transparent"></div>
+        {/* Floating shapes for visual interest */}
+        <div className="absolute top-10 left-10 w-32 h-32 bg-white/20 rounded-full blur-xl animate-pulse"></div>
+        <div className="absolute bottom-20 right-10 w-24 h-24 bg-sky-200/30 rounded-full blur-lg animate-bounce"></div>
+        <div className="absolute top-1/3 right-1/4 w-16 h-16 bg-blue-200/20 rounded-full blur-md animate-ping"></div>
       </div>
-      <p className="text-sm text-gray-600 mt-2">
-          What can I do for you today?
-        </p>
-      </header>
 
-      {hasConfiguredProviders ? (
-        <>
-          <div className="flex flex-col flex-grow gap-4 overflow-hidden md:flex-row shadow-sm">
-            <div className="card bg-base-100 shadow-md flex-1 flex flex-col overflow-hidden">
-              <OutputHeader
-                onClearHistory={handleClearHistory}
-                onReflectAndLearn={handleReflectAndLearn}
-                isProcessing={isProcessing}
-              />
-              <div
-                ref={outputRef}
-                className="card-body p-3 overflow-auto bg-base-100 flex-1"
-              >
-                <MessageDisplay
-                  messages={messages}
-                  streamingSegments={streamingSegments}
-                  isStreaming={isStreaming}
-                />
+      {/* Main Container with bright glassmorphism */}
+      <div className="relative z-10 flex flex-col h-full p-3 transition-all duration-300">
+        
+        {/* Compact Header - Reduced margin */}
+        {!isOutputExpanded && (
+          <header className="mb-3">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br ${getStatusAccent()} shadow-lg flex items-center justify-center transform hover:scale-105 transition-transform duration-200`}>
+                  <span className="text-xl">🤖</span>
+                </div>
+                <div>
+                  <h1 className="text-2xl font-black text-gray-800 tracking-tight">BrowserOnly</h1>
+                  <div className="text-xs text-sky-600 font-semibold">Your AI Browser Assistant</div>
+                </div>
               </div>
+              
+              <TabStatusBar 
+                tabId={tabId}
+                tabTitle={tabTitle}
+                tabStatus={tabStatus}
+              />
             </div>
+          </header>
+        )}
+
+        {hasConfiguredProviders ? (
+  <>
+    {/* Main Content Area with Bright Cards - Increased flex-1 priority */}
+    <div className={`flex-grow flex flex-col gap-3 transition-all duration-300 ${isOutputExpanded ? 'fixed inset-4 z-50 bg-sky-50/95 backdrop-blur-md rounded-3xl p-4 overflow-hidden' : 'overflow-hidden min-h-0'}`}>
+      
+      {/* Chat Display Area - Maximized height */}
+      <div className={`${isOutputExpanded ? 'flex-1' : 'flex-1 min-h-0'} bg-white/80 backdrop-blur-sm rounded-3xl shadow-lg border border-white/50 overflow-hidden transition-all duration-300`}>
+        <div className="bg-gradient-to-r from-sky-50 to-blue-50 border-b border-sky-100 flex items-center justify-between px-4 py-2">
+          {/* OutputHeader - 只显示标题 */}
+          <div className="text-xl font-bold text-gray-800">
+            Output
           </div>
+          
+          {/* 按钮组：OutputHeader功能按钮 + 展开控制 */}
+          <div className="flex items-center gap-2">
+            {/* Reflect 按钮 */}
+            <div className="tooltip tooltip-bottom" data-tip="Reflect and learn from this session">
+              <button 
+                onClick={handleReflectAndLearn}
+                className="btn btn-sm bg-gradient-to-r from-sky-500 to-blue-600 border-0 text-white hover:from-sky-600 hover:to-blue-700 shadow-lg rounded-xl transform hover:scale-105 transition-all duration-200"
+                disabled={isProcessing}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+              </button>
+            </div>
+            
+            {/* Clear 按钮 */}
+            <div className="tooltip tooltip-bottom" data-tip="Clear conversation history and LLM context">
+              <button 
+                onClick={handleClearHistory}
+                className="btn btn-sm bg-white/70 backdrop-blur-sm border border-gray-200 text-gray-700 hover:bg-white/90 hover:border-gray-300 shadow-md rounded-xl transform hover:scale-105 transition-all duration-200"
+                disabled={isProcessing}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </div>
+            
+            {/* 分隔线 */}
+            <div className="w-px h-6 bg-gray-300 mx-2"></div>
+            
+            {/* 展开/收缩按钮 */}
+            <button
+              onClick={toggleOutputExpansion}
+              className={`btn btn-sm btn-circle ${isOutputExpanded ? 'bg-red-500 hover:bg-red-600 text-white border-0' : 'bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white border-0'} shadow-lg hover:scale-110 transition-all duration-200 z-50 pointer-events-auto`}
+              title={isOutputExpanded ? 'Minimize window' : 'Expand window'}
+            >
+              {isOutputExpanded ? (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                </svg>
+              )}
+            </button>
+          </div>
+        </div>
+        <div
+          ref={outputRef}
+          className={`p-6 overflow-auto flex-1 bg-gradient-to-b from-white/50 to-sky-50/30 ${isOutputExpanded ? 'h-full max-h-full' : ''}`}
+          style={isOutputExpanded ? { height: 'calc(100vh - 200px)', maxHeight: 'calc(100vh - 200px)' } : { maxHeight: 'calc(100% - 60px)' }}
+        >
+          <MessageDisplay
+            messages={messages}
+            streamingSegments={streamingSegments}
+            isStreaming={isStreaming}
+          />
+        </div>
+      </div>
 
-          {/* Add Token Usage Display */}
-          <TokenUsageDisplay />
+      {/* Approval Requests with Bright Styling - Only shown when not expanded */}
+      {!isOutputExpanded && approvalRequests.map(req => (
+        <div key={req.requestId} className="bg-amber-100/80 backdrop-blur-sm rounded-2xl shadow-lg border border-amber-200/50 p-4">
+          <ApprovalRequest
+            requestId={req.requestId}
+            toolName={req.toolName}
+            toolInput={req.toolInput}
+            reason={req.reason}
+            onApprove={handleApprove}
+            onReject={handleReject}
+          />
+        </div>
+      ))}
+    </div>
 
-          {/* Display approval requests */}
-          {approvalRequests.map(req => (
-            <ApprovalRequest
-              key={req.requestId}
-              requestId={req.requestId}
-              toolName={req.toolName}
-              toolInput={req.toolInput}
-              reason={req.reason}
-              onApprove={handleApprove}
-              onReject={handleReject}
-            />
-          ))}
-
+    {/* Bottom Input Section - Hide when expanded */}
+    {!isOutputExpanded && (
+      <div className="mt-3 space-y-3 flex-shrink-0">
+        <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-lg border border-white/50 p-4">
           <PromptForm
             onSubmit={handleSubmit}
             onCancel={handleCancel}
             isProcessing={isProcessing}
             tabStatus={tabStatus}
           />
-          <ProviderSelector isProcessing={isProcessing} />
-        </>
-      ) : (
-        <div className="flex flex-col flex-grow items-center justify-center">
-          <div className="text-center mb-6">
-            <h2 className="text-xl font-semibold mb-2">No LLM provider configured</h2>
-            <p className="text-gray-600 mb-4">
-              You need to configure an LLM provider before you can use BrowserOnly.
-            </p>
-            <button
-              onClick={navigateToOptions}
-              className="btn btn-primary"
-            >
-              Configure Providers
-            </button>
+        </div>
+        
+        {/* Merged Provider and Token Section */}
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/50 p-3">
+          <div className="flex items-center justify-between gap-4">
+            {/* Provider Selector takes more space */}
+            <div className="flex-1">
+              <ProviderSelector isProcessing={isProcessing} />
+            </div>
+            
+            {/* Vertical divider */}
+            <div className="w-px h-8 bg-gray-300"></div>
+            
+            {/* Compact Token Usage Display */}
+            <div className="flex-shrink-0">
+              <TokenUsageDisplay />
+            </div>
           </div>
         </div>
-      )}
+      </div>
+    )}
+  </>
+) : (
+  /* No Provider Configured State - Bright Version */
+  <div className="flex-1 flex items-center justify-center">
+    <div className="text-center max-w-sm">
+      <div className="w-32 h-32 mx-auto mb-8 rounded-3xl bg-white/80 backdrop-blur-sm shadow-2xl border border-white/50 flex items-center justify-center transform hover:scale-105 transition-transform duration-300">
+        <span className="text-6xl">⚙️</span>
+      </div>
+      
+      <h2 className="text-3xl font-bold text-gray-800 mb-4">Let's Get Started!</h2>
+      <p className="text-gray-600 mb-8 leading-relaxed text-lg">
+        Configure your AI provider to unlock powerful browser automation and assistance features.
+      </p>
+      
+      <button
+        onClick={navigateToOptions}
+        className="btn btn-lg bg-gradient-to-r from-sky-500 to-blue-600 border-0 text-white hover:from-sky-600 hover:to-blue-700 shadow-2xl rounded-2xl transform hover:scale-105 transition-all duration-300"
+      >
+        <span className="mr-3 text-xl">🚀</span>
+        Configure Providers
+      </button>
+      
+      <div className="mt-6 flex justify-center space-x-4">
+        <div className="w-2 h-2 bg-sky-400 rounded-full animate-pulse"></div>
+        <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
+        <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
+      </div>
+    </div>
+  </div>
+)}
+
+        {/* Bright Floating Elements */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute top-16 left-16 w-3 h-3 bg-sky-400/60 rounded-full animate-bounce"></div>
+          <div className="absolute top-32 right-24 w-2 h-2 bg-blue-400/50 rounded-full animate-ping"></div>
+          <div className="absolute bottom-32 left-24 w-4 h-4 bg-indigo-300/40 rounded-full animate-pulse"></div>
+          <div className="absolute bottom-16 right-16 w-2.5 h-2.5 bg-sky-300/60 rounded-full animate-bounce" style={{animationDelay: '1s'}}></div>
+        </div>
+      </div>
     </div>
   );
 }

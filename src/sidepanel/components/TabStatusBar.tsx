@@ -94,44 +94,47 @@ export const TabStatusBar: React.FC<TabStatusBarProps> = ({
   };
   
   return (
-    <div className="text-sm bg-base-300 rounded-md px-2 py-1 border border-base-content border-opacity-10 flex items-center justify-between max-w-[200px]">
+    <div className="text-sm bg-white/80 backdrop-blur-sm rounded-xl px-3 py-2 border border-white/50 shadow-md flex items-center justify-between max-w-[240px] transition-all duration-200 hover:shadow-lg">
       <div className="flex items-center flex-grow overflow-hidden">
-        <div className={`w-2 h-2 rounded-full mr-2 flex-shrink-0 ${
-          tabStatus === 'attached' ? 'bg-green-500 animate-pulse' : 
-          tabStatus === 'detached' ? 'bg-red-500' : 
-          tabStatus === 'running' ? 'bg-blue-500 animate-pulse' :
-          tabStatus === 'idle' ? 'bg-green-500' :
-          tabStatus === 'error' ? 'bg-red-500 animate-pulse' : 'bg-yellow-500'
-        }`} title={
-          tabStatus === 'attached' ? 'Connected' : 
-          tabStatus === 'detached' ? 'Disconnected' : 
-          tabStatus === 'running' ? 'Agent Running' :
-          tabStatus === 'idle' ? 'Agent Idle' :
-          tabStatus === 'error' ? 'Agent Error' : 'Unknown'
-        }></div>
-        <span 
-          className="cursor-pointer hover:underline hover:text-primary truncate"
-          onClick={handleTabClick}
-          title={`${tabTitle}${tabUrl ? `\n${tabUrl}` : ''}`}
-        > 
-          {tabTitle}
-        </span>
+      <div className={`w-2.5 h-2.5 rounded-full mr-3 flex-shrink-0 shadow-sm ${
+        tabStatus === 'attached' ? 'bg-emerald-500 shadow-emerald-200 animate-pulse' : 
+        tabStatus === 'detached' ? 'bg-red-500 shadow-red-200' : 
+        tabStatus === 'running' ? 'bg-blue-500 shadow-blue-200 animate-pulse' :
+        tabStatus === 'idle' ? 'bg-emerald-500 shadow-emerald-200' :
+        tabStatus === 'error' ? 'bg-red-500 shadow-red-200 animate-pulse' : 'bg-amber-500 shadow-amber-200'
+      }`} title={
+        tabStatus === 'attached' ? 'Connected' : 
+        tabStatus === 'detached' ? 'Disconnected' : 
+        tabStatus === 'running' ? 'Agent Running' :
+        tabStatus === 'idle' ? 'Agent Idle' :
+        tabStatus === 'error' ? 'Agent Error' : 'Unknown'
+      }></div>
+      <span 
+        className="cursor-pointer hover:text-sky-600 truncate text-gray-700 font-medium transition-colors duration-200 hover:underline decoration-sky-400 underline-offset-2"
+        onClick={handleTabClick}
+        title={`${tabTitle}${tabUrl ? `\n${tabUrl}` : ''}`}
+      > 
+        {tabTitle}
+      </span>
       </div>
-      
-      <div className="flex items-center ml-2">
-          <button 
-            className="px-1.5 py-0.5 bg-base-200 hover:bg-primary hover:text-primary-content rounded text-xs border border-base-content border-opacity-20"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            title="Attach to current tab"
-          >
-            <FontAwesomeIcon 
-              icon={faSync} 
-              className={isRefreshing ? 'animate-spin' : ''} 
-              size="xs"
-            />
-          </button>
+    
+      <div className="flex items-center ml-3">
+      <button 
+        className="px-2 py-1 bg-gradient-to-r from-sky-100 to-blue-100 hover:from-sky-200 hover:to-blue-200 text-sky-700 hover:text-sky-800 rounded-lg text-xs border border-sky-200 hover:border-sky-300 shadow-sm hover:shadow transition-all duration-200 transform hover:scale-105"
+        onClick={handleRefresh}
+        disabled={isRefreshing}
+        title="Attach to current tab"
+      >
+        <svg 
+          className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`}
+          fill="none" 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+      </button>
       </div>
     </div>
-  );
+);
 };

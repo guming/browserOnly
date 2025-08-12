@@ -138,42 +138,46 @@ export function ProviderSelector({ isProcessing }: ProviderSelectorProps) {
   };
 
   return (
-    <div className="flex items-center justify-between mb-2 px-0">
-      <div className="flex items-center">
-        <button 
-          className="btn btn-ghost btn-xs p-1" 
-          onClick={openOptionsPage}
-          title="Open Settings"
-          disabled={isProcessing}
-        >
-          <FontAwesomeIcon icon={faCog} className="text-gray-500 hover:text-gray-700" />
-        </button>
-        <select 
-          className="select select-ghost select-xs select-bordered w-auto focus:outline-none focus:ring-0 pl-0"
-          value={`${currentProvider}|${currentModel}`}
-          onChange={handleChange}
-          disabled={isProcessing}
-        >
-          {options.map(option => (
-            option.models.map(model => (
-              <option 
-                key={`${option.provider}|${model.id}`} 
-                value={`${option.provider}|${model.id}`}
-              >
-                {option.displayName} - {model.name}
-              </option>
-            ))
-          ))}
-        </select>
-      </div>
-      <button 
-        className="btn btn-ghost btn-xs p-1" 
-        onClick={openHelpPage}
-        title="Open Help"
-        disabled={isProcessing}
-      >
-        <FontAwesomeIcon icon={faCircleInfo} className="text-gray-500 hover:text-gray-700" />
-      </button>
-    </div>
+    <div className="flex items-center justify-between">
+  <div className="flex items-center gap-3">
+    <button
+      className="w-8 h-8 rounded-xl bg-white/70 backdrop-blur-sm border border-gray-200 text-gray-600 hover:bg-white/90 hover:text-gray-800 hover:border-gray-300 shadow-sm transition-all duration-200 flex items-center justify-center transform hover:scale-105"
+      onClick={openOptionsPage}
+      title="Open Settings"
+      disabled={isProcessing}
+    >
+      <FontAwesomeIcon icon={faCog} className="text-sm" />
+    </button>
+    
+    <select
+      className="bg-gradient-to-r from-sky-50 to-blue-50 border border-sky-200 rounded-xl px-3 py-2 text-sm font-medium text-gray-700 hover:border-sky-300 focus:border-sky-400 focus:ring-2 focus:ring-sky-200 focus:outline-none transition-all duration-200 backdrop-blur-sm"
+      value={`${currentProvider}|${currentModel}`}
+      onChange={handleChange}
+      disabled={isProcessing}
+      style={{ minWidth: '200px' }}
+    >
+      {options.map(option => (
+        option.models.map(model => (
+          <option
+            key={`${option.provider}|${model.id}`}
+            value={`${option.provider}|${model.id}`}
+            className="bg-white text-gray-700"
+          >
+            {option.displayName} - {model.name}
+          </option>
+        ))
+      ))}
+    </select>
+  </div>
+  
+  <button
+    className="w-8 h-8 rounded-xl bg-white/70 backdrop-blur-sm border border-gray-200 text-gray-600 hover:bg-white/90 hover:text-gray-800 hover:border-gray-300 shadow-sm transition-all duration-200 flex items-center justify-center transform hover:scale-105"
+    onClick={openHelpPage}
+    title="Open Help"
+    disabled={isProcessing}
+  >
+    <FontAwesomeIcon icon={faCircleInfo} className="text-sm" />
+  </button>
+</div>
   );
 }
