@@ -134,7 +134,7 @@ export function ConnectionTab() {
     <div className="space-y-6">
       <div className="card bg-base-100 shadow-md">
         <div className="card-body">
-          <h2 className="card-title text-xl">🔗 Connection Settings</h2>
+          <h2 className="card-title text-xl">🔗 Connection Settings (coming soon)</h2>
           <p className="mb-4">
             Configure connection settings for BrowserOnly.
           </p>

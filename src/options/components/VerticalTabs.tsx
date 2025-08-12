@@ -157,43 +157,36 @@ export function VerticalTabs(props: VerticalTabsProps) {
   };
 
   return (
-    <div className="flex min-h-screen relative overflow-hidden bg-gradient-to-br from-sky-50 to-blue-100">
-  {/* Bright Animated Background */}
-  <div className="absolute inset-0 bg-gradient-to-br from-sky-300 via-blue-300 to-indigo-300 opacity-40 transition-all duration-1000">
-    <div className="absolute inset-0 bg-gradient-to-t from-white/30 to-transparent"></div>
-    {/* Floating shapes for visual interest */}
-    <div className="absolute top-10 left-10 w-32 h-32 bg-white/20 rounded-full blur-xl animate-pulse"></div>
-    <div className="absolute bottom-20 right-10 w-24 h-24 bg-sky-200/30 rounded-full blur-lg animate-bounce"></div>
-    <div className="absolute top-1/3 right-1/4 w-16 h-16 bg-blue-200/20 rounded-full blur-md animate-ping"></div>
-  </div>
-
-  {/* Left Sidebar - Modern Glassmorphism */}
-  <div className="relative z-10 w-64 bg-white/80 backdrop-blur-sm shadow-2xl border-r border-white/50">
+    <div className="flex min-h-screen bg-gray-100">
+  {/* 完全移除动态背景和装饰元素 */}
+  
+  {/* Left Sidebar - 纯色设计 */}
+  <div className="w-64 bg-white border-r border-gray-200">
     <div className="p-6">
-      {/* Modern Header */}
+      {/* 简化的Header */}
       <div className="flex items-center gap-3 mb-8">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 shadow-lg flex items-center justify-center transform hover:scale-105 transition-transform duration-200">
+        <div className="w-12 h-12 bg-blue-600 flex items-center justify-center">
           <span className="text-2xl">🤖</span>
         </div>
         <div>
-          <h1 className="text-2xl font-black text-gray-800 tracking-tight">BrowserOnly</h1>
-          <div className="text-xs text-sky-600 font-semibold">Configuration</div>
+          <h1 className="text-2xl font-bold text-gray-800">BrowserOnly</h1>
+          <div className="text-sm text-blue-600">Configuration</div>
         </div>
       </div>
       
-      {/* Modern Vertical Navigation */}
+      {/* 简化的垂直导航 */}
       <div className="space-y-2">
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            className={`w-full flex items-center gap-4 px-4 py-3 rounded-2xl font-medium transition-all duration-300 transform hover:scale-[1.02] ${
-              activeTab === tab.id 
-                ? 'bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-lg shadow-sky-500/25' 
-                : 'bg-white/50 backdrop-blur-sm text-gray-700 hover:bg-white/70 hover:text-gray-900 shadow-md border border-white/30'
+            className={`w-full flex items-center gap-4 px-4 py-3 font-medium ${
+              activeTab === tab.id
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-50 text-gray-700 hover:bg-gray-100 hover:text-gray-900 border border-gray-200'
             }`}
             onClick={() => setActiveTab(tab.id)}
           >
-            <span className={`text-xl ${activeTab === tab.id ? 'animate-pulse' : ''}`}>
+            <span className="text-xl">
               {tab.icon}
             </span>
             <span className="font-semibold">{tab.label}</span>
@@ -203,21 +196,13 @@ export function VerticalTabs(props: VerticalTabsProps) {
     </div>
   </div>
 
-  {/* Right Content Area - Modern Card Design */}
-  <div className="relative z-10 flex-1 p-6 overflow-auto">
-    <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-white/50 h-full overflow-auto">
+  {/* Right Content Area - 简化卡片设计 */}
+  <div className="flex-1 p-6 overflow-auto">
+    <div className="bg-white border border-gray-200 h-full overflow-auto">
       <div className="p-8">
         {renderTabContent()}
       </div>
     </div>
-  </div>
-
-  {/* Bright Floating Elements */}
-  <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-    <div className="absolute top-16 left-80 w-3 h-3 bg-sky-400/60 rounded-full animate-bounce"></div>
-    <div className="absolute top-32 right-24 w-2 h-2 bg-blue-400/50 rounded-full animate-ping"></div>
-    <div className="absolute bottom-32 left-80 w-4 h-4 bg-indigo-300/40 rounded-full animate-pulse"></div>
-    <div className="absolute bottom-16 right-16 w-2.5 h-2.5 bg-sky-300/60 rounded-full animate-bounce" style={{animationDelay: '1s'}}></div>
   </div>
 </div>
   );
