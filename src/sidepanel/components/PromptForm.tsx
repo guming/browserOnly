@@ -45,7 +45,6 @@ export const PromptForm: React.FC<PromptFormProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim() || isProcessing || tabStatus === 'detached') return;
-    console.log("the exec role is ", role);
     onSubmit(prompt, role);
     setPrompt(''); // Clear the prompt after submission
   };

@@ -16,7 +16,7 @@ export default {
     }],
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(@google/genai|@anthropic-ai/sdk)/)',
+    'node_modules/(?!(@google/genai|@anthropic-ai/sdk|@modelcontextprotocol)/)',
   ],
   setupFilesAfterEnv: ['<rootDir>/tests/setup/setupTests.ts'],
   testMatch: [

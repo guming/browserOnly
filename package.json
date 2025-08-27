@@ -14,7 +14,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/parsaghaffari/BrowserOnly.git"
+    "url": "https://github.com/gumingcn/BrowserOnly.git"
   },
   "scripts": {
     "build": "tsc && vite build && node scripts/copy-static.js",
@@ -38,6 +38,7 @@
     "@langchain/anthropic": "^0.3.18",
     "@langchain/core": "^0.3.45",
     "@langchain/langgraph": "^0.2.64",
+    "@modelcontextprotocol/sdk": "^1.17.2",
     "@notionhq/client": "^3.1.3",
     "jsdom": "^26.1.0",
     "langchain": "^0.3.22",

@@ -58,6 +58,8 @@ import { ToolFactory } from "./types";
 
 import { startExtract } from "./subAgentAsTools";
 
+import { notionCreatePage} from "./notionTools"
+
 // Export all tools
 export {
   // Navigation tools

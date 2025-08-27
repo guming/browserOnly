@@ -157,21 +157,3 @@ export const startExtract : ToolFactory = (page: Page) =>
       }
     },
 });
-
-
-
-
-export function getExtractStatus() {
-  return {
-    name: "get_crawler_status",
-    description: "Get the current status of the crawler (running or idle).",
-    func: async (): Promise<string> => {
-      try {
-        return `Extract service is ready`;
-      } catch (error) {
-        logWithTimestamp(`Error getting crawler status: ${error instanceof Error ? error.message : String(error)}`, 'error');
-        return `Error getting crawler status: ${error instanceof Error ? error.message : String(error)}`;
-      }
-    }
-  };
-}

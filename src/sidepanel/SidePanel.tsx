@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { ConfigManager } from '../background/configManager';
+import { DownloadMarkdownMessage } from '../background/types';
 import { TokenTrackingService } from '../tracking/tokenTrackingService';
 import { ApprovalRequest } from './components/ApprovalRequest';
 import { MessageDisplay } from './components/MessageDisplay';
-import { OutputHeader } from './components/OutputHeader';
+import { MultiTabStatusBar } from './components/MultiTabStatusBar';
 import { PromptForm } from './components/PromptForm';
 import { ProviderSelector } from './components/ProviderSelector';
-import { TabStatusBar } from './components/TabStatusBar';
 import { TokenUsageDisplay } from './components/TokenUsageDisplay';
 import { useChromeMessaging } from './hooks/useChromeMessaging';
 import { useMessageManagement } from './hooks/useMessageManagement';
 import { useTabManagement } from './hooks/useTabManagement';
-import { DownloadMarkdownMessage } from '../background/types';
+import { useTabSelection } from './hooks/useTabSelection'; 
 
 export function SidePanel() {
   // State for tab status
@@ -75,6 +75,34 @@ export function SidePanel() {
     tabTitle,
     setTabTitle
   } = useTabManagement();
+
+  // 解决方案：添加本地状态来跟踪当前选中的tab
+  const [currentSelectedTabId, setCurrentSelectedTabId] = useState<number | null>(tabId);
+  useEffect(() => {
+    if (tabId && tabId !== currentSelectedTabId) {
+      setCurrentSelectedTabId(tabId);
+    }
+  }, [tabId, currentSelectedTabId]);
+
+  // add new feature - tab selection
+  const {
+    handleTabSelect,
+    selectedTabHistory,
+    isTabSwitching,
+    getRecentTabs,
+  } = useTabSelection({
+    setTabTitle,
+    setTabStatus,
+    windowId,
+    onTabChanged: (newTabId: number) => {
+      setCurrentSelectedTabId(newTabId);
+      
+      chrome.runtime.sendMessage({
+        action: 'switchToTab',
+        tabId: newTabId
+      });
+    }
+  });
 
   const {
     messages,
@@ -302,7 +330,7 @@ export function SidePanel() {
   return (
     <div className="flex flex-col h-screen relative overflow-hidden bg-gradient-to-br from-sky-50 to-blue-100">
   {/* 简化后的静态背景 - 减少GPU负载 */}
-  <div className={`absolute inset-0 bg-gradient-to-br ${getStatusGradient()} opacity-60`}>
+  <div className={`absolute inset-0 bg-gradient-to-br ${getStatusGradient()} opacity-60 z-0`}>
     <div className="absolute inset-0 bg-gradient-to-t from-white/30 to-transparent"></div>
     {/* 简化浮动形状，移除所有动画效果 */}
     <div className="absolute top-10 left-10 w-20 h-20 bg-white/15 rounded-full"></div>
@@ -325,23 +353,43 @@ export function SidePanel() {
               <div className="text-xs text-sky-600 font-semibold">Your AI Browser Assistant</div>
             </div>
           </div>
-          
-          <TabStatusBar 
-            tabId={tabId}
-            tabTitle={tabTitle}
-            tabStatus={tabStatus}
-          />
+          <div className="relative z-50">
+            <MultiTabStatusBar 
+                  selectedTabId={currentSelectedTabId || tabId}
+                  onTabSelect={handleTabSelect}
+                />
+          </div>
         </div>
+        {/* Recent tabs显示也需要高z-index */}
+            {selectedTabHistory.length > 1 && (
+              <div className="mb-2 relative z-50">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 font-medium">Recent:</span>
+                  <div className="flex gap-1">
+                    {selectedTabHistory.slice(1, 4).map(historyTabId => (
+                      <button
+                        key={historyTabId}
+                        onClick={() => handleTabSelect(historyTabId)}
+                        className="px-2 py-1 bg-white/60 hover:bg-white/80 text-gray-600 rounded-lg text-xs transition-all duration-200 hover:scale-105 shadow-sm"
+                        disabled={isTabSwitching}
+                      >
+                        #{historyTabId}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
       </header>
     )}
 
     {hasConfiguredProviders ? (
       <>
         {/* Main Content Area - 优化动画性能 */}
-        <div className={`flex-grow flex flex-col gap-3 ${isOutputExpanded ? 'fixed inset-4 z-50 bg-sky-50/95 backdrop-blur-sm rounded-3xl p-4 overflow-hidden' : 'overflow-hidden min-h-0'}`}>
+        <div className={`flex-grow flex flex-col gap-3 ${isOutputExpanded ? 'fixed inset-4 z-50 bg-sky-50/95 backdrop-blur-sm rounded-3xl p-4 overflow-hidden' : 'overflow-hidden min-h-0 z-20'}`}>
           
           {/* Chat Display Area - 减少backdrop-blur使用 */}
-          <div className={`${isOutputExpanded ? 'flex-1' : 'flex-1 min-h-0'} bg-white/90 rounded-3xl shadow-lg border border-white/50 overflow-hidden will-change-transform`}>
+          <div className={`${isOutputExpanded ? 'flex-1' : 'flex-1 min-h-0'} bg-white/90 rounded-3xl shadow-lg border border-white/50 overflow-hidden will-change-transform relative z-30`}>
             <div className="bg-gradient-to-r from-sky-50 to-blue-50 border-b border-sky-100 flex items-center justify-between px-4 py-2">
               <div className="text-xl font-bold text-gray-800">
                 Output

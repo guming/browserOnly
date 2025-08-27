@@ -53,7 +53,7 @@ describe('PromptManager', () => {
 
     it('should handle empty tools array', () => {
       const emptyPromptManager = new PromptManager([]);
-      const systemPrompt = emptyPromptManager.getSystemPrompt();
+      const systemPrompt = emptyPromptManager.getSystemPrompt('operator');
       
       expect(systemPrompt).toContain('You are a browser-automation assistant called **BrowserOnly 🤖️**');
       // The prompt contains "browser_click" in the instructions, not in tool descriptions
@@ -77,7 +77,7 @@ describe('PromptManager', () => {
       const title = 'Example Page';
 
       promptManager.setCurrentPageContext(url, title);
-      const systemPrompt = promptManager.getSystemPrompt();
+      const systemPrompt = promptManager.getSystemPrompt('operator');
 
       expect(systemPrompt).toContain('CURRENT PAGE CONTEXT');
       expect(systemPrompt).toContain(`You are currently on ${url} (${title})`);
@@ -85,12 +85,12 @@ describe('PromptManager', () => {
 
     it('should update page context when called multiple times', () => {
       promptManager.setCurrentPageContext('https://first.com', 'First Page');
-      let systemPrompt = promptManager.getSystemPrompt();
+      let systemPrompt = promptManager.getSystemPrompt('operator');
       expect(systemPrompt).toContain('https://first.com');
       expect(systemPrompt).toContain('First Page');
 
       promptManager.setCurrentPageContext('https://second.com', 'Second Page');
-      systemPrompt = promptManager.getSystemPrompt();
+      systemPrompt = promptManager.getSystemPrompt('operator');
       expect(systemPrompt).toContain('https://second.com');
       expect(systemPrompt).toContain('Second Page');
       expect(systemPrompt).not.toContain('https://first.com');
@@ -101,7 +101,7 @@ describe('PromptManager', () => {
       const title = 'Page with "quotes" & special chars';
 
       promptManager.setCurrentPageContext(url, title);
-      const systemPrompt = promptManager.getSystemPrompt();
+      const systemPrompt = promptManager.getSystemPrompt('operator');
 
       expect(systemPrompt).toContain(url);
       expect(systemPrompt).toContain(title);
@@ -109,7 +109,7 @@ describe('PromptManager', () => {
 
     it('should handle empty URL and title', () => {
       promptManager.setCurrentPageContext('', '');
-      const systemPrompt = promptManager.getSystemPrompt();
+      const systemPrompt = promptManager.getSystemPrompt('operator');
 
       expect(systemPrompt).toContain('CURRENT PAGE CONTEXT');
       expect(systemPrompt).toContain('You are currently on  ()');
@@ -118,7 +118,7 @@ describe('PromptManager', () => {
 
   describe('getSystemPrompt', () => {
     it('should generate system prompt with tool descriptions', () => {
-      const systemPrompt = promptManager.getSystemPrompt();
+      const systemPrompt = promptManager.getSystemPrompt('operator');
 
       expect(systemPrompt).toContain('You are a browser-automation assistant called **BrowserOnly 🤖️**');
       expect(systemPrompt).toContain('browser_click: Click on an element using CSS selector');
@@ -127,7 +127,7 @@ describe('PromptManager', () => {
     });
 
     it('should include multi-tab operation instructions', () => {
-      const systemPrompt = promptManager.getSystemPrompt();
+      const systemPrompt = promptManager.getSystemPrompt('operator');
 
       expect(systemPrompt).toContain('MULTI-TAB OPERATION INSTRUCTIONS');
       expect(systemPrompt).toContain('Tab Context Awareness');
@@ -136,7 +136,7 @@ describe('PromptManager', () => {
     });
 
     it('should include canonical sequence instructions', () => {
-      const systemPrompt = promptManager.getSystemPrompt();
+      const systemPrompt = promptManager.getSystemPrompt('operator');
 
       expect(systemPrompt).toContain('CANONICAL SEQUENCE');
       expect(systemPrompt).toContain('Identify domain');
@@ -147,7 +147,7 @@ describe('PromptManager', () => {
     });
 
     it('should include memory format instructions', () => {
-      const systemPrompt = promptManager.getSystemPrompt();
+      const systemPrompt = promptManager.getSystemPrompt('operator');
 
       expect(systemPrompt).toContain('MEMORY FORMAT');
       expect(systemPrompt).toContain('Domain: www.google.com');
@@ -156,7 +156,7 @@ describe('PromptManager', () => {
     });
 
     it('should include tool-call syntax instructions', () => {
-      const systemPrompt = promptManager.getSystemPrompt();
+      const systemPrompt = promptManager.getSystemPrompt('operator');
 
       expect(systemPrompt).toContain('TOOL-CALL SYNTAX');
       expect(systemPrompt).toContain('<tool>tool_name</tool>');
@@ -165,7 +165,7 @@ describe('PromptManager', () => {
     });
 
     it('should detect macOS and use Command key', () => {
-      const systemPrompt = promptManager.getSystemPrompt();
+      const systemPrompt = promptManager.getSystemPrompt('operator');
 
       expect(systemPrompt).toContain('macOS');
       expect(systemPrompt).toContain('Command');
@@ -179,7 +179,7 @@ describe('PromptManager', () => {
       });
 
       const windowsPromptManager = new PromptManager(mockTools);
-      const systemPrompt = windowsPromptManager.getSystemPrompt();
+      const systemPrompt = windowsPromptManager.getSystemPrompt('operator');
 
       expect(systemPrompt).toContain('Windows');
       expect(systemPrompt).toContain('Control');
@@ -199,7 +199,7 @@ describe('PromptManager', () => {
       });
 
       const linuxPromptManager = new PromptManager(mockTools);
-      const systemPrompt = linuxPromptManager.getSystemPrompt();
+      const systemPrompt = linuxPromptManager.getSystemPrompt('operator');
 
       expect(systemPrompt).toContain('Linux');
       expect(systemPrompt).toContain('Control');
@@ -212,14 +212,14 @@ describe('PromptManager', () => {
     });
 
     it('should not include page context when not set', () => {
-      const systemPrompt = promptManager.getSystemPrompt();
+      const systemPrompt = promptManager.getSystemPrompt('operator');
 
       expect(systemPrompt).not.toContain('CURRENT PAGE CONTEXT');
     });
 
     it('should include page context when set', () => {
       promptManager.setCurrentPageContext('https://test.com', 'Test Page');
-      const systemPrompt = promptManager.getSystemPrompt();
+      const systemPrompt = promptManager.getSystemPrompt('operator');
 
       expect(systemPrompt).toContain('CURRENT PAGE CONTEXT');
       expect(systemPrompt).toContain('You are currently on https://test.com (Test Page)');
@@ -242,7 +242,7 @@ describe('PromptManager', () => {
       ];
 
       promptManager.updateTools(newTools);
-      const systemPrompt = promptManager.getSystemPrompt();
+      const systemPrompt = promptManager.getSystemPrompt('operator');
 
       expect(systemPrompt).toContain('browser_scroll: Scroll the page');
       expect(systemPrompt).toContain('browser_wait: Wait for an element');
@@ -251,7 +251,7 @@ describe('PromptManager', () => {
 
     it('should handle empty tools update', () => {
       promptManager.updateTools([]);
-      const systemPrompt = promptManager.getSystemPrompt();
+      const systemPrompt = promptManager.getSystemPrompt('operator');
 
       expect(systemPrompt).toContain('You are a browser-automation assistant');
       // The prompt will still contain "browser_click" in the instructions
@@ -270,7 +270,7 @@ describe('PromptManager', () => {
       ];
 
       promptManager.updateTools(newTools);
-      const systemPrompt = promptManager.getSystemPrompt();
+      const systemPrompt = promptManager.getSystemPrompt('operator');
 
       expect(systemPrompt).toContain('CURRENT PAGE CONTEXT');
       expect(systemPrompt).toContain('https://example.com');
@@ -298,7 +298,7 @@ describe('PromptManager', () => {
       ];
       
       promptManager.updateTools(searchTools);
-      const systemPrompt = promptManager.getSystemPrompt();
+      const systemPrompt = promptManager.getSystemPrompt('operator');
 
       // Verify all components are present
       expect(systemPrompt).toContain('BrowserOnly 🤖️');
@@ -313,8 +313,8 @@ describe('PromptManager', () => {
     it('should generate consistent prompts for same inputs', () => {
       promptManager.setCurrentPageContext('https://test.com', 'Test');
       
-      const prompt1 = promptManager.getSystemPrompt();
-      const prompt2 = promptManager.getSystemPrompt();
+      const prompt1 = promptManager.getSystemPrompt('operator');
+      const prompt2 = promptManager.getSystemPrompt('operator');
 
       expect(prompt1).toBe(prompt2);
     });
@@ -328,7 +328,7 @@ describe('PromptManager', () => {
 
       contexts.forEach(([url, title]) => {
         promptManager.setCurrentPageContext(url, title);
-        const systemPrompt = promptManager.getSystemPrompt();
+        const systemPrompt = promptManager.getSystemPrompt('operator');
         
         expect(systemPrompt).toContain(url);
         expect(systemPrompt).toContain(title);
@@ -359,7 +359,7 @@ describe('PromptManager', () => {
       ];
 
       promptManager.updateTools(toolsWithEmptyDesc);
-      const systemPrompt = promptManager.getSystemPrompt();
+      const systemPrompt = promptManager.getSystemPrompt('operator');
 
       expect(systemPrompt).toContain('tool1: ');
       expect(systemPrompt).toContain('tool2: Valid description');
@@ -380,7 +380,7 @@ describe('PromptManager', () => {
       ];
 
       promptManager.updateTools(specialTools);
-      const systemPrompt = promptManager.getSystemPrompt();
+      const systemPrompt = promptManager.getSystemPrompt('operator');
 
       expect(systemPrompt).toContain('tool_with_underscores');
       expect(systemPrompt).toContain('tool-with-dashes');
@@ -399,7 +399,7 @@ describe('PromptManager', () => {
       ];
 
       promptManager.updateTools(longDescTools);
-      const systemPrompt = promptManager.getSystemPrompt();
+      const systemPrompt = promptManager.getSystemPrompt('operator');
 
       expect(systemPrompt).toContain('long_tool');
       expect(systemPrompt).toContain(longDescription);
@@ -418,7 +418,7 @@ describe('PromptManager', () => {
 
       expect(() => {
         const tempPromptManager = new PromptManager(mockTools);
-        tempPromptManager.getSystemPrompt();
+        tempPromptManager.getSystemPrompt('operator');
       }).toThrow();
 
       // Restore navigator
@@ -443,8 +443,8 @@ describe('PromptManager', () => {
       }
 
       // Should still work correctly
-      const systemPrompt = promptManager.getSystemPrompt();
-      expect(systemPrompt).toContain('BrowserOnly 🤖️');
+      const systemPrompt = promptManager.getSystemPrompt('operator');
+      expect(systemPrompt).toContain('BrowserOnly');
       expect(systemPrompt).toContain('tool_99');
       expect(systemPrompt).toContain('https://site99.com');
     });
@@ -454,7 +454,7 @@ describe('PromptManager', () => {
       
       // Generate multiple prompts
       for (let i = 0; i < 50; i++) {
-        promptManager.getSystemPrompt();
+        promptManager.getSystemPrompt('operator');
       }
       
       const endTime = Date.now();
