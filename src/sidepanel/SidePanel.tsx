@@ -76,20 +76,61 @@ export function SidePanel() {
     setTabTitle
   } = useTabManagement();
 
-  // 解决方案：添加本地状态来跟踪当前选中的tab
   const [currentSelectedTabId, setCurrentSelectedTabId] = useState<number | null>(tabId);
   useEffect(() => {
     if (tabId && tabId !== currentSelectedTabId) {
+      console.log('new tabId:',tabId)
       setCurrentSelectedTabId(tabId);
     }
-  }, [tabId, currentSelectedTabId]);
+  }, [tabId]);
+
+  // 修复：添加浏览器标签页切换监听
+  useEffect(() => {
+    const handleTabActivated = (activeInfo: chrome.tabs.TabActiveInfo) => {
+      console.log('SidePanel: Tab activated:', activeInfo.tabId);
+      // 只有当激活的标签页与当前窗口相同时才更新
+      if (activeInfo.windowId === windowId) {
+        setCurrentSelectedTabId(activeInfo.tabId);
+        
+        // 通知背景脚本切换标签页
+        chrome.runtime.sendMessage({
+          action: 'switchToTab',
+          tabId: activeInfo.tabId
+        });
+      }
+    };
+
+    const handleTabUpdated = (tabId: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
+      // 当标签页标题更新时，如果是当前选中的标签页，更新标题
+      if (tabId === currentSelectedTabId && changeInfo.title) {
+        setTabTitle(changeInfo.title);
+      }
+    };
+
+    // 添加事件监听器
+    if (chrome.tabs && chrome.tabs.onActivated) {
+      chrome.tabs.onActivated.addListener(handleTabActivated);
+    }
+    if (chrome.tabs && chrome.tabs.onUpdated) {
+      chrome.tabs.onUpdated.addListener(handleTabUpdated);
+    }
+
+    return () => {
+      // 清理事件监听器
+      if (chrome.tabs && chrome.tabs.onActivated) {
+        chrome.tabs.onActivated.removeListener(handleTabActivated);
+      }
+      if (chrome.tabs && chrome.tabs.onUpdated) {
+        chrome.tabs.onUpdated.removeListener(handleTabUpdated);
+      }
+    };
+  }, [windowId, currentSelectedTabId, setTabTitle]);
 
   // add new feature - tab selection
   const {
     handleTabSelect,
     selectedTabHistory,
     isTabSwitching,
-    getRecentTabs,
   } = useTabSelection({
     setTabTitle,
     setTabStatus,
@@ -164,7 +205,7 @@ export function SidePanel() {
     approveRequest,
     rejectRequest
   } = useChromeMessaging({
-    tabId,
+    tabId:currentSelectedTabId,
     windowId,
     onUpdateOutput: (content) => {
       addMessage({ ...content, isComplete: true });
@@ -360,26 +401,6 @@ export function SidePanel() {
                 />
           </div>
         </div>
-        {/* Recent tabs显示也需要高z-index */}
-            {selectedTabHistory.length > 1 && (
-              <div className="mb-2 relative z-50">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500 font-medium">Recent:</span>
-                  <div className="flex gap-1">
-                    {selectedTabHistory.slice(1, 4).map(historyTabId => (
-                      <button
-                        key={historyTabId}
-                        onClick={() => handleTabSelect(historyTabId)}
-                        className="px-2 py-1 bg-white/60 hover:bg-white/80 text-gray-600 rounded-lg text-xs transition-all duration-200 hover:scale-105 shadow-sm"
-                        disabled={isTabSwitching}
-                      >
-                        #{historyTabId}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
       </header>
     )}
 

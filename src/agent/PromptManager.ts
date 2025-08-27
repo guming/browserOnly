@@ -58,7 +58,7 @@ If a request matches any Special Command, skip planning and tool selection. Imme
   console.log("basePrompt is ", basePrompt, mode);
 
   // If mode is 'munger', return only the basePrompt
-  if (mode === 'munger') {
+  if (mode === 'munger'|| mode ==='books') {
     return basePrompt;
   }
 

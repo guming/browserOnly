@@ -73,7 +73,7 @@ export const MultiTabStatusBar: React.FC<MultiTabStatusBarProps> = ({
     ) => {
       if (sender.id !== chrome.runtime.id) return;
 
-      if (message.action === 'targetChanged' && message.tabId==selectedTabId && message.url) {
+      if (message.action === 'targetChanged' && message.tabId && message.url) {
         setTabUrl(message.url);
         setAvailableTabs(prev => prev.map(tab => 
           tab.id === message.tabId 

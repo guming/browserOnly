@@ -28,6 +28,7 @@ import healthPrompt from './healthPrompt.ts';
 import wikiPrompt from './wikiPrompt.ts';
 import mungerPrompt from './mungerPrompt.ts';
 import dataAnalystPrompt from './dataAnalystPrompt.ts';
+import booksPrompt from './bookPromot.ts';
 
 // Export a function that takes the dynamic prompts as parameters
 export const createModePrompts = (
@@ -43,5 +44,6 @@ export const createModePrompts = (
   health: healthPrompt,
   wiki: wikiPrompt,
   munger: mungerPrompt,
-  dataAnalyst: dataAnalystPrompt
+  dataAnalyst: dataAnalystPrompt,
+  books: booksPrompt,
 });
