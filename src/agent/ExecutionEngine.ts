@@ -226,11 +226,33 @@ export class ExecutionEngine {
     let toolCallDetected = false;
 
     // Get tools from the ToolManager
-    const tools = this.toolManager.getTools();
+     // 处理带连字符和不带连字符的角色字符串
+  let baseRole: string;
+  let selectedNotebookLMOption: string | undefined;
+
+  if (role.includes('-')) {
+    // 情况1: 带连字符的角色 (如 "notebooklm-option1")
+    const roleParts = role.split('-');
+    baseRole = roleParts[0]; // 'notebooklm'
+    selectedNotebookLMOption = roleParts[1]; // 具体选项值
+  } else {
+    // 情况2: 单纯的角色 (如 "operator")
+    baseRole = role; // 'operator'
+    selectedNotebookLMOption = undefined; // 没有额外选项
+  }
+
+  console.log('Base role:', baseRole); // 'notebooklm' 或 'operator'
+  console.log('Selected option:', selectedNotebookLMOption); // 具体选项值 或 undefined
+
+  // Get tools from the ToolManager
+  const tools = this.toolManager.getTools();
+  
+  // 根据是否有选项来调用不同的系统提示
+  const systemPrompt = this.promptManager.getSystemPrompt(baseRole);
 
     // Use provider interface instead of direct Anthropic API
     const stream = this.llmProvider.createMessage(
-      this.promptManager.getSystemPrompt(role),
+      systemPrompt,
       messages,
       tools
     );
@@ -346,7 +368,7 @@ export class ExecutionEngine {
 
           // ── 1. Call LLM with streaming ───────────────────────────────────────
           const { accumulatedText } = await this.processLlmStream(messages, adaptedCallbacks,role);
-          console.log('accumulatedText',accumulatedText);
+          console.log('accumulatedText',accumulatedText, role);
           
           // Check for cancellation after LLM response
           if (this.errorHandler.isExecutionCancelled()) break;

@@ -22,7 +22,10 @@ interface PromptFormProps {
 }
 
 // 定义角色类型
-type RoleType = 'operator' | 'researcher' | 'lawyer' | 'trader' | 'math' | 'qa' | 'code' | 'health' | 'wiki' | 'books' | 'munger';
+type RoleType = 'operator' | 'researcher' | 'lawyer' | 'trader' | 'math' | 'qa' | 'code' | 'health' | 'wiki' | 'books' | 'munger' |'notebooklm';
+
+// 定义NotebookLM选项类型
+type NotebookLMOption = 'summary' | 'study-guide' | 'faq' | 'mindmap';
 
 // 定义书籍列表
 interface Book {
@@ -35,61 +38,16 @@ interface Book {
 
 const availableBooks: Book[] = [
   {
-    id: 'rich_dad_poor_dad',
-    title: 'Rich Dad Poor Dad',
-    author: 'Robert Kiyosaki',
-    emoji: '💰',
-    description: 'Personal finance and investing wisdom'
-  },
-  {
-    id: 'thinking_fast_slow',
-    title: 'Thinking, Fast and Slow',
-    author: 'Daniel Kahneman',
-    emoji: '🧠',
-    description: 'Behavioral economics and decision making'
-  },
-  {
-    id: 'atomic_habits',
-    title: 'Atomic Habits',
-    author: 'James Clear',
-    emoji: '⚡',
-    description: 'Building good habits and breaking bad ones'
-  },
-  {
-    id: 'deep_work',
-    title: 'Deep Work',
-    author: 'Cal Newport',
-    emoji: '🎯',
-    description: 'Focused success in a distracted world'
-  },
-  {
-    id: 'psychology_money',
-    title: 'The Psychology of Money',
-    author: 'Morgan Housel',
-    emoji: '🧮',
-    description: 'Timeless lessons on wealth and happiness'
-  },
-  {
-    id: 'sapiens',
-    title: 'Sapiens',
-    author: 'Yuval Noah Harari',
-    emoji: '🌍',
-    description: 'A brief history of humankind'
-  },
-  {
     id: 'Build the Life You Want',
     title: 'Build the Life You Want',
     author: 'Oprah Winfrey',
     emoji: '🏆',
-    description: 'Personal and professional effectiveness'
+    description: `Are you ready to begin? Please answer the following two questions so we can start immediately:  
+
+1. To help me understand you better, please describe your **current situation or specific challenges** in detail (e.g., feeling burnt out at work, tense family relationships, or a lack of life direction).  
+2. What is the **most important and specific goal** you hope to achieve using this methodology? (e.g., finding more fulfillment at work, improving communication with your partner, or simply feeling calmer and happier in daily life).  
+`,
   },
-  {
-    id: 'lean_startup',
-    title: 'The Lean Startup',
-    author: 'Eric Ries',
-    emoji: '🚀',
-    description: 'Innovation and entrepreneurship'
-  }
 ];
 
 const roleIcons: Record<RoleType, any> = {
@@ -97,14 +55,43 @@ const roleIcons: Record<RoleType, any> = {
   researcher: faSearch,
   lawyer: faBalanceScale,
   trader: faChartLine,
+  notebooklm: faBook,
   math: faCalculator,
   qa: faVial,
   code: faCode,
   health: faHeartbeat,
   wiki: faBook,
   books: faBook,
-  munger: faBook
+  munger: faBook,
 };
+
+// NotebookLM选项配置
+const notebookLMOptions = [
+  {
+    id: 'summary' as NotebookLMOption,
+    title: 'Summary',
+    emoji: '📄',
+    description: 'Generate a comprehensive summary of the content'
+  },
+  {
+    id: 'study-guide' as NotebookLMOption,
+    title: 'Study Guide',
+    emoji: '📚',
+    description: 'Create a detailed study guide with key points'
+  },
+  {
+    id: 'faq' as NotebookLMOption,
+    title: 'FAQ',
+    emoji: '❓',
+    description: 'Generate frequently asked questions and answers'
+  },
+  {
+    id: 'mindmap' as NotebookLMOption,
+    title: 'Mind Map',
+    emoji: '🧠',
+    description: 'Generate a visual mind map structure of the content'
+  }
+];
 
 export const PromptForm: React.FC<PromptFormProps> = ({
   onSubmit,
@@ -116,16 +103,24 @@ export const PromptForm: React.FC<PromptFormProps> = ({
   const [role, setRole] = useState<RoleType>('operator');
   const [selectedBook, setSelectedBook] = useState<string>('');
   const [showBookSelection, setShowBookSelection] = useState(false);
+  const [selectedNotebookLMOption, setSelectedNotebookLMOption] = useState<NotebookLMOption>('summary');
+  const [showNotebookLMOptions, setShowNotebookLMOptions] = useState(false);
 
-  // 当角色改变时重置书籍选择
+  // 当角色改变时重置相关状态
   useEffect(() => {
     if (role === 'books') {
       setShowBookSelection(true);
+      setShowNotebookLMOptions(false);
       if (!selectedBook) {
         setSelectedBook(availableBooks[0].id);
       }
+    } else if (role === 'notebooklm') {
+      setShowNotebookLMOptions(true);
+      setShowBookSelection(false);
+      setSelectedBook('');
     } else {
       setShowBookSelection(false);
+      setShowNotebookLMOptions(false);
       setSelectedBook('');
     }
   }, [role, selectedBook]);
@@ -134,11 +129,24 @@ export const PromptForm: React.FC<PromptFormProps> = ({
     e.preventDefault();
     if (!prompt.trim() || isProcessing || tabStatus === 'detached') return;
     
-    // 如果是书籍模式，将书籍信息附加到角色信息中
-    const finalRole = role === 'books' ? `books:${selectedBook}` : role;
+    let finalRole = '';
+    if (role === 'books') {
+      finalRole = `books`;
+    } else if (role === 'notebooklm') {
+      finalRole = `notebooklm-${selectedNotebookLMOption}`;
+    }else{
+      finalRole = role;
+    }
     
     onSubmit(prompt, finalRole);
     setPrompt(''); // Clear the prompt after submission
+  };
+
+  const handleNotebookLMOptionClick = (option: NotebookLMOption) => {
+    setSelectedNotebookLMOption(option);
+    // 直接提交，使用选项作为prompt
+    const finalRole = `notebooklm-${option}`;
+    onSubmit(`#${option}`, finalRole);
   };
 
   useEffect(() => {
@@ -153,13 +161,17 @@ export const PromptForm: React.FC<PromptFormProps> = ({
     return availableBooks.find(book => book.id === selectedBook);
   };
 
+  const getSelectedNotebookLMOption = () => {
+    return notebookLMOptions.find(option => option.id === selectedNotebookLMOption);
+  };
+
   return (
     <form onSubmit={handleSubmit} className="mt-4 relative">
       <div className="w-full">
         {/* 主要角色选择 */}
         <div className="relative">
           <select
-            className={`w-full bg-gradient-to-r from-sky-50 via-blue-50 to-indigo-50 border-2 border-sky-200 rounded-2xl px-4 text-sm font-medium text-gray-800 shadow-lg hover:shadow-xl hover:border-sky-300 focus:outline-none focus:ring-3 focus:ring-sky-300 focus:border-sky-400 transition-all duration-300 backdrop-blur-sm appearance-none cursor-pointer ${showBookSelection ? 'py-2 mb-2' : 'py-3 mb-3'}`}
+            className={`w-full bg-gradient-to-r from-sky-50 via-blue-50 to-indigo-50 border-2 border-sky-200 rounded-2xl px-4 text-sm font-medium text-gray-800 shadow-lg hover:shadow-xl hover:border-sky-300 focus:outline-none focus:ring-3 focus:ring-sky-300 focus:border-sky-400 transition-all duration-300 backdrop-blur-sm appearance-none cursor-pointer ${showBookSelection || showNotebookLMOptions ? 'py-2 mb-2' : 'py-3 mb-3'}`}
             value={role}
             onChange={(e) => setRole(e.target.value as RoleType)}
             disabled={isProcessing || tabStatus === 'detached'}
@@ -171,6 +183,7 @@ export const PromptForm: React.FC<PromptFormProps> = ({
             }}
           >
             <option value="operator" className="bg-white text-gray-800 py-2">⚡ Browser Operator</option>
+            <option value="notebooklm" className="bg-white text-gray-800 py-2">📓 NotebookLM</option>
             <option value="researcher" className="bg-white text-gray-800 py-2">🔎 Research Analyst</option>
             <option value="lawyer" className="bg-white text-gray-800 py-2">⚖️ Legal Advisor</option>
             <option value="math" className="bg-white text-gray-800 py-2">∑ Mathematics Expert</option>
@@ -178,13 +191,52 @@ export const PromptForm: React.FC<PromptFormProps> = ({
             <option value="qa" className="bg-white text-gray-800 py-2">✓ TestCase Writer</option>
             <option value="health" className="bg-white text-gray-800 py-2">⚕️ Medical Consultant</option>
             <option value="wiki" className="bg-white text-gray-800 py-2">📖 Ask Wiki</option>
-            <option value="books" className="bg-white text-gray-800 py-2">📚 Ask the Books</option>
+            <option value="books" className="bg-white text-gray-800 py-2">📚 Ask The Books</option>
             <option value="munger" className="bg-white text-gray-800 py-2">💎 Talk to Charlie Munger</option>
           </select>
           
           {/* 装饰性渐变边框 */}
           <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-sky-400 via-blue-400 to-indigo-400 opacity-0 hover:opacity-20 transition-opacity duration-300 pointer-events-none -z-10"></div>
         </div>
+
+        {/* NotebookLM选项按钮 - 只在选择notebooklm时显示 */}
+        {showNotebookLMOptions && role === 'notebooklm' && (
+          <div className="mb-3 transform transition-all duration-200 ease-in-out">
+            <div className="grid grid-cols-2 gap-2">
+              {notebookLMOptions.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => handleNotebookLMOptionClick(option.id)}
+                  className={`px-4 py-3 rounded-full text-sm font-medium transition-all duration-200 border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
+                    selectedNotebookLMOption === option.id
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-md hover:bg-blue-700'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400 shadow-sm'
+                  }`}
+                  disabled={isProcessing || tabStatus === 'detached'}
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="text-base">{option.emoji}</span>
+                    <span>{option.title}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+            
+            {/* 选中选项的描述 */}
+            {selectedNotebookLMOption && (
+              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="text-sm text-blue-900 font-medium flex items-center gap-2">
+                  <span>{getSelectedNotebookLMOption()?.emoji}</span>
+                  <span>{getSelectedNotebookLMOption()?.title}</span>
+                </div>
+                <div className="text-sm text-blue-700 mt-1">
+                  {getSelectedNotebookLMOption()?.description}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 书籍二级选择 - 只在选择books时显示 */}
         {showBookSelection && role === 'books' && (
@@ -245,7 +297,9 @@ export const PromptForm: React.FC<PromptFormProps> = ({
               ? "Tab connection lost. Please refresh the tab to continue." 
               : role === 'books' && selectedBook
                 ? `Ask ${getSelectedBookInfo()?.title} anything...`
-                : "Type your message here..."}
+                : role === 'notebooklm'
+                  ? `Generate ${getSelectedNotebookLMOption()?.title.toLowerCase()} for your content...`
+                  : "Type your message here..."}
             autoFocus
             disabled={isProcessing || tabStatus === 'detached'}
             minRows={1}
