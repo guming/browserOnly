@@ -139,10 +139,10 @@ export const openaiModels = {
 
 //DeepSeek
 export type DeepSeekModelId = keyof typeof deepseekModels;
-export const deepseekDefaultModelId: DeepSeekModelId = "deepseek-chat";
+export const deepseekDefaultModelId: DeepSeekModelId = "deepseek-reasoner";
 export const deepseekModels = {
-  "deepseek-chat": {
-    name: "deepseek-chat",
+  "deepseek-reasoner": {
+    name: "deepseek-reasoner",
     inputPrice: 0.28,
     outputPrice: 1.09,
     maxTokens: 4096,

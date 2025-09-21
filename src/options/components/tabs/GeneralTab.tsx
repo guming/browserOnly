@@ -102,6 +102,7 @@ export function GeneralTab() {
           </div>
         </div>
       </div>
+
     </div>
   );
 }

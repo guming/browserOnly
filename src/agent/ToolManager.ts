@@ -11,6 +11,9 @@ export class ToolManager {
   
   // Flag to indicate if we should use tab tools exclusively
   private useTabToolsOnly: boolean = false;
+
+  // Additional tools that can be added dynamically
+  private additionalTools: BrowserTool[] = [];
   
   constructor(page: Page, tools: BrowserTool[]) {
     this.page = page;
@@ -37,6 +40,34 @@ export class ToolManager {
    */
   findTool(toolName: string): BrowserTool | undefined {
     return this.tools.find(t => t.name === toolName);
+  }
+
+  /**
+   * Add additional tools dynamically
+   */
+  addTools(tools: BrowserTool[]): void {
+    // Wrap new tools with health check
+    const wrappedTools = tools.map(tool => this.wrapToolWithHealthCheck(tool));
+    this.additionalTools = [...this.additionalTools, ...wrappedTools];
+    
+    // Update the tools array with combined tools
+    this.tools = [...this.tools, ...wrappedTools];
+  }
+
+  /**
+   * Remove all additional tools
+   */
+  clearAdditionalTools(): void {
+    // Remove additional tools from the main tools array
+    this.tools = this.tools.filter(tool => !this.additionalTools.includes(tool));
+    this.additionalTools = [];
+  }
+
+  /**
+   * Get only the additional tools
+   */
+  getAdditionalTools(): BrowserTool[] {
+    return this.additionalTools;
   }
   
   /**

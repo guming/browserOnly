@@ -54,11 +54,8 @@ import {
   browserTabSelect, 
   browserTabClose 
 } from "./tabTools";
-import { ToolFactory } from "./types";
 
-import { startExtract } from "./subAgentAsTools";
-
-import { notionCreatePage} from "./notionTools"
+import { startExtract } from "./extractHtml";
 
 // Export all tools
 export {
@@ -109,10 +106,12 @@ export {
   clearAllMemories,
   // Extract tools
   startExtract
+  // Notion tools are exported separately from ./notionTools
 };
 
 // Function to get all tools as an array
 export function getAllTools(page: Page) {
+  
   const tools = [
     // Navigation tools
     browserNavigate(page),
@@ -162,6 +161,8 @@ export function getAllTools(page: Page) {
 
     // Extract tools
     startExtract(page)
+    // Notion tools are not included here as they require a NotionMCPClient instance
+    // Use getAllNotionTools(client) from ./notionTools for Notion-specific tools
   ];
   
   return tools;

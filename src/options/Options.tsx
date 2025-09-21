@@ -97,6 +97,12 @@ export function Options() {
   const [openaiCompatibleModels, setOpenaiCompatibleModels] = useState<Model[]>([]);
   const [newModel, setNewModel] = useState({ id: '', name: '', isReasoningModel: false });
 
+  // Notion settings
+  const [notionEnabled, setNotionEnabled] = useState(false);
+  const [notionMcpServerUrl, setNotionMcpServerUrl] = useState('');
+  const [notionBearerToken, setNotionBearerToken] = useState('');
+  const [notionDatabaseId, setNotionDatabaseId] = useState('');
+
   // Load saved settings when component mounts
   useEffect(() => {
     chrome.storage.sync.get({
@@ -122,6 +128,10 @@ export function Options() {
       openaiCompatibleBaseUrl: '',
       openaiCompatibleModelId: '',
       openaiCompatibleModels: [],
+      notionEnabled: false,
+      notionMcpServerUrl: '',
+      notionBearerToken: '',
+      notionDatabaseId: '',
     }, (result) => {
       
       setProvider(result.provider);
@@ -146,6 +156,10 @@ export function Options() {
       setOpenaiCompatibleBaseUrl(result.openaiCompatibleBaseUrl || '');
       setOpenaiCompatibleModelId(result.openaiCompatibleModelId || '');
       setOpenaiCompatibleModels(result.openaiCompatibleModels || []);
+      setNotionEnabled(result.notionEnabled || false);
+      setNotionMcpServerUrl(result.notionMcpServerUrl || '');
+      setNotionBearerToken(result.notionBearerToken || '');
+      setNotionDatabaseId(result.notionDatabaseId || '');
     });
   }, []);
 
@@ -177,6 +191,10 @@ export function Options() {
       openaiCompatibleBaseUrl,
       openaiCompatibleModelId,
       openaiCompatibleModels,
+      notionEnabled,
+      notionMcpServerUrl,
+      notionBearerToken,
+      notionDatabaseId,
     }, () => {
       
       setIsSaving(false);
@@ -306,6 +324,15 @@ export function Options() {
       handleEditModel={handleEditModel}
       // Pricing data
       getModelPricingData={getModelPricingData}
+      // Notion settings
+      notionEnabled={notionEnabled}
+      setNotionEnabled={setNotionEnabled}
+      notionMcpServerUrl={notionMcpServerUrl}
+      setNotionMcpServerUrl={setNotionMcpServerUrl}
+      notionBearerToken={notionBearerToken}
+      setNotionBearerToken={setNotionBearerToken}
+      notionDatabaseId={notionDatabaseId}
+      setNotionDatabaseId={setNotionDatabaseId}
     />
   );
 }

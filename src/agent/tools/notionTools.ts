@@ -1,20 +1,42 @@
 import { DynamicTool } from "@langchain/core/tools";
-import { 
-  NotionMCPClient, 
-  CreatePageOptions, 
-  UpdatePageOptions, 
-  QueryDatabaseOptions 
-} from "../notionClient.js";
+import { NotionSDKClient } from "../notionClient.js";
+import type { 
+  CreatePageParameters,
+  UpdatePageParameters,
+  QueryDatabaseParameters 
+} from '@notionhq/client/build/src/api-endpoints';
 
-export type NotionToolFactory = (client: NotionMCPClient) => DynamicTool;
+export type NotionToolFactory = (client: NotionSDKClient) => DynamicTool;
+
+// 定义接口以保持向后兼容
+interface CreatePageOptions {
+  parent: { database_id: string } | { page_id: string };
+  title: string;
+  properties?: Record<string, any>;
+  children?: any[];
+}
+
+interface UpdatePageOptions {
+  pageId: string;
+  properties?: Record<string, any>;
+  archived?: boolean;
+}
+
+interface QueryDatabaseOptions {
+  databaseId: string;
+  filter?: any;
+  sorts?: any[];
+  start_cursor?: string;
+  page_size?: number;
+}
 
 // 创建页面工具
-export const notionCreatePage: NotionToolFactory = (client: NotionMCPClient) =>
+export const notionCreatePage: NotionToolFactory = (client: NotionSDKClient) =>
   new DynamicTool({
     name: "notion_create_page",
     description: `Create a new page in Notion. 
       Input should be a JSON string with:
-      - parent: database_id or page_id where the page should be created
+      - parent: object with database_id or page_id where the page should be created
       - title: the title of the page
       - properties: optional page properties object
       - children: optional array of block children`,
@@ -26,7 +48,19 @@ export const notionCreatePage: NotionToolFactory = (client: NotionMCPClient) =>
           return "Error: Both 'parent' and 'title' are required fields";
         }
 
-        const result = await client.createPage(options);
+        // 构建 SDK 兼容的参数
+        const createParams: CreatePageParameters = {
+          parent: options.parent,
+          properties: {
+            title: {
+              title: [{ text: { content: options.title } }]
+            },
+            ...options.properties
+          },
+          ...(options.children && { children: options.children })
+        };
+
+        const result = await client.createPage(createParams);
         return `Successfully created page "${options.title}". Page ID: ${result.id || 'unknown'}`;
       } catch (error) {
         if (error instanceof SyntaxError) {
@@ -40,7 +74,7 @@ export const notionCreatePage: NotionToolFactory = (client: NotionMCPClient) =>
   });
 
 // 更新页面工具
-export const notionUpdatePage: NotionToolFactory = (client: NotionMCPClient) =>
+export const notionUpdatePage: NotionToolFactory = (client: NotionSDKClient) =>
   new DynamicTool({
     name: "notion_update_page",
     description: `Update an existing page in Notion.
@@ -56,7 +90,15 @@ export const notionUpdatePage: NotionToolFactory = (client: NotionMCPClient) =>
           return "Error: 'pageId' is required";
         }
 
-        await client.updatePage(options);
+        const updateParams: any = {};
+        if (options.properties) {
+          updateParams.properties = options.properties;
+        }
+        if (typeof options.archived === 'boolean') {
+          updateParams.archived = options.archived;
+        }
+
+        await client.updatePage(options.pageId, updateParams);
         return `Successfully updated page ${options.pageId}`;
       } catch (error) {
         if (error instanceof SyntaxError) {
@@ -70,7 +112,7 @@ export const notionUpdatePage: NotionToolFactory = (client: NotionMCPClient) =>
   });
 
 // 获取页面工具
-export const notionGetPage: NotionToolFactory = (client: NotionMCPClient) =>
+export const notionGetPage: NotionToolFactory = (client: NotionSDKClient) =>
   new DynamicTool({
     name: "notion_get_page",
     description: "Get a page from Notion by its ID. Input should be a page ID string.",
@@ -81,7 +123,10 @@ export const notionGetPage: NotionToolFactory = (client: NotionMCPClient) =>
         }
 
         const result = await client.getPage(pageId.trim());
-        return `Successfully retrieved page ${pageId}. Title: ${result.properties?.title?.title?.[0]?.plain_text || 'No title'}`;
+        const title = result.properties?.title?.title?.[0]?.plain_text || 
+                     result.properties?.Name?.title?.[0]?.plain_text || 
+                     'No title';
+        return `Successfully retrieved page ${pageId}. Title: ${title}`;
       } catch (error) {
         return `Error getting page: ${
           error instanceof Error ? error.message : String(error)
@@ -91,7 +136,7 @@ export const notionGetPage: NotionToolFactory = (client: NotionMCPClient) =>
   });
 
 // 查询数据库工具
-export const notionQueryDatabase: NotionToolFactory = (client: NotionMCPClient) =>
+export const notionQueryDatabase: NotionToolFactory = (client: NotionSDKClient) =>
   new DynamicTool({
     name: "notion_query_database",
     description: `Query a Notion database.
@@ -99,8 +144,8 @@ export const notionQueryDatabase: NotionToolFactory = (client: NotionMCPClient) 
       - databaseId: the ID of the database to query
       - filter: optional filter object
       - sorts: optional array of sort objects
-      - startCursor: optional cursor for pagination
-      - pageSize: optional number of results per page (max 100)`,
+      - start_cursor: optional cursor for pagination
+      - page_size: optional number of results per page (max 100)`,
     func: async (input: string) => {
       try {
         const options: QueryDatabaseOptions = JSON.parse(input);
@@ -109,7 +154,13 @@ export const notionQueryDatabase: NotionToolFactory = (client: NotionMCPClient) 
           return "Error: 'databaseId' is required";
         }
 
-        const result = await client.queryDatabase(options);
+        const queryParams: any = {};
+        if (options.filter) queryParams.filter = options.filter;
+        if (options.sorts) queryParams.sorts = options.sorts;
+        if (options.start_cursor) queryParams.start_cursor = options.start_cursor;
+        if (options.page_size) queryParams.page_size = options.page_size;
+
+        const result = await client.queryDatabase(options.databaseId, queryParams);
         const count = result.results?.length || 0;
         return `Successfully queried database ${options.databaseId}. Found ${count} results.`;
       } catch (error) {
@@ -124,14 +175,15 @@ export const notionQueryDatabase: NotionToolFactory = (client: NotionMCPClient) 
   });
 
 // 搜索工具
-export const notionSearch: NotionToolFactory = (client: NotionMCPClient) =>
+export const notionSearch: NotionToolFactory = (client: NotionSDKClient) =>
   new DynamicTool({
     name: "notion_search",
     description: `Search for pages and databases in Notion workspace.
       Input should be a JSON string with:
       - query: the search query string
       - filter: optional filter object to limit search scope
-      - sort: optional sort object`,
+      - sort: optional sort object
+      - page_size: optional number of results per page`,
     func: async (input: string) => {
       try {
         const options = JSON.parse(input);
@@ -140,7 +192,12 @@ export const notionSearch: NotionToolFactory = (client: NotionMCPClient) =>
           return "Error: 'query' is required";
         }
 
-        const result = await client.search(options.query, options);
+        const searchParams: any = { query: options.query };
+        if (options.filter) searchParams.filter = options.filter;
+        if (options.sort) searchParams.sort = options.sort;
+        if (options.page_size) searchParams.page_size = options.page_size;
+
+        const result = await client.search(searchParams);
         const count = result.results?.length || 0;
         return `Search completed for "${options.query}". Found ${count} results.`;
       } catch (error) {
@@ -155,7 +212,7 @@ export const notionSearch: NotionToolFactory = (client: NotionMCPClient) =>
   });
 
 // 获取数据库工具
-export const notionGetDatabase: NotionToolFactory = (client: NotionMCPClient) =>
+export const notionGetDatabase: NotionToolFactory = (client: NotionSDKClient) =>
   new DynamicTool({
     name: "notion_get_database",
     description: "Get a database from Notion by its ID. Input should be a database ID string.",
@@ -166,7 +223,8 @@ export const notionGetDatabase: NotionToolFactory = (client: NotionMCPClient) =>
         }
 
         const result = await client.getDatabase(databaseId.trim());
-        return `Successfully retrieved database ${databaseId}. Title: ${result.title?.[0]?.plain_text || 'No title'}`;
+        const title = result.title?.[0]?.plain_text || 'No title';
+        return `Successfully retrieved database ${databaseId}. Title: ${title}`;
       } catch (error) {
         return `Error getting database: ${
           error instanceof Error ? error.message : String(error)
@@ -176,7 +234,7 @@ export const notionGetDatabase: NotionToolFactory = (client: NotionMCPClient) =>
   });
 
 // 删除页面工具
-export const notionDeletePage: NotionToolFactory = (client: NotionMCPClient) =>
+export const notionDeletePage: NotionToolFactory = (client: NotionSDKClient) =>
   new DynamicTool({
     name: "notion_delete_page",
     description: "Delete (archive) a page in Notion. Input should be a page ID string.",
@@ -197,7 +255,7 @@ export const notionDeletePage: NotionToolFactory = (client: NotionMCPClient) =>
   });
 
 // 获取页面块工具
-export const notionGetPageBlocks: NotionToolFactory = (client: NotionMCPClient) =>
+export const notionGetPageBlocks: NotionToolFactory = (client: NotionSDKClient) =>
   new DynamicTool({
     name: "notion_get_page_blocks",
     description: "Get all blocks from a Notion page. Input should be a page ID string.",
@@ -207,7 +265,7 @@ export const notionGetPageBlocks: NotionToolFactory = (client: NotionMCPClient) 
           return "Error: Page ID is required";
         }
 
-        const result = await client.getPageBlocks(pageId.trim());
+        const result = await client.getBlocks(pageId.trim());
         const count = result.results?.length || 0;
         return `Successfully retrieved ${count} blocks from page ${pageId}`;
       } catch (error) {
@@ -219,7 +277,7 @@ export const notionGetPageBlocks: NotionToolFactory = (client: NotionMCPClient) 
   });
 
 // 添加块工具
-export const notionAppendBlocks: NotionToolFactory = (client: NotionMCPClient) =>
+export const notionAppendBlocks: NotionToolFactory = (client: NotionSDKClient) =>
   new DynamicTool({
     name: "notion_append_blocks",
     description: `Append blocks to a Notion page.
@@ -252,7 +310,7 @@ export const notionAppendBlocks: NotionToolFactory = (client: NotionMCPClient) =
   });
 
 // 更新块工具
-export const notionUpdateBlock: NotionToolFactory = (client: NotionMCPClient) =>
+export const notionUpdateBlock: NotionToolFactory = (client: NotionSDKClient) =>
   new DynamicTool({
     name: "notion_update_block",
     description: `Update a block in Notion.
@@ -280,8 +338,123 @@ export const notionUpdateBlock: NotionToolFactory = (client: NotionMCPClient) =>
     },
   });
 
+// NotebookLM 风格的工具
+export const notionGenerateSummary: NotionToolFactory = (client: NotionSDKClient) =>
+  new DynamicTool({
+    name: "notion_generate_summary",
+    description: `Generate a summary of a Notion page content.
+      Input should be a page ID string.`,
+    func: async (pageId: string) => {
+      try {
+        if (!pageId || pageId.trim() === '') {
+          return "Error: Page ID is required";
+        }
+
+        const page = await client.getPage(pageId.trim());
+        const blocks = await client.getBlocksAll(pageId.trim());
+        
+        const title = page.properties?.title?.title?.[0]?.plain_text || 
+                     page.properties?.Name?.title?.[0]?.plain_text || 
+                     'Untitled';
+        
+        // 提取文本内容
+        const textContent = blocks
+          .filter(block => block.type === 'paragraph' && block.paragraph?.rich_text)
+          .map(block => block.paragraph.rich_text.map((rt: { plain_text: any; }) => rt.plain_text).join(''))
+          .join('\n')
+          .slice(0, 1000); // 限制长度
+
+        return `Summary of "${title}":\n\n${textContent}${textContent.length >= 1000 ? '...' : ''}`;
+      } catch (error) {
+        return `Error generating summary: ${
+          error instanceof Error ? error.message : String(error)
+        }`;
+      }
+    },
+  });
+
+export const notionGenerateStudyGuide: NotionToolFactory = (client: NotionSDKClient) =>
+  new DynamicTool({
+    name: "notion_generate_study_guide",
+    description: `Generate a study guide from a Notion page content.
+      Input should be a page ID string.`,
+    func: async (pageId: string) => {
+      try {
+        if (!pageId || pageId.trim() === '') {
+          return "Error: Page ID is required";
+        }
+
+        const page = await client.getPage(pageId.trim());
+        const blocks = await client.getBlocksAll(pageId.trim());
+        
+        const title = page.properties?.title?.title?.[0]?.plain_text || 
+                     page.properties?.Name?.title?.[0]?.plain_text || 
+                     'Untitled';
+        
+        // 提取标题
+        const headers = blocks
+          .filter(block => block.type?.startsWith('heading_'))
+          .map(block => `- ${block[block.type]?.rich_text?.[0]?.plain_text}`)
+          .join('\n');
+
+        // 提取要点
+        const bulletPoints = blocks
+          .filter(block => block.type === 'bulleted_list_item')
+          .map(block => `  • ${block.bulleted_list_item?.rich_text?.[0]?.plain_text}`)
+          .join('\n');
+
+        return `Study Guide for "${title}":\n\nMain Topics:\n${headers}\n\nKey Points:\n${bulletPoints}`;
+      } catch (error) {
+        return `Error generating study guide: ${
+          error instanceof Error ? error.message : String(error)
+        }`;
+      }
+    },
+  });
+
+export const notionGenerateFAQ: NotionToolFactory = (client: NotionSDKClient) =>
+  new DynamicTool({
+    name: "notion_generate_faq",
+    description: `Generate FAQ from a Notion page content.
+      Input should be a page ID string.`,
+    func: async (pageId: string) => {
+      try {
+        if (!pageId || pageId.trim() === '') {
+          return "Error: Page ID is required";
+        }
+
+        const page = await client.getPage(pageId.trim());
+        const blocks = await client.getBlocksAll(pageId.trim());
+        
+        const title = page.properties?.title?.title?.[0]?.plain_text || 
+                     page.properties?.Name?.title?.[0]?.plain_text || 
+                     'Untitled';
+
+        const textContent = blocks
+          .filter(block => block.type === 'paragraph' && block.paragraph?.rich_text)
+          .map(block => block.paragraph.rich_text.map((rt: { plain_text: any; }) => rt.plain_text).join(''))
+          .join(' ')
+          .slice(0, 500);
+
+        // 简单的 FAQ 生成
+        const faqs = [
+          `Q: What is ${title} about?`,
+          `A: ${textContent.slice(0, 200)}...`,
+          `\nQ: What are the key points of ${title}?`,
+          `A: Please refer to the main content for detailed information.`
+        ].join('\n');
+
+        return `FAQ for "${title}":\n\n${faqs}`;
+      } catch (error) {
+        return `Error generating FAQ: ${
+          error instanceof Error ? error.message : String(error)
+        }`;
+      }
+    },
+  });
+
 // 便捷函数：获取所有工具
-export function getAllNotionTools(client: NotionMCPClient): DynamicTool[] {
+export function getAllNotionTools(client: NotionSDKClient): DynamicTool[] {
   return [
     notionCreatePage(client),
     notionUpdatePage(client),
@@ -297,7 +470,7 @@ export function getAllNotionTools(client: NotionMCPClient): DynamicTool[] {
 }
 
 // 便捷函数：获取基础工具（最常用的）
-export function getBasicNotionTools(client: NotionMCPClient): DynamicTool[] {
+export function getBasicNotionTools(client: NotionSDKClient): DynamicTool[] {
   return [
     notionCreatePage(client),
     notionUpdatePage(client),
@@ -308,12 +481,28 @@ export function getBasicNotionTools(client: NotionMCPClient): DynamicTool[] {
 }
 
 // 便捷函数：获取高级工具
-export function getAdvancedNotionTools(client: NotionMCPClient): DynamicTool[] {
+export function getAdvancedNotionTools(client: NotionSDKClient): DynamicTool[] {
   return [
     notionGetDatabase(client),
     notionDeletePage(client),
     notionGetPageBlocks(client),
     notionAppendBlocks(client),
     notionUpdateBlock(client)
+  ];
+}
+
+// 便捷函数：获取 NotebookLM 风格工具
+export function getNotebookLMTools(client: NotionSDKClient): DynamicTool[] {
+  return [
+    notionGenerateSummary(client),
+    notionGenerateStudyGuide(client),
+    notionGenerateFAQ(client),
+  ];
+}
+
+// 便捷函数：获取所有工具（包括 NotebookLM）
+export function getAllNotionToolsWithNotebookLM(client: NotionSDKClient): DynamicTool[] {
+  return [
+    ...getAllNotionTools(client),
   ];
 }

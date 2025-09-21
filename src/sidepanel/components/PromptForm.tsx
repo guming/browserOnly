@@ -166,12 +166,12 @@ export const PromptForm: React.FC<PromptFormProps> = ({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="mt-4 relative">
+    <form onSubmit={handleSubmit} className="mt-2 relative">
       <div className="w-full">
         {/* 主要角色选择 */}
         <div className="relative">
           <select
-            className={`w-full bg-gradient-to-r from-sky-50 via-blue-50 to-indigo-50 border-2 border-sky-200 rounded-2xl px-4 text-sm font-medium text-gray-800 shadow-lg hover:shadow-xl hover:border-sky-300 focus:outline-none focus:ring-3 focus:ring-sky-300 focus:border-sky-400 transition-all duration-300 backdrop-blur-sm appearance-none cursor-pointer ${showBookSelection || showNotebookLMOptions ? 'py-2 mb-2' : 'py-3 mb-3'}`}
+            className={`w-full bg-gradient-to-r from-sky-50 via-blue-50 to-indigo-50 border-2 border-sky-200 rounded-2xl px-4 text-sm font-medium text-gray-800 shadow-lg hover:shadow-xl hover:border-sky-300 focus:outline-none focus:ring-3 focus:ring-sky-300 focus:border-sky-400 transition-all duration-300 backdrop-blur-sm appearance-none cursor-pointer ${showBookSelection || showNotebookLMOptions ? 'py-2 mb-1' : 'py-2 mb-2'}`}
             value={role}
             onChange={(e) => setRole(e.target.value as RoleType)}
             disabled={isProcessing || tabStatus === 'detached'}
@@ -201,36 +201,43 @@ export const PromptForm: React.FC<PromptFormProps> = ({
 
         {/* NotebookLM选项按钮 - 只在选择notebooklm时显示 */}
         {showNotebookLMOptions && role === 'notebooklm' && (
-          <div className="mb-3 transform transition-all duration-200 ease-in-out">
-            <div className="grid grid-cols-2 gap-2">
+          <div className="mb-2 transform transition-all duration-200 ease-in-out">
+            <div className="grid grid-cols-4 gap-2">
               {notebookLMOptions.map((option) => (
                 <button
                   key={option.id}
                   type="button"
                   onClick={() => handleNotebookLMOptionClick(option.id)}
-                  className={`px-4 py-3 rounded-full text-sm font-medium transition-all duration-200 border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
+                  className={`group relative px-2 py-2 rounded-xl text-xs font-medium transition-all duration-200 border focus:outline-none focus:ring-2 focus:ring-offset-1 transform hover:scale-105 backdrop-blur-sm shadow-md hover:shadow-lg ${
                     selectedNotebookLMOption === option.id
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-md hover:bg-blue-700'
-                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400 shadow-sm'
+                      ? 'bg-gradient-to-r from-sky-500 to-blue-600 text-white border-sky-400 shadow-sky-200/50 focus:ring-sky-300'
+                      : 'bg-white/90 text-gray-700 border-white/50 hover:bg-white hover:border-sky-200 shadow-gray-200/50 focus:ring-sky-300 hover:text-sky-700'
                   }`}
                   disabled={isProcessing || tabStatus === 'detached'}
                 >
-                  <div className="flex items-center justify-center gap-2">
-                    <span className="text-base">{option.emoji}</span>
-                    <span>{option.title}</span>
+                  <div className="relative flex flex-col items-center gap-1">
+                    <span className="text-lg transform group-hover:scale-110 transition-transform duration-200">{option.emoji}</span>
+                    <span className="font-semibold tracking-tight leading-tight">{option.title}</span>
                   </div>
+
+                  {/* 选中状态指示器 */}
+                  {selectedNotebookLMOption === option.id && (
+                    <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-white rounded-full shadow-md flex items-center justify-center">
+                      <div className="w-1 h-1 bg-sky-500 rounded-full animate-pulse"></div>
+                    </div>
+                  )}
                 </button>
               ))}
             </div>
-            
-            {/* 选中选项的描述 */}
+
+            {/* 选中选项的描述 - 更紧凑 */}
             {selectedNotebookLMOption && (
-              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="text-sm text-blue-900 font-medium flex items-center gap-2">
+              <div className="mt-2 p-2 bg-sky-50/80 backdrop-blur-sm border border-sky-200/50 rounded-lg shadow-sm">
+                <div className="text-xs text-sky-900 font-medium flex items-center gap-2">
                   <span>{getSelectedNotebookLMOption()?.emoji}</span>
                   <span>{getSelectedNotebookLMOption()?.title}</span>
                 </div>
-                <div className="text-sm text-blue-700 mt-1">
+                <div className="text-xs text-sky-700 mt-1 leading-tight">
                   {getSelectedNotebookLMOption()?.description}
                 </div>
               </div>
@@ -240,7 +247,7 @@ export const PromptForm: React.FC<PromptFormProps> = ({
 
         {/* 书籍二级选择 - 只在选择books时显示 */}
         {showBookSelection && role === 'books' && (
-          <div className="mb-3 transform transition-all duration-300 ease-in-out">
+          <div className="mb-2 transform transition-all duration-300 ease-in-out">
             <div className="relative">
               <select
                 className="w-full bg-gradient-to-r from-amber-50 via-orange-50 to-red-50 border-2 border-amber-200 rounded-2xl px-4 py-2 text-sm font-medium text-gray-800 shadow-lg hover:shadow-xl hover:border-amber-300 focus:outline-none focus:ring-3 focus:ring-amber-300 focus:border-amber-400 transition-all duration-300 backdrop-blur-sm appearance-none cursor-pointer"

@@ -1,9 +1,9 @@
 import { AnthropicProvider } from '../models/providers/anthropic';
+import { DeepSeekProvider } from '../models/providers/deepseek';
 import { GeminiProvider } from '../models/providers/gemini';
 import { OllamaProvider, OllamaProviderOptions } from '../models/providers/ollama';
 import { OpenAIProvider } from '../models/providers/openai';
 import { OpenAICompatibleProvider } from '../models/providers/openai-compatible';
-import { DeepSeekProvider } from '../models/providers/deepseek';
 
 export interface ProviderConfig {
   provider: 'anthropic' | 'openai' | 'gemini' | 'ollama' | 'openai-compatible' | 'deepseek';
@@ -14,7 +14,12 @@ export interface ProviderConfig {
   // openai-compatible only
   openaiCompatibleModels?: Array<{ id: string; name: string; isReasoningModel?: boolean }>;
   connectionEndpoint?: string;
-  connectionKey?: string; 
+  connectionKey?: string;
+}
+
+export interface NotionConfig {
+  enabled: boolean;
+  bearerToken: string;
 }
 
 export class ConfigManager {
@@ -182,14 +187,6 @@ export class ConfigManager {
   
   async updateProviderAndModel(provider: string, modelId: string): Promise<void> {
     // Get current config
-    const result = await chrome.storage.sync.get({
-      provider: 'anthropic',
-      anthropicModelId: 'claude-3-7-sonnet-20250219',
-      openaiModelId: 'gpt-4o',
-      geminiModelId: 'gemini-1.5-pro',
-      ollamaModelId: 'llama3.1',
-      deepseekModelId: 'deepseek-chat',
-    });
     
     // Update provider
     await chrome.storage.sync.set({ provider });
@@ -212,5 +209,44 @@ export class ConfigManager {
         await chrome.storage.sync.set({ deepseekModelId: modelId });
         break;
     }
+  }
+
+  /**
+   * Get Notion configuration
+   */
+  async getNotionConfig(): Promise<NotionConfig> {
+    const result = await chrome.storage.sync.get({
+      notionEnabled: false,
+      notionBearerToken: '',
+    });
+
+    return {
+      enabled: result.notionEnabled,
+      bearerToken: result.notionBearerToken,
+    };
+  }
+
+  /**
+   * Save Notion configuration
+   */
+  async saveNotionConfig(config: Partial<NotionConfig>): Promise<void> {
+    const storageData: Record<string, any> = {};
+
+    if (config.enabled !== undefined) {
+      storageData.notionEnabled = config.enabled;
+    }
+    if (config.bearerToken !== undefined) {
+      storageData.notionBearerToken = config.bearerToken;
+    }
+
+    await chrome.storage.sync.set(storageData);
+  }
+
+  /**
+   * Check if Notion is configured and enabled
+   */
+  async isNotionEnabled(): Promise<boolean> {
+    const config = await this.getNotionConfig();
+    return config.enabled && config.bearerToken !== '';
   }
 }

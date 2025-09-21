@@ -25,9 +25,9 @@ export function ProviderSelector({ provider, setProvider }: ProviderSelectorProp
         backgroundSize: '16px'
       }}
     >
-      <option value="anthropic" className="bg-white text-gray-800 py-2">🧠 Anthropic (Claude)</option>
-      <option value="openai" className="bg-white text-gray-800 py-2">⚡ OpenAI (GPT)</option>
       <option value="deepseek" className="bg-white text-gray-800 py-2">🔍 DeepSeek</option>
+      <option value="openai" className="bg-white text-gray-800 py-2">⚡ OpenAI (GPT)</option>
+      <option value="anthropic" className="bg-white text-gray-800 py-2">🧠 Anthropic (Claude)</option>
       <option value="gemini" className="bg-white text-gray-800 py-2">💎 Google (Gemini)</option>
       <option value="ollama" className="bg-white text-gray-800 py-2">🦙 Ollama</option>
       <option value="openai-compatible" className="bg-white text-gray-800 py-2">🔧 OpenAI Compatible</option>

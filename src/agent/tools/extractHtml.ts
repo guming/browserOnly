@@ -1,6 +1,5 @@
 import { DynamicTool } from 'langchain/tools';
 import { Page } from 'playwright-crx';
-import { logWithTimestamp } from '../../background/utils';
 import { ToolFactory } from './types';
 import { getCurrentTabId, withActivePage } from './utils';
 

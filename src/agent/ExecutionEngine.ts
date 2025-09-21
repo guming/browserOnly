@@ -236,7 +236,6 @@ export class ExecutionEngine {
     baseRole = roleParts[0]; // 'notebooklm'
     selectedNotebookLMOption = roleParts[1]; // 具体选项值
   } else {
-    // 情况2: 单纯的角色 (如 "operator")
     baseRole = role; // 'operator'
     selectedNotebookLMOption = undefined; // 没有额外选项
   }
@@ -247,7 +246,6 @@ export class ExecutionEngine {
   // Get tools from the ToolManager
   const tools = this.toolManager.getTools();
   
-  // 根据是否有选项来调用不同的系统提示
   const systemPrompt = this.promptManager.getSystemPrompt(baseRole);
 
     // Use provider interface instead of direct Anthropic API

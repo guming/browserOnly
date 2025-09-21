@@ -76,6 +76,16 @@ interface VerticalTabsProps {
   
   // Pricing data
   getModelPricingData: () => any[];
+
+  // Notion settings
+  notionEnabled: boolean;
+  setNotionEnabled: (enabled: boolean) => void;
+  notionMcpServerUrl: string;
+  setNotionMcpServerUrl: (url: string) => void;
+  notionBearerToken: string;
+  setNotionBearerToken: (token: string) => void;
+  notionDatabaseId: string;
+  setNotionDatabaseId: (databaseId: string) => void;
 }
 
 export function VerticalTabs(props: VerticalTabsProps) {
@@ -148,7 +158,14 @@ export function VerticalTabs(props: VerticalTabsProps) {
           />
         );
       case 'connection':
-        return <ConnectionTab />;
+        return <ConnectionTab
+          notionEnabled={props.notionEnabled}
+          setNotionEnabled={props.setNotionEnabled}
+          notionBearerToken={props.notionBearerToken}
+          setNotionBearerToken={props.setNotionBearerToken}
+          notionDatabaseId={props.notionDatabaseId}
+          setNotionDatabaseId={props.setNotionDatabaseId}
+        />;
       case 'memory':
         return <MemoryTab />;
       default:

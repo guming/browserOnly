@@ -5,7 +5,9 @@ import { MemoryManager } from "./MemoryManager";
 import { initializePageContext } from "./PageContextManager";
 import { PromptManager } from "./PromptManager";
 import { ToolManager } from "./ToolManager";
+import { NotionSDKClient } from "./notionClient";
 import { getAllTools } from "./tools/index";
+import { getAllNotionTools } from "./tools/notionTools";
 import { BrowserTool, ToolExecutionContext } from "./tools/types";
 // Define our own DynamicTool interface to avoid import issues
 interface DynamicTool {
@@ -25,6 +27,7 @@ function isDynamicTool(obj: any): obj is DynamicTool {
     typeof obj.func === 'function'
   );
 }
+// eslint-disable-next-line import/order
 import { LLMProvider } from "../models/providers/types";
 import { createProvider } from "../models/providers/factory";
 import { ConfigManager, ProviderConfig } from "../background/configManager";
@@ -41,6 +44,7 @@ export class BrowserAgent {
   private memoryManager: MemoryManager;
   private errorHandler: ErrorHandler;
   private executionEngine: ExecutionEngine;
+  private notionClient: NotionSDKClient | null = null;
 
   /**
    * Create a new BrowserAgent
@@ -56,11 +60,17 @@ export class BrowserAgent {
     const rawTools = getAllTools(page);
     const browserTools = this.convertToBrowserTools(rawTools);
 
-    // Initialize all the components
+    // Initialize all the components with basic tools first
     this.toolManager = new ToolManager(page, browserTools);
     this.promptManager = new PromptManager(this.toolManager.getTools());
     this.memoryManager = new MemoryManager(this.toolManager.getTools());
     this.errorHandler = new ErrorHandler();
+
+    // Initialize Notion client and tools if configured (will add tools dynamically)
+    this.initializeNotionTools();
+
+    // Update prompt manager with any additional tools that were added
+    this.promptManager.updateTools(this.toolManager.getTools());
 
     // Initialize the execution engine with all the components
     this.executionEngine = new ExecutionEngine(
@@ -111,6 +121,62 @@ export class BrowserAgent {
         };
       }
     });
+  }
+
+  /**
+   * Initialize Notion client and tools
+   */
+  private async initializeNotionTools(): Promise<void> {
+    try {
+      const configManager = ConfigManager.getInstance();
+      const notionConfig = await configManager.getNotionConfig();
+      
+      if (notionConfig.enabled && notionConfig.bearerToken) {
+        this.notionClient = new NotionSDKClient({
+          auth: notionConfig.bearerToken
+        });
+        
+        try {
+          console.log('Notion client connected successfully');
+          
+          // Add Notion tools to the tool manager
+          const notionDynamicTools = getAllNotionTools(this.notionClient);
+          const notionBrowserTools = this.convertToBrowserTools(notionDynamicTools);
+          this.toolManager.addTools(notionBrowserTools);
+          
+        } catch (error) {
+          console.error('Failed to connect to Notion MCP server:', error);
+          this.notionClient = null;
+        }
+      }
+    } catch (error) {
+      console.error('Error initializing Notion tools:', error);
+      this.notionClient = null;
+    }
+  }
+
+  /**
+   * Get Notion tools if configured
+   */
+  private getNotionTools(): BrowserTool[] {
+    if (!this.notionClient || !this.notionClient.isConnected) {
+      return [];
+    }
+
+    try {
+      const notionDynamicTools = getAllNotionTools(this.notionClient);
+      return this.convertToBrowserTools(notionDynamicTools);
+    } catch (error) {
+      console.error('Error converting Notion tools:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Check if Notion tools are available
+   */
+  hasNotionTools(): boolean {
+    return this.notionClient !== null && this.notionClient.isConnected;
   }
 
   /**
