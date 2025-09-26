@@ -103,6 +103,11 @@ export function Options() {
   const [notionBearerToken, setNotionBearerToken] = useState('');
   const [notionDatabaseId, setNotionDatabaseId] = useState('');
 
+  // DuckDB settings
+  const [duckdbEnabled, setDuckdbEnabled] = useState(false);
+  const [duckdbConnectionString, setDuckdbConnectionString] = useState('');
+  const [duckdbDatabasePath, setDuckdbDatabasePath] = useState(':memory:');
+
   // Load saved settings when component mounts
   useEffect(() => {
     chrome.storage.sync.get({
@@ -132,6 +137,9 @@ export function Options() {
       notionMcpServerUrl: '',
       notionBearerToken: '',
       notionDatabaseId: '',
+      duckdbEnabled: false,
+      duckdbConnectionString: '',
+      duckdbDatabasePath: ':memory:',
     }, (result) => {
       
       setProvider(result.provider);
@@ -160,6 +168,9 @@ export function Options() {
       setNotionMcpServerUrl(result.notionMcpServerUrl || '');
       setNotionBearerToken(result.notionBearerToken || '');
       setNotionDatabaseId(result.notionDatabaseId || '');
+      setDuckdbEnabled(result.duckdbEnabled || false);
+      setDuckdbConnectionString(result.duckdbConnectionString || '');
+      setDuckdbDatabasePath(result.duckdbDatabasePath || ':memory:');
     });
   }, []);
 
@@ -195,6 +206,9 @@ export function Options() {
       notionMcpServerUrl,
       notionBearerToken,
       notionDatabaseId,
+      duckdbEnabled,
+      duckdbConnectionString,
+      duckdbDatabasePath,
     }, () => {
       
       setIsSaving(false);
@@ -333,6 +347,13 @@ export function Options() {
       setNotionBearerToken={setNotionBearerToken}
       notionDatabaseId={notionDatabaseId}
       setNotionDatabaseId={setNotionDatabaseId}
+      // DuckDB settings
+      duckdbEnabled={duckdbEnabled}
+      setDuckdbEnabled={setDuckdbEnabled}
+      duckdbConnectionString={duckdbConnectionString}
+      setDuckdbConnectionString={setDuckdbConnectionString}
+      duckdbDatabasePath={duckdbDatabasePath}
+      setDuckdbDatabasePath={setDuckdbDatabasePath}
     />
   );
 }

@@ -46,7 +46,7 @@ export const MultiTabStatusBar: React.FC<MultiTabStatusBarProps> = ({
         });
 
         const tabInfos: TabInfo[] = tabs
-          .filter(tab => tab.id && tab.url && !tab.url.startsWith('chrome://'))
+          .filter(tab => tab.id && tab.url)
           .map(tab => ({
             id: tab.id!,
             title: tab.title || 'Untitled',
@@ -112,7 +112,6 @@ export const MultiTabStatusBar: React.FC<MultiTabStatusBarProps> = ({
   // 更新当前选中的tab信息
   useEffect(() => {
     const current = availableTabs.find(tab => tab.id === selectedTabId);
-    console.log("the current:",current);
     setSelectedTab(current || null);
   }, [selectedTabId, availableTabs]);
 

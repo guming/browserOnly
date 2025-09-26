@@ -86,6 +86,14 @@ interface VerticalTabsProps {
   setNotionBearerToken: (token: string) => void;
   notionDatabaseId: string;
   setNotionDatabaseId: (databaseId: string) => void;
+
+  // DuckDB settings
+  duckdbEnabled: boolean;
+  setDuckdbEnabled: (enabled: boolean) => void;
+  duckdbConnectionString: string;
+  setDuckdbConnectionString: (connectionString: string) => void;
+  duckdbDatabasePath: string;
+  setDuckdbDatabasePath: (databasePath: string) => void;
 }
 
 export function VerticalTabs(props: VerticalTabsProps) {
@@ -165,6 +173,12 @@ export function VerticalTabs(props: VerticalTabsProps) {
           setNotionBearerToken={props.setNotionBearerToken}
           notionDatabaseId={props.notionDatabaseId}
           setNotionDatabaseId={props.setNotionDatabaseId}
+          duckdbEnabled={props.duckdbEnabled}
+          setDuckdbEnabled={props.setDuckdbEnabled}
+          duckdbConnectionString={props.duckdbConnectionString}
+          setDuckdbConnectionString={props.setDuckdbConnectionString}
+          duckdbDatabasePath={props.duckdbDatabasePath}
+          setDuckdbDatabasePath={props.setDuckdbDatabasePath}
         />;
       case 'memory':
         return <MemoryTab />;

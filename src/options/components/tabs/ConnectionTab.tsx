@@ -1,4 +1,5 @@
 import { NotionSettings } from '../NotionSettings';
+import { DuckDBSettings } from '../DuckDBSettings';
 
 interface ConnectionTabProps {
   notionEnabled: boolean;
@@ -7,6 +8,12 @@ interface ConnectionTabProps {
   setNotionBearerToken: (token: string) => void;
   notionDatabaseId: string;
   setNotionDatabaseId: (databaseId: string) => void;
+  duckdbEnabled: boolean;
+  setDuckdbEnabled: (enabled: boolean) => void;
+  duckdbConnectionString: string;
+  setDuckdbConnectionString: (connectionString: string) => void;
+  duckdbDatabasePath: string;
+  setDuckdbDatabasePath: (databasePath: string) => void;
 }
 
 export function ConnectionTab({
@@ -15,7 +22,13 @@ export function ConnectionTab({
   notionBearerToken,
   setNotionBearerToken,
   notionDatabaseId,
-  setNotionDatabaseId
+  setNotionDatabaseId,
+  duckdbEnabled,
+  setDuckdbEnabled,
+  duckdbConnectionString,
+  setDuckdbConnectionString,
+  duckdbDatabasePath,
+  setDuckdbDatabasePath
 }: ConnectionTabProps) {
 
   return (
@@ -38,6 +51,16 @@ export function ConnectionTab({
           setNotionBearerToken={setNotionBearerToken}
           notionDatabaseId={notionDatabaseId}
           setNotionDatabaseId={setNotionDatabaseId}
+        />
+
+        {/* DuckDB Integration Card */}
+        <DuckDBSettings
+          duckdbEnabled={duckdbEnabled}
+          setDuckdbEnabled={setDuckdbEnabled}
+          duckdbConnectionString={duckdbConnectionString}
+          setDuckdbConnectionString={setDuckdbConnectionString}
+          duckdbDatabasePath={duckdbDatabasePath}
+          setDuckdbDatabasePath={setDuckdbDatabasePath}
         />
 
         {/* Future Integrations Placeholder */}
