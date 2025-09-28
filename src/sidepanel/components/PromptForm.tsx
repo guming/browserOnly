@@ -1,21 +1,22 @@
 import { faPaperPlane, faXmark } from '@fortawesome/free-solid-svg-icons';
-import { 
-  faUserTie, 
-  faSearch, 
-  faBalanceScale, 
-  faChartLine, 
-  faCalculator, 
-  faVial, 
-  faCode, 
+import {
+  faUserTie,
+  faSearch,
+  faBalanceScale,
+  faChartLine,
+  faCalculator,
+  faVial,
+  faCode,
   faHeartbeat,
   faBook
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useEffect, useState } from 'react';
 import TextareaAutosize from 'react-textarea-autosize';
+import { MultiTabSelector } from './MultiTabSelector';
 
 interface PromptFormProps {
-  onSubmit: (prompt: string, role: string) => void;
+  onSubmit: (prompt: string, role: string, selectedTabIds?: number[]) => void;
   onCancel: () => void;
   isProcessing: boolean;
   tabStatus: 'attached' | 'detached' | 'unknown' | 'running' | 'idle' | 'error';
@@ -105,6 +106,8 @@ export const PromptForm: React.FC<PromptFormProps> = ({
   const [showBookSelection, setShowBookSelection] = useState(false);
   const [selectedNotebookLMOption, setSelectedNotebookLMOption] = useState<NotebookLMOption>('summary');
   const [showNotebookLMOptions, setShowNotebookLMOptions] = useState(false);
+  const [showMultiTabSelector, setShowMultiTabSelector] = useState(false);
+  const [selectedTabIds, setSelectedTabIds] = useState<number[]>([]);
 
   // 当角色改变时重置相关状态
   useEffect(() => {
@@ -128,7 +131,7 @@ export const PromptForm: React.FC<PromptFormProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim() || isProcessing || tabStatus === 'detached') return;
-    
+
     let finalRole = '';
     if (role === 'books') {
       finalRole = `books`;
@@ -137,8 +140,10 @@ export const PromptForm: React.FC<PromptFormProps> = ({
     }else{
       finalRole = role;
     }
-    
-    onSubmit(prompt, finalRole);
+
+    // Pass selected tab IDs for research role with multitab analysis
+    const tabIds = role === 'researcher' && selectedTabIds.length > 0 ? selectedTabIds : undefined;
+    onSubmit(prompt, finalRole, tabIds);
     setPrompt(''); // Clear the prompt after submission
   };
 
@@ -147,6 +152,15 @@ export const PromptForm: React.FC<PromptFormProps> = ({
     // 直接提交，使用选项作为prompt
     const finalRole = `notebooklm-${option}`;
     onSubmit(`#${option}`, finalRole);
+  };
+
+  const handleTabsSelected = (tabIds: number[]) => {
+    setSelectedTabIds(tabIds);
+    setShowMultiTabSelector(false);
+  };
+
+  const handleMultiTabAnalysis = () => {
+    setShowMultiTabSelector(true);
   };
 
   useEffect(() => {
@@ -168,7 +182,6 @@ export const PromptForm: React.FC<PromptFormProps> = ({
   return (
     <form onSubmit={handleSubmit} className="mt-2 relative">
       <div className="w-full">
-        {/* 主要角色选择 */}
         <div className="relative">
           <select
             className={`w-full bg-gradient-to-r from-sky-50 via-blue-50 to-indigo-50 border-2 border-sky-200 rounded-2xl px-4 text-sm font-medium text-gray-800 shadow-lg hover:shadow-xl hover:border-sky-300 focus:outline-none focus:ring-3 focus:ring-sky-300 focus:border-sky-400 transition-all duration-300 backdrop-blur-sm appearance-none cursor-pointer ${showBookSelection || showNotebookLMOptions ? 'py-2 mb-1' : 'py-2 mb-2'}`}
@@ -195,7 +208,6 @@ export const PromptForm: React.FC<PromptFormProps> = ({
             <option value="munger" className="bg-white text-gray-800 py-2">💎 Talk to Charlie Munger</option>
           </select>
           
-          {/* 装饰性渐变边框 */}
           <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-sky-400 via-blue-400 to-indigo-400 opacity-0 hover:opacity-20 transition-opacity duration-300 pointer-events-none -z-10"></div>
         </div>
 
@@ -242,6 +254,53 @@ export const PromptForm: React.FC<PromptFormProps> = ({
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {role === 'researcher' && (
+          <div className="mb-2 transform transition-all duration-200 ease-in-out">
+            <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border-2 border-blue-200 rounded-2xl p-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🔍</span>
+                  <div>
+                    <div className="text-sm font-semibold text-blue-900">Multi-Tab Analysis</div>
+                    <div className="text-xs text-blue-700">
+                      {selectedTabIds.length > 0
+                        ? `${selectedTabIds.length} tab${selectedTabIds.length > 1 ? 's' : ''} selected for analysis`
+                        : 'Analyze multiple tabs together for comprehensive research'
+                      }
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleMultiTabAnalysis}
+                  className="px-3 py-1.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl text-xs font-medium shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 flex items-center gap-1"
+                  disabled={isProcessing || tabStatus === 'detached'}
+                >
+                  <span>📋</span>
+                  Select Tabs
+                </button>
+              </div>
+
+              {selectedTabIds.length > 0 && (
+                <div className="mt-2 flex items-center gap-2">
+                  <div className="flex-1 bg-blue-100/50 rounded-lg px-2 py-1">
+                    <div className="text-xs text-blue-800 font-medium">
+                      Ready to analyze {selectedTabIds.length} selected tab{selectedTabIds.length > 1 ? 's' : ''}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTabIds([])}
+                    className="text-blue-600 hover:text-blue-700 text-xs hover:underline transition-colors duration-200"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -344,6 +403,13 @@ export const PromptForm: React.FC<PromptFormProps> = ({
           )}
         </div>
       </div>
+
+      {/* MultiTab Selector Modal */}
+      <MultiTabSelector
+        isVisible={showMultiTabSelector}
+        onTabsSelected={handleTabsSelected}
+        onClose={() => setShowMultiTabSelector(false)}
+      />
     </form>
   );
 };

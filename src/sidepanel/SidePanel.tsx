@@ -282,13 +282,18 @@ export function SidePanel() {
   });
 
   // Handle form submission
-  const handleSubmit = async (prompt: string, role: string) => {
+  const handleSubmit = async (prompt: string, role: string, selectedTabIds?: number[]) => {
     setIsProcessing(true);
     setTabStatus('running');
-    addSystemMessage(`New ${role} prompt: "${prompt}"`);
+
+    if (selectedTabIds && selectedTabIds.length > 0) {
+      addSystemMessage(`New ${role} multitab analysis: "${prompt}" (analyzing ${selectedTabIds.length} tabs)`);
+    } else {
+      addSystemMessage(`New ${role} prompt: "${prompt}"`);
+    }
 
     try {
-      await executePrompt(prompt, role);
+      await executePrompt(prompt, role, selectedTabIds);
     } catch (error) {
       console.error('Error:', error);
       addSystemMessage('Error: ' + (error instanceof Error ? error.message : String(error)));

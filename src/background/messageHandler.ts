@@ -204,7 +204,12 @@ function handleExecutePrompt(
 ): void {
   // Use the tabId from the message if available
   if (message.tabId) {
-    executePrompt(message.prompt, message.tabId,false,message.role);
+    // Check if this is a multitab analysis request
+    if ((message as any).multiTabAnalysis && (message as any).selectedTabIds) {
+      executePrompt(message.prompt, message.tabId, false, message.role, (message as any).selectedTabIds);
+    } else {
+      executePrompt(message.prompt, message.tabId, false, message.role);
+    }
   } else {
     executePrompt(message.prompt);
   }

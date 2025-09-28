@@ -226,17 +226,25 @@ export const useChromeMessaging = ({
     onAgentStatusUpdate
   ]);
 
-  const executePrompt = (prompt: string, role: string) => {
+  const executePrompt = (prompt: string, role: string, selectedTabIds?: number[]) => {
     return new Promise<void>((resolve, reject) => {
       try {
-        // Send message to background script with tab ID
-        chrome.runtime.sendMessage({
+        // Send message to background script with tab ID and optional multitab IDs
+        const message: any = {
           action: 'executePrompt',
           prompt,
           role,
           tabId,
           windowId
-        }, () => {
+        };
+
+        // Add selected tab IDs for multitab analysis if provided
+        if (selectedTabIds && selectedTabIds.length > 0) {
+          message.selectedTabIds = selectedTabIds;
+          message.multiTabAnalysis = true;
+        }
+
+        chrome.runtime.sendMessage(message, () => {
           const lastError = chrome.runtime.lastError;
           if (lastError) {
             console.error(lastError);

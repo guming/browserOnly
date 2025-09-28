@@ -458,8 +458,10 @@ export function cancelExecution(tabId?: number): void {
  * @param prompt The prompt to execute
  * @param tabId Optional tab ID to execute the prompt for
  * @param isReflectionPrompt Optional flag to indicate if this is a reflection prompt
+ * @param role The role of the agent
+ * @param selectedTabIds Optional array of tab IDs for multitab analysis
  */
-export async function executePrompt(prompt: string, tabId?: number, isReflectionPrompt: boolean = false, role:string = 'operator'): Promise<void> {
+export async function executePrompt(prompt: string, tabId?: number, isReflectionPrompt: boolean = false, role:string = 'operator', selectedTabIds?: number[]): Promise<void> {
   try {
     // Get provider configuration from ConfigManager
     const configManager = ConfigManager.getInstance();
@@ -614,10 +616,184 @@ export async function executePrompt(prompt: string, tabId?: number, isReflection
       }
     }
     
+    // Handle multitab analysis if selectedTabIds is provided and not empty
+    let enhancedPrompt = prompt;
+    const isMultiTabAnalysis = selectedTabIds && Array.isArray(selectedTabIds) && selectedTabIds.length > 0;
+
+    if (isMultiTabAnalysis) {
+      sendUIMessage('updateOutput', {
+        type: 'system',
+        content: `Gathering content from ${selectedTabIds.length} selected tabs for analysis...`
+      }, targetTabId);
+
+      try {
+        // Gather content from all selected tabs by temporarily attaching to them
+        const tabContents: string[] = [];
+
+        for (const tabId of selectedTabIds) {
+          try {
+            const tab = await chrome.tabs.get(tabId);
+            if (tab && tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
+              logWithTimestamp(`Processing tab ${tabId}: ${tab.title} (${tab.url})`);
+
+              // Check if tab already has a state (Playwright page attached)
+              let tabState = getTabState(tabId);
+              let temporarilyAttached = false;
+
+              // If no tab state exists, temporarily attach to this tab
+              if (!tabState?.page) {
+                try {
+                  logWithTimestamp(`Temporarily attaching to tab ${tabId} for content extraction`);
+                  const { attachToTab } = await import('./tabManager');
+                  await attachToTab(tabId);
+                  tabState = getTabState(tabId);
+                  temporarilyAttached = true;
+                } catch (attachError) {
+                  logWithTimestamp(`Failed to attach to tab ${tabId}: ${attachError instanceof Error ? attachError.message : String(attachError)}`, 'warn');
+                }
+              }
+
+              let pageContent: any = null;
+
+              // Try to extract content using Playwright if we have a page
+              if (tabState?.page) {
+                try {
+                  pageContent = await tabState.page.evaluate(() => {
+                    const title = document.title || '';
+                    const url = window.location.href || '';
+
+                    // Get main content areas with better selectors
+                    const contentSelectors = [
+                      'main', 'article', '[role="main"]', '.content', '.main-content',
+                      'h1, h2, h3, h4, h5, h6', 'p', 'li', 'div'
+                    ];
+
+                    let content = '';
+                    const processedTexts = new Set<string>();
+
+                    for (const selector of contentSelectors) {
+                      const elements = document.querySelectorAll(selector);
+                      elements.forEach(el => {
+                        // Skip hidden elements
+                        const style = window.getComputedStyle(el);
+                        if (style.display === 'none' || style.visibility === 'hidden') {
+                          return;
+                        }
+
+                        const text = el.textContent?.trim();
+                        if (text && text.length > 15 && !processedTexts.has(text) &&
+                            !text.match(/^(skip|menu|navigation|footer|header|cookie|privacy|advertisement)/i)) {
+                          processedTexts.add(text);
+                          content += text + '\n\n';
+                        }
+                      });
+                      if (content.length > 10000) break;
+                    }
+
+                    return {
+                      title,
+                      url,
+                      content: content.slice(0, 12000)
+                    };
+                  });
+                  logWithTimestamp(`Successfully extracted ${pageContent.content.length} characters from tab ${tabId}`);
+                } catch (evalError) {
+                  logWithTimestamp(`Content extraction failed for tab ${tabId}: ${evalError instanceof Error ? evalError.message : String(evalError)}`, 'warn');
+                  pageContent = null;
+                }
+              }
+
+              // If we temporarily attached and got no useful content, try to get basic page info
+              if (tabState?.page && (!pageContent || pageContent.content.length < 100)) {
+                try {
+                  const basicInfo = await tabState.page.evaluate(() => {
+                    return {
+                      title: document.title || '',
+                      url: window.location.href || '',
+                      content: document.body?.innerText?.slice(0, 5000) || 'No readable content found'
+                    };
+                  });
+                  if (basicInfo.content.length > 50) {
+                    pageContent = basicInfo;
+                    logWithTimestamp(`Got basic content from tab ${tabId}: ${basicInfo.content.length} characters`);
+                  }
+                } catch (basicError) {
+                  logWithTimestamp(`Basic content extraction failed for tab ${tabId}: ${basicError instanceof Error ? basicError.message : String(basicError)}`, 'warn');
+                }
+              }
+
+              // Add the content to our results
+              if (pageContent && pageContent.content && pageContent.content.length > 50) {
+                tabContents.push(`=== TAB: ${pageContent.title} ===\nURL: ${pageContent.url}\n\nCONTENT:\n${pageContent.content}\n\n=== END OF TAB ===\n`);
+                logWithTimestamp(`Added content for tab ${tabId}: ${pageContent.title} (${pageContent.content.length} chars)`);
+              } else {
+                // Fallback with basic tab info
+                tabContents.push(`=== TAB: ${tab.title} ===\nURL: ${tab.url}\n\nCONTENT:\nUnable to extract detailed content from this tab. The page may require user interaction or may not be fully loaded.\nTab Title: ${tab.title}\nTab URL: ${tab.url}\n\n=== END OF TAB ===\n`);
+                logWithTimestamp(`Added fallback content for tab ${tabId}: ${tab.title}`);
+              }
+
+              // If we temporarily attached, we might want to keep it attached for the agent to use
+              // or detach if it's not the main tab - for now, we'll keep it attached
+              if (temporarilyAttached) {
+                logWithTimestamp(`Keeping temporary attachment for tab ${tabId} - it may be useful for the agent`);
+              }
+            }
+          } catch (error) {
+            logWithTimestamp(`Error processing tab ${tabId}: ${error instanceof Error ? error.message : String(error)}`, 'error');
+            try {
+              const tab = await chrome.tabs.get(tabId);
+              tabContents.push(`=== TAB: ${tab.title || 'Unknown'} ===\nURL: ${tab.url || 'Unknown'}\n\nCONTENT:\nError accessing this tab: ${error instanceof Error ? error.message : String(error)}\n\n=== END OF TAB ===\n`);
+            } catch {
+              tabContents.push(`=== TAB ID: ${tabId} ===\nError: Unable to access tab information\n\n=== END OF TAB ===\n`);
+            }
+          }
+        }
+
+        // Enhance the prompt with gathered content
+        const combinedContent = tabContents.join('\n');
+        const totalContentLength = combinedContent.length;
+        const tabsWithContent = tabContents.filter(content => content.includes('CONTENT:\n') && !content.includes('Unable to extract')).length;
+
+        logWithTimestamp(`Multitab analysis summary: ${tabsWithContent}/${selectedTabIds.length} tabs with content, total ${totalContentLength} characters`);
+
+        enhancedPrompt = `MULTI-TAB RESEARCH ANALYSIS REQUEST
+
+Original Request: ${prompt}
+
+I have gathered content from ${selectedTabIds.length} tabs for your analysis. Successfully extracted meaningful content from ${tabsWithContent} tabs. Please analyze all the provided content comprehensively and answer the original request based on the information from all tabs.
+
+Here is the content from all selected tabs:
+
+${combinedContent}
+
+Please provide a comprehensive analysis based on ALL the tab contents above, addressing the original request: "${prompt}"
+
+Note: Focus on the actual content from the tabs that were successfully analyzed. If some tabs couldn't be accessed, work with the available content.`;
+
+        sendUIMessage('updateOutput', {
+          type: 'system',
+          content: `✅ Successfully gathered content from ${tabsWithContent}/${selectedTabIds.length} tabs (${Math.round(totalContentLength/1000)}K characters). Proceeding with analysis...`
+        }, targetTabId);
+
+      } catch (error) {
+        logWithTimestamp(`Error in multitab analysis: ${error instanceof Error ? error.message : String(error)}`, 'error');
+        sendUIMessage('updateOutput', {
+          type: 'system',
+          content: `⚠️ Error gathering multitab content: ${error instanceof Error ? error.message : String(error)}. Proceeding with original prompt...`
+        }, targetTabId);
+        enhancedPrompt = prompt; // Fall back to original prompt
+      }
+    } else {
+      // Single tab mode - use original prompt
+      logWithTimestamp(`Executing single-tab prompt (no selectedTabIds provided or empty array)`);
+    }
+
     // Execute the prompt
     sendUIMessage('updateOutput', {
       type: 'system',
-      content: `Executing prompt: "${prompt}"`
+      content: isMultiTabAnalysis
+        ? `Executing multitab analysis prompt for ${selectedTabIds.length} tabs`
+        : `Executing prompt: "${prompt}"`
     }, targetTabId);
     
     // Set agent status to RUNNING if we have a window ID
@@ -637,23 +813,23 @@ export async function executePrompt(prompt: string, tabId?: number, isReflection
     // Check if this is the first prompt (no original request yet)
     if (!history.originalRequest) {
       // Store this as the original request without adding any special tag
-      await setOriginalRequest(targetTabId, { 
-        role: "user", 
-        content: prompt 
+      await setOriginalRequest(targetTabId, {
+        role: "user",
+        content: enhancedPrompt
       });
-      
+
       // Also add it to the conversation history to maintain the flow
-      await addToConversationHistory(targetTabId, { 
-        role: "user", 
-        content: prompt 
+      await addToConversationHistory(targetTabId, {
+        role: "user",
+        content: enhancedPrompt
       });
-      
-      logWithTimestamp(`Set original request for tab ${targetTabId}: "${prompt}"`);
+
+      logWithTimestamp(`Set original request for tab ${targetTabId}: "${selectedTabIds && selectedTabIds.length > 0 ? 'multitab analysis' : prompt}"`);
     } else {
       // This is a follow-up prompt, add it to conversation history
-      await addToConversationHistory(targetTabId, { 
-        role: "user", 
-        content: prompt 
+      await addToConversationHistory(targetTabId, {
+        role: "user",
+        content: enhancedPrompt
       });
     }
     
@@ -882,11 +1058,12 @@ export async function executePrompt(prompt: string, tabId?: number, isReflection
     
     // Execute the prompt with the agent
     const messageHistory = await getMessageHistory(targetTabId);
-    console.log("role in controller is ",role);
+    console.log("role in controller is ", role);
+    console.log("executing with enhanced prompt for multitab:", selectedTabIds && selectedTabIds.length > 0);
     await executePromptWithFallback(
-      agent, 
-      prompt, 
-      callbacks, 
+      agent,
+      enhancedPrompt,
+      callbacks,
       messageHistory,
       role
     );
