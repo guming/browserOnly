@@ -21,15 +21,25 @@
   },
   "web_accessible_resources": [
   {
-    "resources": ["mermaid.min.js","initMermaid.js"],
+    "resources": ["mermaid.min.js","initMermaid.js", "pdf-viewer.html", "pdf-proxy-viewer.html", "viewer.mjs", "pdf.mjs", "pdf.worker.mjs", "viewer.css", "pdf.min.js", "pdf.worker.min.js", "*.js", "*.mjs", "*.map"],
     "matches": ["<all_urls>"]
   }],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
   "side_panel": {
     "default_path": "sidepanel.html"
   },
   "options_page": "options.html",
   "permissions": ["debugger", "tabs", "sidePanel", "storage", "activeTab", "commands", "downloads", "contextMenus"],
   "host_permissions": ["<all_urls>"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["pdfInterceptor.js"],
+      "run_at": "document_start"
+    }
+  ],
   "commands": {
     "_execute_action": {
       "suggested_key": {

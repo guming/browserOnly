@@ -22,6 +22,9 @@ interface PromptFormProps {
   tabStatus: 'attached' | 'detached' | 'unknown' | 'running' | 'idle' | 'error';
 }
 
+// 定义模式类型
+type ModeType = 'operator' | 'ask';
+
 // 定义角色类型
 type RoleType = 'operator' | 'researcher' | 'lawyer' | 'trader' | 'math' | 'qa' | 'code' | 'health' | 'wiki' | 'books' | 'munger' |'notebooklm';
 
@@ -101,6 +104,7 @@ export const PromptForm: React.FC<PromptFormProps> = ({
   tabStatus
 }) => {
   const [prompt, setPrompt] = useState('');
+  const [mode, setMode] = useState<ModeType>('operator');
   const [role, setRole] = useState<RoleType>('operator');
   const [selectedBook, setSelectedBook] = useState<string>('');
   const [showBookSelection, setShowBookSelection] = useState(false);
@@ -108,6 +112,20 @@ export const PromptForm: React.FC<PromptFormProps> = ({
   const [showNotebookLMOptions, setShowNotebookLMOptions] = useState(false);
   const [showMultiTabSelector, setShowMultiTabSelector] = useState(false);
   const [selectedTabIds, setSelectedTabIds] = useState<number[]>([]);
+
+  // 当模式改变时重置角色
+  useEffect(() => {
+    if (mode === 'operator') {
+      setRole('operator');
+    } else if (mode === 'ask') {
+      setRole('books');
+    }
+    // 重置相关状态
+    setShowBookSelection(false);
+    setShowNotebookLMOptions(false);
+    setSelectedBook('');
+    setSelectedTabIds([]);
+  }, [mode]);
 
   // 当角色改变时重置相关状态
   useEffect(() => {
@@ -182,9 +200,46 @@ export const PromptForm: React.FC<PromptFormProps> = ({
   return (
     <form onSubmit={handleSubmit} className="mt-2 relative">
       <div className="w-full">
+        {/* Mode Switch */}
+        <div className="mb-3">
+          <div className="flex items-center justify-center bg-gray-50 rounded-2xl p-1 border border-gray-200">
+            <button
+              type="button"
+              onClick={() => setMode('operator')}
+              className={`flex-1 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+                mode === 'operator'
+                  ? 'bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-lg'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+              }`}
+              disabled={isProcessing || tabStatus === 'detached'}
+            >
+              <span className="flex items-center justify-center gap-2">
+                <span>⚡</span>
+                <span>Operator</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('ask')}
+              className={`flex-1 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+                mode === 'ask'
+                  ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-lg'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+              }`}
+              disabled={isProcessing || tabStatus === 'detached'}
+            >
+              <span className="flex items-center justify-center gap-2">
+                <span>🤔</span>
+                <span>Ask</span>
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Role Selection */}
         <div className="relative">
           <select
-            className={`w-full bg-gradient-to-r from-sky-50 via-blue-50 to-indigo-50 border-2 border-sky-200 rounded-2xl px-4 text-sm font-medium text-gray-800 shadow-lg hover:shadow-xl hover:border-sky-300 focus:outline-none focus:ring-3 focus:ring-sky-300 focus:border-sky-400 transition-all duration-300 backdrop-blur-sm appearance-none cursor-pointer ${showBookSelection || showNotebookLMOptions ? 'py-2 mb-1' : 'py-2 mb-2'}`}
+            className={`w-full bg-gradient-to-r ${mode === 'operator' ? 'from-sky-50 via-blue-50 to-indigo-50 border-sky-200' : 'from-emerald-50 via-green-50 to-teal-50 border-emerald-200'} border-2 rounded-2xl px-4 text-sm font-medium text-gray-800 shadow-lg hover:shadow-xl hover:border-${mode === 'operator' ? 'sky' : 'emerald'}-300 focus:outline-none focus:ring-3 focus:ring-${mode === 'operator' ? 'sky' : 'emerald'}-300 focus:border-${mode === 'operator' ? 'sky' : 'emerald'}-400 transition-all duration-300 backdrop-blur-sm appearance-none cursor-pointer ${showBookSelection || showNotebookLMOptions ? 'py-2 mb-1' : 'py-2 mb-2'}`}
             value={role}
             onChange={(e) => setRole(e.target.value as RoleType)}
             disabled={isProcessing || tabStatus === 'detached'}
@@ -195,20 +250,27 @@ export const PromptForm: React.FC<PromptFormProps> = ({
               backgroundSize: '16px'
             }}
           >
-            <option value="operator" className="bg-white text-gray-800 py-2">⚡ Browser Operator</option>
-            <option value="notebooklm" className="bg-white text-gray-800 py-2">📓 NotebookLM</option>
-            <option value="researcher" className="bg-white text-gray-800 py-2">🔎 Research Analyst</option>
-            <option value="lawyer" className="bg-white text-gray-800 py-2">⚖️ Legal Advisor</option>
-            <option value="math" className="bg-white text-gray-800 py-2">∑ Mathematics Expert</option>
-            <option value="code" className="bg-white text-gray-800 py-2">⌨️ Code Developer</option>
-            <option value="qa" className="bg-white text-gray-800 py-2">✓ TestCase Writer</option>
-            <option value="health" className="bg-white text-gray-800 py-2">⚕️ Medical Consultant</option>
-            <option value="wiki" className="bg-white text-gray-800 py-2">📖 Ask Wiki</option>
-            <option value="books" className="bg-white text-gray-800 py-2">📚 Ask The Books</option>
-            <option value="munger" className="bg-white text-gray-800 py-2">💎 Talk to Charlie Munger</option>
+            {mode === 'operator' ? (
+              <>
+                <option value="operator" className="bg-white text-gray-800 py-2">⚡ Browser Operator</option>
+                <option value="notebooklm" className="bg-white text-gray-800 py-2">📓 NotebookLM</option>
+                <option value="researcher" className="bg-white text-gray-800 py-2">🔎 Research Analyst</option>
+                <option value="lawyer" className="bg-white text-gray-800 py-2">⚖️ Legal Advisor</option>
+                <option value="math" className="bg-white text-gray-800 py-2">∑ Mathematics Expert</option>
+                <option value="code" className="bg-white text-gray-800 py-2">⌨️ Code Developer</option>
+                <option value="qa" className="bg-white text-gray-800 py-2">✓ TestCase Writer</option>
+                <option value="health" className="bg-white text-gray-800 py-2">⚕️ Medical Consultant</option>
+                <option value="wiki" className="bg-white text-gray-800 py-2">📖 Wiki Assistant</option>
+              </>
+            ) : (
+              <>
+                <option value="books" className="bg-white text-gray-800 py-2">📚 Ask The Books</option>
+                <option value="munger" className="bg-white text-gray-800 py-2">💎 Talk to Charlie Munger</option>
+              </>
+            )}
           </select>
-          
-          <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-sky-400 via-blue-400 to-indigo-400 opacity-0 hover:opacity-20 transition-opacity duration-300 pointer-events-none -z-10"></div>
+
+          <div className={`absolute inset-0 rounded-2xl bg-gradient-to-r ${mode === 'operator' ? 'from-sky-400 via-blue-400 to-indigo-400' : 'from-emerald-400 via-green-400 to-teal-400'} opacity-0 hover:opacity-20 transition-opacity duration-300 pointer-events-none -z-10`}></div>
         </div>
 
         {/* NotebookLM选项按钮 - 只在选择notebooklm时显示 */}
@@ -257,7 +319,8 @@ export const PromptForm: React.FC<PromptFormProps> = ({
           </div>
         )}
 
-        {role === 'researcher' && (
+        {/* Research Role Multitab Options - 只在operator模式且选择researcher时显示 */}
+        {mode === 'operator' && role === 'researcher' && (
           <div className="mb-2 transform transition-all duration-200 ease-in-out">
             <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border-2 border-blue-200 rounded-2xl p-3">
               <div className="flex items-center justify-between">
@@ -359,13 +422,21 @@ export const PromptForm: React.FC<PromptFormProps> = ({
               }
               // Allow Shift+Enter to create a new line (default behavior)
             }}
-            placeholder={tabStatus === 'detached' 
-              ? "Tab connection lost. Please refresh the tab to continue." 
-              : role === 'books' && selectedBook
-                ? `Ask ${getSelectedBookInfo()?.title} anything...`
+            placeholder={tabStatus === 'detached'
+              ? "Tab connection lost. Please refresh the tab to continue."
+              : mode === 'ask'
+                ? role === 'books' && selectedBook
+                  ? `Ask ${getSelectedBookInfo()?.title} anything...`
+                  : role === 'wiki'
+                    ? "Ask your Wiki Assistant anything..."
+                    : role === 'munger'
+                      ? "Chat with Charlie Munger..."
+                      : "Ask your question..."
                 : role === 'notebooklm'
                   ? `Generate ${getSelectedNotebookLMOption()?.title.toLowerCase()} for your content...`
-                  : "Type your message here..."}
+                  : mode === 'operator' && role === 'researcher' && selectedTabIds.length > 0
+                    ? "Enter your research question for multitab analysis..."
+                    : "Type your message here..."}
             autoFocus
             disabled={isProcessing || tabStatus === 'detached'}
             minRows={1}

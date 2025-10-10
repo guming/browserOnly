@@ -217,7 +217,27 @@ export interface DownloadMarkdownMessage {
   windowId?: number;
 }
 
-export type BackgroundMessage = 
+export interface TogglePdfInterceptionMessage {
+  action: 'togglePdfInterception';
+  enabled: boolean;
+  tabId?: number;
+  windowId?: number;
+}
+
+export interface CheckPdfUrlMessage {
+  action: 'checkPdfUrl';
+  tabId?: number;
+  windowId?: number;
+}
+
+export interface FetchPdfAsBlobMessage {
+  action: 'fetchPdfAsBlob';
+  url: string;
+  tabId?: number;
+  windowId?: number;
+}
+
+export type BackgroundMessage =
   | ExecutePromptMessage
   | CancelExecutionMessage
   | ClearHistoryMessage
@@ -233,7 +253,10 @@ export type BackgroundMessage =
   | ForceResetPlaywrightMessage
   | RequestApprovalMessage
   | CheckAgentStatusMessage
-  | DownloadMarkdownMessage;
+  | DownloadMarkdownMessage
+  | TogglePdfInterceptionMessage
+  | CheckPdfUrlMessage
+  | FetchPdfAsBlobMessage;
 
 // New message types for enhanced tab management
 export interface TabStatusChangedMessage {

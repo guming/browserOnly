@@ -52,7 +52,7 @@ export function Options() {
   };
   
   // Provider selection
-  const [provider, setProvider] = useState('anthropic');
+  const [provider, setProvider] = useState('DeepSeek');
   
   // Anthropic settings
   const [anthropicApiKey, setAnthropicApiKey] = useState('');
@@ -111,7 +111,7 @@ export function Options() {
   // Load saved settings when component mounts
   useEffect(() => {
     chrome.storage.sync.get({
-      provider: 'anthropic',
+      provider: 'deepseek',
       anthropicApiKey: '',
       anthropicModelId: anthropicDefaultModelId,
       anthropicBaseUrl: '',

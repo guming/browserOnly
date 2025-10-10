@@ -28,7 +28,7 @@ import healthPrompt from './healthPrompt.ts';
 import wikiPrompt from './wikiPrompt.ts';
 import mungerPrompt from './mungerPrompt.ts';
 import dataAnalystPrompt from './dataAnalystPrompt.ts';
-import booksPrompt from './bookPrompt.ts';
+import { booksPrompt } from './bookPrompt.ts';
 import studyGuidePrompt from './notebooklmPrompt.ts'
 
 // Export a function that takes the dynamic prompts as parameters

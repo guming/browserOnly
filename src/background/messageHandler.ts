@@ -120,11 +120,23 @@ export function handleMessage(
             sendResponse({ success: false, error: errorMessage });
           });
         return true; // Keep the message channel open for async response
-      case 'download-markdown': 
+      case 'download-markdown':
           console.log('download message is', message.filename)
           handleDownloadMarkdown(message);
           return true;
-       
+
+      case 'togglePdfInterception':
+        handleTogglePdfInterception(message, sendResponse);
+        return true;
+
+      case 'checkPdfUrl':
+        handleCheckPdfUrl(message, sendResponse);
+        return true;
+
+      case 'fetchPdfAsBlob':
+        handleFetchPdfAsBlob(message, sendResponse);
+        return true;
+
       default:
         // This should never happen due to the type guard, but TypeScript requires it
         logWithTimestamp(`Unhandled message action: ${(message as any).action}`, 'warn');
@@ -188,7 +200,10 @@ function isBackgroundMessage(message: any): message is BackgroundMessage {
       message.action === 'forceResetPlaywright' ||
       message.action === 'requestApproval' ||  // Add support for request approval messages
       message.action === 'checkAgentStatus' || // Add support for agent status check
-      message.action === 'download-markdown' 
+      message.action === 'download-markdown' ||
+      message.action === 'togglePdfInterception' ||
+      message.action === 'checkPdfUrl' ||
+      message.action === 'fetchPdfAsBlob'
     )
   );
 }
@@ -496,6 +511,114 @@ async function handleCheckAgentStatus(
   } catch (error) {
     const errorMessage = handleError(error, 'checking agent status');
     logWithTimestamp(`Error checking agent status: ${errorMessage}`, 'error');
+    sendResponse({ success: false, error: errorMessage });
+  }
+}
+
+/**
+ * Handle PDF interception toggle
+ * @param message The message to handle
+ * @param sendResponse The function to send a response
+ */
+function handleTogglePdfInterception(
+  message: Extract<BackgroundMessage, { action: 'togglePdfInterception' }>,
+  sendResponse: (response?: any) => void
+): void {
+  try {
+    // Store the setting in Chrome storage
+    chrome.storage.sync.set({
+      'pdf-interceptor-enabled': message.enabled
+    }, () => {
+      if (chrome.runtime.lastError) {
+        logWithTimestamp(`Error storing PDF interception setting: ${chrome.runtime.lastError.message}`, 'error');
+        sendResponse({ success: false, error: chrome.runtime.lastError.message });
+        return;
+      }
+
+      // Broadcast to all content scripts
+      chrome.tabs.query({}, (tabs) => {
+        tabs.forEach((tab) => {
+          if (tab.id) {
+            chrome.tabs.sendMessage(tab.id, {
+              action: 'togglePdfInterception',
+              enabled: message.enabled
+            }).catch(() => {
+              // Ignore errors - content script might not be injected
+            });
+          }
+        });
+      });
+
+      logWithTimestamp(`PDF interception ${message.enabled ? 'enabled' : 'disabled'}`);
+      sendResponse({ success: true });
+    });
+  } catch (error) {
+    const errorMessage = handleError(error, 'toggling PDF interception');
+    logWithTimestamp(`Error toggling PDF interception: ${errorMessage}`, 'error');
+    sendResponse({ success: false, error: errorMessage });
+  }
+}
+
+/**
+ * Handle PDF URL check
+ * @param message The message to handle
+ * @param sendResponse The function to send a response
+ */
+function handleCheckPdfUrl(
+  message: Extract<BackgroundMessage, { action: 'checkPdfUrl' }>,
+  sendResponse: (response?: any) => void
+): void {
+  try {
+    if (!message.tabId) {
+      sendResponse({ success: false, error: 'No tab ID provided' });
+      return;
+    }
+
+    // Send message to content script to check PDF URL
+    chrome.tabs.sendMessage(message.tabId, {
+      action: 'checkPdfUrl'
+    }).then((response) => {
+      sendResponse({ success: true, ...response });
+    }).catch((error) => {
+      logWithTimestamp(`Error checking PDF URL in tab ${message.tabId}: ${error}`, 'error');
+      sendResponse({ success: false, error: 'Failed to check PDF URL' });
+    });
+  } catch (error) {
+    const errorMessage = handleError(error, 'checking PDF URL');
+    logWithTimestamp(`Error checking PDF URL: ${errorMessage}`, 'error');
+    sendResponse({ success: false, error: errorMessage });
+  }
+}
+
+/**
+ * Fetch PDF file as blob through background script to bypass CORS
+ */
+async function handleFetchPdfAsBlob(
+  message: Extract<BackgroundMessage, { action: 'fetchPdfAsBlob' }>,
+  sendResponse: (response?: any) => void
+): Promise<void> {
+  try {
+    const response = await fetch(message.url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch PDF: ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+    const arrayBuffer = await blob.arrayBuffer();
+    const base64 = btoa(
+      Array.from(new Uint8Array(arrayBuffer))
+        .map(byte => String.fromCharCode(byte))
+        .join('')
+    );
+
+    sendResponse({
+      success: true,
+      data: base64,
+      type: blob.type
+    });
+  } catch (error) {
+    const errorMessage = handleError(error, 'fetching PDF as blob');
+    logWithTimestamp(`Error fetching PDF as blob: ${errorMessage}`, 'error');
     sendResponse({ success: false, error: errorMessage });
   }
 }

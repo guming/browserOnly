@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PDF Viewer</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+    #loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      font-size: 18px;
+      color: #666;
+    }
+    #viewer-iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+    #error {
+      display: none;
+      padding: 40px;
+      text-align: center;
+      color: #d32f2f;
+    }
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div id="loading">Loading PDF...</div>
+  <div id="error"></div>
+  <iframe id="viewer-iframe" class="hidden"></iframe>
+
+  <script>
+    (async function() {
+      const params = new URLSearchParams(window.location.search);
+      const pdfUrl = params.get('file');
+
+      const loading = document.getElementById('loading');
+      const error = document.getElementById('error');
+      const viewerIframe = document.getElementById('viewer-iframe');
+
+      if (!pdfUrl) {
+        loading.classList.add('hidden');
+        error.textContent = 'No PDF URL provided';
+        error.style.display = 'block';
+        return;
+      }
+
+      try {
+        // Fetch the PDF through the background script to avoid CORS issues
+        const response = await chrome.runtime.sendMessage({
+          action: 'fetchPdfAsBlob',
+          url: decodeURIComponent(pdfUrl)
+        });
+
+        if (!response.success) {
+          throw new Error(response.error || 'Failed to fetch PDF');
+        }
+
+        // Convert base64 to blob
+        const binaryString = atob(response.data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        const blob = new Blob([bytes], { type: response.type || 'application/pdf' });
+
+        // Create a data URL instead of blob URL to work around origin checks
+        const reader = new FileReader();
+        reader.onload = function() {
+          const dataUrl = reader.result;
+
+          // Load PDF.js viewer with the data URL
+          const extensionId = chrome.runtime.id;
+          const viewerUrl = `chrome-extension://${extensionId}/pdf-viewer.html?file=${encodeURIComponent(dataUrl)}`;
+
+          viewerIframe.src = viewerUrl;
+          loading.classList.add('hidden');
+          viewerIframe.classList.remove('hidden');
+        };
+        reader.readAsDataURL(blob);
+
+      } catch (err) {
+        console.error('Error loading PDF:', err);
+        loading.classList.add('hidden');
+        error.textContent = `Error loading PDF: ${err.message}`;
+        error.style.display = 'block';
+      }
+    })();
+  </script>
+</body>
+</html>
