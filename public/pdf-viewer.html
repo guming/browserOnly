@@ -32,8 +32,11 @@ See https://github.com/adobe-type-tools/cmap-resources
 <script src="pdf.mjs" type="module"></script>
 
     <link rel="stylesheet" href="viewer.css">
+    <link rel="stylesheet" href="pdf-text-extract.css">
 
   <script src="viewer.mjs" type="module"></script>
+  <script src="marked.min.js"></script>
+  <script src="pdf-text-extract.js" defer></script>
   </head>
 
   <body tabindex="0">
@@ -298,6 +301,10 @@ See https://github.com/adobe-type-tools/cmap-resources
                 <div id="editorModeSeparator" class="verticalToolbarSeparator"></div>
 
                 <div class="toolbarHorizontalGroup hiddenMediumView">
+                  <button id="extractTextButton" class="toolbarButton" type="button" tabindex="0" title="Extract Text">
+                    <span>Extract Text</span>
+                  </button>
+
                   <button id="printButton" class="toolbarButton" type="button" tabindex="0" data-l10n-id="pdfjs-print-button">
                     <span data-l10n-id="pdfjs-print-button-label"></span>
                   </button>
@@ -772,5 +779,37 @@ See https://github.com/adobe-type-tools/cmap-resources
 
     </div> <!-- outerContainer -->
     <div id="printContainer"></div>
+
+    <!-- Text Extraction Panel -->
+    <div id="textExtractionPanel">
+      <div class="text-panel-header">
+        <div class="text-panel-title">Extracted Text</div>
+        <button id="closeTextPanelBtn" title="Close" aria-label="Close text panel">×</button>
+      </div>
+
+      <div class="text-panel-actions">
+        <button id="copyTextBtn" title="Copy as plain text">
+          📋 Copy Text
+        </button>
+        <button id="copyMarkdownBtn" title="Copy as markdown">
+          📝 Copy Markdown
+        </button>
+      </div>
+
+      <div class="text-panel-content">
+        <div id="extractionLoading">
+          <div class="spinner"></div>
+          <div>Extracting text from PDF...</div>
+          <div id="extractionProgress"></div>
+        </div>
+        <div class="paper-container">
+          <div class="paper-sheet">
+            <div id="extractedContent"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- End Text Extraction Panel -->
+
   </body>
 </html>

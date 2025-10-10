@@ -21,7 +21,7 @@
   },
   "web_accessible_resources": [
   {
-    "resources": ["mermaid.min.js","initMermaid.js", "pdf-viewer.html", "pdf-proxy-viewer.html", "viewer.mjs", "pdf.mjs", "pdf.worker.mjs", "viewer.css", "pdf.min.js", "pdf.worker.min.js", "*.js", "*.mjs", "*.map"],
+    "resources": ["mermaid.min.js","initMermaid.js", "pdf-viewer.html", "pdf-proxy-viewer.html", "viewer.mjs", "pdf.mjs", "pdf.worker.mjs", "viewer.css", "pdf-text-extract.css", "pdf-text-extract.js", "marked.min.js", "pdf.min.js", "pdf.worker.min.js", "*.js", "*.mjs", "*.map", "*.css"],
     "matches": ["<all_urls>"]
   }],
   "content_security_policy": {
