@@ -16,7 +16,7 @@ export {
 } from './constants.ts';
 
 // Import individual mode prompts
-import {happinessBookPrompt, howToReadPrompt} from './booksPrompt.ts';
+import { booksPromptData } from './booksPrompt.ts';
 import operatorPrompt from './operatorPrompt.ts';
 import researcherPrompt from './researcherPrompt.ts';
 import lawyerPrompt from './lawyerPrompt.ts';
@@ -33,21 +33,28 @@ import studyGuidePrompt from './notebooklmPrompt.ts'
 
 // Export a function that takes the dynamic prompts as parameters
 export const createModePrompts = (
-): ModePrompts => ({
-  operator: operatorPrompt,
-  researcher: researcherPrompt,
-  lawyer: lawyerPrompt,
-  trader: traderPrompt,
-  math: mathPrompt,
-  qa: qaPrompt,
-  devops: devopsPrompt,
-  code: codePrompt,
-  health: healthPrompt,
-  wiki: wikiPrompt,
-  munger: mungerPrompt,
-  dataAnalyst: dataAnalystPrompt,
-  books: happinessBookPrompt,
-  'books-happinessBook': happinessBookPrompt,
-  'books-howToRead': howToReadPrompt,
-  notebooklm: studyGuidePrompt,
-});
+): ModePrompts => {
+  // Create book-specific prompt entries
+  const bookPrompts: ModePrompts = {};
+  Object.keys(booksPromptData).forEach(bookId => {
+    bookPrompts[`books-${bookId}`] = booksPromptData[bookId].prompt;
+  });
+
+  return {
+    operator: operatorPrompt,
+    researcher: researcherPrompt,
+    lawyer: lawyerPrompt,
+    trader: traderPrompt,
+    math: mathPrompt,
+    qa: qaPrompt,
+    devops: devopsPrompt,
+    code: codePrompt,
+    health: healthPrompt,
+    wiki: wikiPrompt,
+    munger: mungerPrompt,
+    dataAnalyst: dataAnalystPrompt,
+    books: booksPromptData.happinessBook.prompt, // Default book prompt
+    ...bookPrompts, // Spread all book-specific prompts
+    notebooklm: studyGuidePrompt,
+  };
+};

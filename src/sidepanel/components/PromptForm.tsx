@@ -46,18 +46,81 @@ const availableBooks: Book[] = [
     title: 'Build the Life You Want',
     author: 'Oprah Winfrey',
     emoji: '🏆',
-    description: `Are you ready to begin? Please answer the following two questions so we can start immediately:
-
-1. To help me understand you better, please describe your **current situation or specific challenges** in detail (e.g., feeling burnt out at work, tense family relationships, or a lack of life direction).
-2. What is the **most important and specific goal** you hope to achieve using this methodology? (e.g., finding more fulfillment at work, improving communication with your partner, or simply feeling calmer and happier in daily life).
-`,
+    description: `Ready to begin? Share:
+1. Your current situation or specific challenges (e.g., burnt out at work, tense relationships, lack of direction)
+2. Your most important goal (e.g., more fulfillment at work, better communication, feeling calmer)`,
   },
   {
     id: 'howToRead',
-    title: 'How to Read',
+    title: 'How to Read a Book',
     author: 'Mortimer J. Adler',
     emoji: '📖',
-    description: 'A classic guide to intelligent reading and comprehension techniques.',
+    description: `Ready to improve your reading? Share:
+1. Your main reading goal (e.g., study faster, read classics, extract insights for work)
+2. Your current reading challenge (e.g., difficulty finishing books, remembering key points)`,
+  },
+  {
+    id: 'thinkingFastAndSlow',
+    title: 'Thinking, Fast and Slow',
+    author: 'Daniel Kahneman',
+    emoji: '🧠',
+    description: `Ready to improve your thinking? Share:
+1. What decisions or judgments are you struggling with? (e.g., investment, relationships, career)
+2. Do you want to strengthen your intuition or improve your analytical accuracy?`,
+  },
+  {
+    id: 'artOfThinkingClearly',
+    title: 'The Art of Thinking Clearly',
+    author: 'Rolf Dobelli',
+    emoji: '💡',
+    description: `Ready to think more clearly? Share:
+1. A recent decision or belief that may have been influenced by bias
+2. Your primary goal (e.g., rational business choices, better relationships, independent thinking)`,
+  },
+  {
+    id: 'gettingThingsDone',
+    title: 'Getting Things Done',
+    author: 'David Allen',
+    emoji: '✅',
+    description: `Ready to get organized? Share:
+1. Your current productivity challenge (e.g., overwhelm, procrastination, disorganization)
+2. What system or tool you currently use to manage tasks (e.g., Notion, Todoist, pen & paper)`,
+  },
+  {
+    id: 'deepWork',
+    title: 'Deep Work',
+    author: 'Cal Newport',
+    emoji: '🎯',
+    description: `Ready to master focus? Share:
+1. What type of work or study requires your deepest focus?
+2. Your main sources of distraction (e.g., notifications, meetings, social media)`,
+  },
+  {
+    id: 'essentialism',
+    title: 'Essentialism: The Disciplined Pursuit of Less',
+    author: 'Greg McKeown',
+    emoji: '🎪',
+    description: `Ready to pursue less but better? Share:
+1. What areas of your life feel overloaded or scattered right now?
+2. The one or two goals that truly matter most to you in this season of life`,
+  },
+  {
+    id: 'leanStartup',
+    title: 'The Lean Startup',
+    author: 'Eric Ries',
+    emoji: '🚀',
+    description: `Ready to build lean? Share:
+1. Your startup idea or current challenge (e.g., validating demand, defining MVP)
+2. Your primary goal (e.g., faster experimentation, customer validation, product-market fit)`,
+  },
+  {
+    id: 'artOfStrategy',
+    title: 'The Art of Strategy',
+    author: 'Avinash K. Dixit & Barry J. Nalebuff',
+    emoji: '♟️',
+    description: `Ready to think strategically? Share:
+1. A strategic situation you're facing (e.g., business competition, negotiation, decision conflict)
+2. Your desired outcome (e.g., predict moves, strengthen position, design win-win solution)`,
   },
 ];
 
