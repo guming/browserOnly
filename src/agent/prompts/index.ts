@@ -16,6 +16,7 @@ export {
 } from './constants.ts';
 
 // Import individual mode prompts
+import {happinessBookPrompt, howToReadPrompt} from './booksPrompt.ts';
 import operatorPrompt from './operatorPrompt.ts';
 import researcherPrompt from './researcherPrompt.ts';
 import lawyerPrompt from './lawyerPrompt.ts';
@@ -28,7 +29,6 @@ import healthPrompt from './healthPrompt.ts';
 import wikiPrompt from './wikiPrompt.ts';
 import mungerPrompt from './mungerPrompt.ts';
 import dataAnalystPrompt from './dataAnalystPrompt.ts';
-import { booksPrompt } from './bookPrompt.ts';
 import studyGuidePrompt from './notebooklmPrompt.ts'
 
 // Export a function that takes the dynamic prompts as parameters
@@ -46,6 +46,8 @@ export const createModePrompts = (
   wiki: wikiPrompt,
   munger: mungerPrompt,
   dataAnalyst: dataAnalystPrompt,
-  books: booksPrompt,
+  books: happinessBookPrompt,
+  'books-happinessBook': happinessBookPrompt,
+  'books-howToRead': howToReadPrompt,
   notebooklm: studyGuidePrompt,
 });

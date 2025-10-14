@@ -5,7 +5,7 @@ export function GeneralTab() {
   return (
     <div className="space-y-6">
       <AboutSection />
-      
+
       {/* Getting Started Guide */}
       <div className="card bg-base-100 shadow-md">
         <div className="card-body">

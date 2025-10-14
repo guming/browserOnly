@@ -53,12 +53,19 @@ If a request matches any Special Command, skip planning and tool selection. Imme
   /**
    * Build the fixed system prompt for the agent.
    */
- getSystemPrompt(mode: string): string {
-  const basePrompt = this.modePrompts[mode];
-  console.log("basePrompt is ", basePrompt, mode);
+ getSystemPrompt(mode: string, subRole?: string): string {
+  let basePrompt = this.modePrompts[mode];
 
-  // If mode is 'munger', return only the basePrompt
-  if (mode === 'munger'|| mode ==='books') {
+  // Handle books mode with subRole
+  if (mode === 'books' && subRole) {
+    const bookPromptKey = `books-${subRole}`;
+    basePrompt = this.modePrompts[bookPromptKey] || basePrompt;
+  }
+
+  console.log("basePrompt is ", basePrompt, mode, subRole);
+
+  // If mode is 'munger' or 'books', return only the basePrompt
+  if (mode === 'munger' || mode === 'books') {
     return basePrompt;
   }
 

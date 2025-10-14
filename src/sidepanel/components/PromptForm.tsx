@@ -42,15 +42,22 @@ interface Book {
 
 const availableBooks: Book[] = [
   {
-    id: 'Build the Life You Want',
+    id: 'happinessBook',
     title: 'Build the Life You Want',
     author: 'Oprah Winfrey',
     emoji: '🏆',
-    description: `Are you ready to begin? Please answer the following two questions so we can start immediately:  
+    description: `Are you ready to begin? Please answer the following two questions so we can start immediately:
 
-1. To help me understand you better, please describe your **current situation or specific challenges** in detail (e.g., feeling burnt out at work, tense family relationships, or a lack of life direction).  
-2. What is the **most important and specific goal** you hope to achieve using this methodology? (e.g., finding more fulfillment at work, improving communication with your partner, or simply feeling calmer and happier in daily life).  
+1. To help me understand you better, please describe your **current situation or specific challenges** in detail (e.g., feeling burnt out at work, tense family relationships, or a lack of life direction).
+2. What is the **most important and specific goal** you hope to achieve using this methodology? (e.g., finding more fulfillment at work, improving communication with your partner, or simply feeling calmer and happier in daily life).
 `,
+  },
+  {
+    id: 'howToRead',
+    title: 'How to Read',
+    author: 'Mortimer J. Adler',
+    emoji: '📖',
+    description: 'A classic guide to intelligent reading and comprehension techniques.',
   },
 ];
 
@@ -151,8 +158,8 @@ export const PromptForm: React.FC<PromptFormProps> = ({
     if (!prompt.trim() || isProcessing || tabStatus === 'detached') return;
 
     let finalRole = '';
-    if (role === 'books') {
-      finalRole = `books`;
+    if (role === 'books' && selectedBook) {
+      finalRole = `books-${selectedBook}`;
     } else if (role === 'notebooklm') {
       finalRole = `notebooklm-${selectedNotebookLMOption}`;
     }else{

@@ -3,6 +3,7 @@ import { GeneralTab } from './tabs/GeneralTab';
 import { ProvidersTab } from './tabs/ProvidersTab';
 import { MemoryTab } from './tabs/MemoryTab';
 import { ConnectionTab } from './tabs/ConnectionTab';
+import { FeaturesTab } from './tabs/FeaturesTab';
 import { Model } from './ModelList';
 import { OllamaModel } from './OllamaModelList';
 
@@ -94,6 +95,10 @@ interface VerticalTabsProps {
   setDuckdbConnectionString: (connectionString: string) => void;
   duckdbDatabasePath: string;
   setDuckdbDatabasePath: (databasePath: string) => void;
+
+  // PDF Viewer settings
+  pdfInterceptorEnabled: boolean;
+  setPdfInterceptorEnabled: (enabled: boolean) => void;
 }
 
 export function VerticalTabs(props: VerticalTabsProps) {
@@ -102,6 +107,7 @@ export function VerticalTabs(props: VerticalTabsProps) {
   const tabs = [
     { id: 'general', label: 'General', icon: '🏠' },
     { id: 'providers', label: 'LLM Configuration', icon: '🤖' },
+    { id: 'features', label: 'Features', icon: '⚙️' },
     { id: 'connection', label: 'Connection', icon: '🔗' },
     { id: 'memory', label: 'Memory', icon: '🧠' },
   ];
@@ -165,6 +171,11 @@ export function VerticalTabs(props: VerticalTabsProps) {
             getModelPricingData={props.getModelPricingData}
           />
         );
+      case 'features':
+        return <FeaturesTab
+          pdfInterceptorEnabled={props.pdfInterceptorEnabled}
+          setPdfInterceptorEnabled={props.setPdfInterceptorEnabled}
+        />;
       case 'connection':
         return <ConnectionTab
           notionEnabled={props.notionEnabled}

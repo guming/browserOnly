@@ -19,7 +19,9 @@ let originalUrl = '';
 async function checkInterceptionEnabled(): Promise<boolean> {
   return new Promise((resolve) => {
     chrome.storage.sync.get([INTERCEPTOR_ENABLED_KEY], (result) => {
-      resolve(result[INTERCEPTOR_ENABLED_KEY] !== false); // Default to enabled
+      const enabled = result[INTERCEPTOR_ENABLED_KEY] !== false; // Default to enabled
+      console.log('[PDF Interceptor] Checking storage:', INTERCEPTOR_ENABLED_KEY, '=', result[INTERCEPTOR_ENABLED_KEY], 'enabled:', enabled);
+      resolve(enabled);
     });
   });
 }
@@ -185,6 +187,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       url: currentUrl,
       originalUrl: isPdf ? extractPdfUrl(currentUrl) : null
     });
+  }
+});
+
+/**
+ * Listen for storage changes to update interception setting
+ */
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === 'sync' && changes[INTERCEPTOR_ENABLED_KEY]) {
+    const newValue = changes[INTERCEPTOR_ENABLED_KEY].newValue;
+    isInterceptorEnabled = newValue !== false;
+    console.log('[PDF Interceptor] Setting changed, interception is now', isInterceptorEnabled ? 'enabled' : 'disabled');
   }
 });
 

@@ -108,6 +108,9 @@ export function Options() {
   const [duckdbConnectionString, setDuckdbConnectionString] = useState('');
   const [duckdbDatabasePath, setDuckdbDatabasePath] = useState(':memory:');
 
+  // PDF Viewer settings
+  const [pdfInterceptorEnabled, setPdfInterceptorEnabled] = useState(true);
+
   // Load saved settings when component mounts
   useEffect(() => {
     chrome.storage.sync.get({
@@ -140,6 +143,7 @@ export function Options() {
       duckdbEnabled: false,
       duckdbConnectionString: '',
       duckdbDatabasePath: ':memory:',
+      'pdf-interceptor-enabled': false,
     }, (result) => {
       
       setProvider(result.provider);
@@ -171,6 +175,7 @@ export function Options() {
       setDuckdbEnabled(result.duckdbEnabled || false);
       setDuckdbConnectionString(result.duckdbConnectionString || '');
       setDuckdbDatabasePath(result.duckdbDatabasePath || ':memory:');
+      setPdfInterceptorEnabled(result['pdf-interceptor-enabled'] !== false);
     });
   }, []);
 
@@ -209,6 +214,7 @@ export function Options() {
       duckdbEnabled,
       duckdbConnectionString,
       duckdbDatabasePath,
+      'pdf-interceptor-enabled': pdfInterceptorEnabled,
     }, () => {
       
       setIsSaving(false);
@@ -354,6 +360,9 @@ export function Options() {
       setDuckdbConnectionString={setDuckdbConnectionString}
       duckdbDatabasePath={duckdbDatabasePath}
       setDuckdbDatabasePath={setDuckdbDatabasePath}
+      // PDF Viewer settings
+      pdfInterceptorEnabled={pdfInterceptorEnabled}
+      setPdfInterceptorEnabled={setPdfInterceptorEnabled}
     />
   );
 }
