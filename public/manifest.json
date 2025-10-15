@@ -1,5 +1,5 @@
 {
-  "name": "BrowserOnly 🤖️",
+  "name": "BrowserOnly",
   "version": "0.4.0",
   "manifest_version": 3,
   "background": {
@@ -12,7 +12,7 @@
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_title": "BrowserOnly 🤖️",
+    "default_title": "BrowserOnly",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon32.png",
