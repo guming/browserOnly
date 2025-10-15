@@ -37,6 +37,7 @@ See https://github.com/adobe-type-tools/cmap-resources
   <script src="viewer.mjs" type="module"></script>
   <script src="marked.min.js"></script>
   <script src="pdf-text-extract.js" defer></script>
+  <script src="pdf-ai-assistant.js" defer></script>
   </head>
 
   <body tabindex="0">
@@ -783,28 +784,78 @@ See https://github.com/adobe-type-tools/cmap-resources
     <!-- Text Extraction Panel -->
     <div id="textExtractionPanel">
       <div class="text-panel-header">
-        <div class="text-panel-title">Extracted Text</div>
+        <div class="text-panel-title">PDF Assistant</div>
         <button id="closeTextPanelBtn" title="Close" aria-label="Close text panel">×</button>
       </div>
 
-      <div class="text-panel-actions">
-        <button id="copyTextBtn" title="Copy as plain text">
-          📋 Copy Text
-        </button>
-        <button id="copyMarkdownBtn" title="Copy as markdown">
-          📝 Copy Markdown
-        </button>
+      <!-- Tab Navigation -->
+      <div class="text-panel-tabs">
+        <button class="tab-button active" data-tab="extract">📄 Extract Text</button>
+        <button class="tab-button" data-tab="ai">🤖 AI Assistant</button>
       </div>
 
-      <div class="text-panel-content">
-        <div id="extractionLoading">
-          <div class="spinner"></div>
-          <div>Extracting text from PDF...</div>
-          <div id="extractionProgress"></div>
+      <!-- Extract Text Tab -->
+      <div id="extractTab" class="tab-content active">
+        <div class="text-panel-actions">
+          <button id="copyTextBtn" title="Copy as plain text">
+            📋 Copy Text
+          </button>
+          <button id="copyMarkdownBtn" title="Copy as markdown">
+            📝 Copy Markdown
+          </button>
         </div>
-        <div class="paper-container">
-          <div class="paper-sheet">
-            <div id="extractedContent"></div>
+
+        <div class="text-panel-content">
+          <div id="extractionLoading">
+            <div class="spinner"></div>
+            <div>Extracting text from PDF...</div>
+            <div id="extractionProgress"></div>
+          </div>
+          <div class="paper-container">
+            <div class="paper-sheet">
+              <div id="extractedContent"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Assistant Tab -->
+      <div id="aiTab" class="tab-content">
+        <div class="ai-panel-actions">
+          <button id="summarizePageBtn" class="ai-action-btn">📄 Summarize This Page</button>
+          <button id="summarizeAllBtn" class="ai-action-btn">📚 Summarize All Pages</button>
+          <button id="clearChatBtn" class="ai-action-btn secondary">🗑️ Clear Chat</button>
+        </div>
+
+        <div class="ai-chat-container">
+          <div id="aiChatMessages" class="ai-chat-messages">
+            <div class="ai-welcome-message">
+              <div class="ai-message assistant">
+                <div class="ai-message-content">
+                  👋 Hello! I'm your PDF AI Assistant. I can help you:
+                  <ul>
+                    <li>Summarize pages or the entire document</li>
+                    <li>Answer questions about the content</li>
+                    <li>Explain complex concepts</li>
+                    <li>Find specific information</li>
+                  </ul>
+                  Try clicking "Summarize This Page" or ask me a question!
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="aiLoadingIndicator" class="ai-loading hidden">
+            <div class="ai-loading-spinner"></div>
+            <span>Thinking...</span>
+          </div>
+
+          <div class="ai-input-container">
+            <textarea id="aiChatInput" class="ai-chat-input" placeholder="Ask a question about this PDF..." rows="2"></textarea>
+            <button id="aiSendBtn" class="ai-send-btn">
+              <span>Send</span>
+              <span class="send-icon">➤</span>
+            </button>
           </div>
         </div>
       </div>

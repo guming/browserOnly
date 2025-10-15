@@ -1,14 +1,16 @@
 import { handleApprovalResponse } from '../agent/approvalManager';
+import { createProvider }  from '../models/providers/factory';
 import { TokenTrackingService } from '../tracking/tokenTrackingService';
 import { executePrompt } from './agentController';
 import { cancelExecution } from './agentController';
 import { clearMessageHistory } from './agentController';
 import { initializeAgent } from './agentController';
+import { ConfigManager } from './configManager';
 import { triggerReflection } from './reflectionController';
 import { attachToTab, getTabState, getWindowForTab, forceResetPlaywright } from './tabManager';
 import { BackgroundMessage, DownloadMarkdownMessage } from './types';
 import { logWithTimestamp, handleError } from './utils';
-
+import { SimpleChatAgent } from '../agent/SimpleChatAgent';
 /**
  * Handle messages from the UI
  * @param message The message to handle
@@ -137,6 +139,15 @@ export function handleMessage(
         handleFetchPdfAsBlob(message, sendResponse);
         return true;
 
+      case 'pdfAiChat':
+        handlePdfAiChat(message, sendResponse)
+          .catch(error => {
+            const errorMessage = handleError(error, 'handling PDF AI chat');
+            logWithTimestamp(`Error in async handlePdfAiChat: ${errorMessage}`, 'error');
+            sendResponse({ success: false, error: errorMessage });
+          });
+        return true; // Keep the message channel open for async response
+
       default:
         // This should never happen due to the type guard, but TypeScript requires it
         logWithTimestamp(`Unhandled message action: ${(message as any).action}`, 'warn');
@@ -203,7 +214,8 @@ function isBackgroundMessage(message: any): message is BackgroundMessage {
       message.action === 'download-markdown' ||
       message.action === 'togglePdfInterception' ||
       message.action === 'checkPdfUrl' ||
-      message.action === 'fetchPdfAsBlob'
+      message.action === 'fetchPdfAsBlob' ||
+      message.action === 'pdfAiChat'
     )
   );
 }
@@ -619,6 +631,110 @@ async function handleFetchPdfAsBlob(
   } catch (error) {
     const errorMessage = handleError(error, 'fetching PDF as blob');
     logWithTimestamp(`Error fetching PDF as blob: ${errorMessage}`, 'error');
+    sendResponse({ success: false, error: errorMessage });
+  }
+}
+
+/**
+ * Handle PDF AI chat requests
+ * @param message The message to handle
+ * @param sendResponse The function to send a response
+ */
+async function handlePdfAiChat(
+  message: any,
+  sendResponse: (response?: any) => void
+): Promise<void> {
+  console.log('[PDF AI Chat] Received request:', {
+    hasMessage: !!message.message,
+    messageLength: message.message?.length,
+    hasSystemPrompt: !!message.systemPrompt,
+    systemPromptLength: message.systemPrompt?.length,
+    hasChatHistory: !!message.chatHistory,
+    historyLength: message.chatHistory?.length
+  });
+
+  try {
+    const { message: userMessage, systemPrompt, chatHistory } = message;
+
+    if (!userMessage) {
+      console.log('[PDF AI Chat] Error: No message provided');
+      sendResponse({ success: false, error: 'No message provided' });
+      return;
+    }
+
+    console.log('[PDF AI Chat] User message:', userMessage.substring(0, 100) + '...');
+
+    // Get provider configuration
+    const configManager = ConfigManager.getInstance();
+    const providerConfig = await configManager.getProviderConfig();
+
+    console.log('[PDF AI Chat] Provider config:', {
+      provider: providerConfig.provider,
+      hasApiKey: !!providerConfig.apiKey,
+      modelId: providerConfig.apiModelId,
+      hasBaseUrl: !!providerConfig.baseUrl
+    });
+
+    if (!providerConfig.apiKey && providerConfig.provider !== 'ollama') {
+      console.log('[PDF AI Chat] Error: No API key configured for provider:', providerConfig.provider);
+      sendResponse({
+        success: false,
+        error: 'No LLM provider configured. Please configure an API key in the settings.'
+      });
+      return;
+    }
+
+    // Create the LLM provider
+    console.log('[PDF AI Chat] Creating LLM provider...');
+   
+    const llmProvider = await createProvider(providerConfig.provider, {
+      apiKey: providerConfig.apiKey || '',
+      apiModelId: providerConfig.apiModelId,
+      baseUrl: providerConfig.baseUrl,
+      thinkingBudgetTokens: providerConfig.thinkingBudgetTokens,
+      openaiCompatibleModels: providerConfig.openaiCompatibleModels,
+    });
+    console.log('[PDF AI Chat] LLM provider created successfully');
+
+    // Dynamically import SimpleChatAgent to avoid circular dependencies
+    console.log('[PDF AI Chat] Creating SimpleChatAgent...');
+
+    // Create a new SimpleChatAgent instance
+    const chatAgent = new SimpleChatAgent(llmProvider, systemPrompt || '');
+    console.log('[PDF AI Chat] SimpleChatAgent created with system prompt length:', (systemPrompt || '').length);
+
+    // Load chat history if provided
+    if (chatHistory && Array.isArray(chatHistory) && chatHistory.length > 0) {
+      console.log('[PDF AI Chat] Loading chat history with', chatHistory.length, 'messages');
+      chatAgent.setHistory(chatHistory);
+    }
+
+    // Use chatSync to get the response
+    console.log('[PDF AI Chat] Sending message to LLM...');
+    const startTime = Date.now();
+    const response = await chatAgent.chatSync(userMessage, false); // false = don't add to history since we manage it in the frontend
+    const duration = Date.now() - startTime;
+
+    console.log('[PDF AI Chat] Received response from LLM:', {
+      responseLength: response.length,
+      duration: `${duration}ms`,
+      preview: response.substring(0, 100) + '...'
+    });
+
+    sendResponse({
+      success: true,
+      response: response
+    });
+
+    console.log('[PDF AI Chat] Request completed successfully');
+  } catch (error) {
+    console.error('[PDF AI Chat] Error occurred:', error);
+    console.error('[PDF AI Chat] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+
+    const errorMessage = handleError(error, 'processing PDF AI chat');
+    logWithTimestamp(`Error processing PDF AI chat: ${errorMessage}`, 'error');
+
+    console.log('[PDF AI Chat] Sending error response:', errorMessage);
     sendResponse({ success: false, error: errorMessage });
   }
 }

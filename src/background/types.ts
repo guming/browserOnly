@@ -237,6 +237,15 @@ export interface FetchPdfAsBlobMessage {
   windowId?: number;
 }
 
+export interface PdfAiChatMessage {
+  action: 'pdfAiChat';
+  message: string;
+  systemPrompt?: string;
+  chatHistory?: Array<{ role: string; content: string }>;
+  tabId?: number;
+  windowId?: number;
+}
+
 export type BackgroundMessage =
   | ExecutePromptMessage
   | CancelExecutionMessage
@@ -256,7 +265,8 @@ export type BackgroundMessage =
   | DownloadMarkdownMessage
   | TogglePdfInterceptionMessage
   | CheckPdfUrlMessage
-  | FetchPdfAsBlobMessage;
+  | FetchPdfAsBlobMessage
+  | PdfAiChatMessage;
 
 // New message types for enhanced tab management
 export interface TabStatusChangedMessage {

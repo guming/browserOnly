@@ -7,6 +7,25 @@
   let extractedText = '';
   let isTextPanelOpen = false;
 
+  // Create a global namespace for sharing data between scripts
+  window.PDFTextExtractor = window.PDFTextExtractor || {};
+
+  // Expose getters for extracted text
+  window.PDFTextExtractor.getExtractedText = function() {
+    return extractedText;
+  };
+
+  window.PDFTextExtractor.hasExtractedText = function() {
+    return extractedText && extractedText.length > 0;
+  };
+
+  window.PDFTextExtractor.triggerExtraction = function() {
+    if (!extractedText) {
+      return extractAllText();
+    }
+    return Promise.resolve(extractedText);
+  };
+
   // Initialize when PDF.js is ready
   document.addEventListener('DOMContentLoaded', function() {
     initializeTextExtraction();
@@ -58,6 +77,7 @@
 
     panel.classList.add('open');
     button?.classList.add('active');
+    document.body.classList.add('text-panel-open');
     isTextPanelOpen = true;
     localStorage.setItem('pdfTextPanelOpen', 'true');
 
@@ -75,6 +95,7 @@
 
     panel.classList.remove('open');
     button?.classList.remove('active');
+    document.body.classList.remove('text-panel-open');
     isTextPanelOpen = false;
     localStorage.setItem('pdfTextPanelOpen', 'false');
   }
@@ -138,10 +159,13 @@
       renderMarkdown(extractedText);
       loadingDiv.style.display = 'none';
 
+      return fullText;
+
     } catch (error) {
       console.error('[Text Extract] Error:', error);
       showError('Failed to extract text: ' + error.message);
       loadingDiv.style.display = 'none';
+      throw error;
     }
   }
 
