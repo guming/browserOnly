@@ -9,7 +9,7 @@ BrowserOnly is a privacy-first open source Chrome extension that lets you contro
 
 Since BrowserOnly runs entirely within your browser (with the exception of the LLM), it can safely interact with logged-in websites, like your social media accounts or email, without compromising security or requiring backend infrastructure. This makes it more convenient for personal use than other "browser use" type products out there.
 
-## 🎲 Features 
+## 🎲 Features
 
 - Supports major LLM providers such as **Anthropic**, **OpenAI**, **Gemini**, and **Ollama** with more coming soon
 - Tracks **token use** and **price** so you know how much you're spending on each task
@@ -17,6 +17,7 @@ Since BrowserOnly runs entirely within your browser (with the exception of the L
 - Uses **Playwright** in the background which is a robust browser automation tool
 - The **memory** feature captures useful tool use sequences and stores them locally to make future use more efficient
 - The agent knows when to ask for user's **approval**, e.g. for purchases or posting updates on social media
+- **Built-in PDF Viewer** with advanced text extraction and AI assistant capabilities for analyzing PDF documents
 
 ## 🕹️ Supported tools
 
@@ -142,6 +143,32 @@ Since BrowserOnly runs entirely within your browser (with the exception of the L
   - Clear all stored memories. Use this with caution as it will delete all memories across all domains.
 </details>
 
+<details>
+<summary><b>PDF Viewer Tools</b></summary>
+
+BrowserOnly includes a built-in PDF viewer with advanced capabilities:
+
+### Text Extraction
+- **Intelligent text extraction** that filters out headers, footers, and page numbers
+- **Paragraph detection** that preserves document structure
+- **Markdown formatting** for easy reading and copying
+- **Copy as plain text or markdown** for use in other applications
+
+### AI Assistant
+- **Chat with PDFs** - Ask questions about the document content
+- **Summarize pages** - Get quick summaries of individual pages or entire documents
+- **Extract insights** - Have the AI analyze and explain complex concepts
+- **Context-aware responses** - The AI has full access to the extracted text
+
+### Features
+- **Dark mode support** - Seamlessly adapts to your theme preference
+- **Tab-based interface** - Switch between text extraction and AI chat
+- **Progress tracking** - Visual feedback during extraction
+- **Session persistence** - Remembers your panel state
+
+To use the PDF viewer, simply open any PDF file in Chrome and click the text extraction button in the toolbar.
+</details>
+
 ## ✅ Use Cases
 
 - **Social media butler**: Checks your social media accounts, summarizes notifications and messages, and helps you respond.
@@ -150,6 +177,7 @@ Since BrowserOnly runs entirely within your browser (with the exception of the L
 - **Research assistant**: Assists with deep dives into topics like companies, job listings, market trends, and academic publications by gathering and organizing information.
 - **Knowledge bookmarking & summarization**: Quickly summarizes articles, extracts key information, and saves useful insights for later reference.
 - **Chat with any website**: Ask questions, generate summaries, fill out forms, etc.
+- **PDF document assistant**: Analyze research papers, reports, and documents with intelligent text extraction and AI-powered Q&A, getting instant summaries and insights without reading the entire document.
 
 ## 🛫 Roadmap
 
