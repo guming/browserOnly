@@ -114,44 +114,42 @@
       contentDiv.innerHTML = '';
 
       const numPages = PDFViewerApplication.pdfDocument.numPages;
-      let fullText = '';
 
+      // First pass: collect all text items from all pages to identify headers/footers
+      const allPagesData = [];
       for (let pageNum = 1; pageNum <= numPages; pageNum++) {
         const page = await PDFViewerApplication.pdfDocument.getPage(pageNum);
+        const viewport = page.getViewport({ scale: 1.0 });
         const textContent = await page.getTextContent();
+
+        allPagesData.push({
+          pageNum,
+          textContent,
+          pageHeight: viewport.height,
+          pageWidth: viewport.width
+        });
+
+        const progress = Math.round((pageNum / numPages) * 50);
+        document.getElementById('extractionProgress').textContent = `Analyzing pages ${pageNum}/${numPages} (${progress}%)`;
+      }
+
+      // Identify repetitive elements (headers/footers)
+      const repetitiveElements = identifyRepetitiveElements(allPagesData);
+
+      // Second pass: extract and filter text with paragraph detection
+      let fullText = '';
+
+      for (let i = 0; i < allPagesData.length; i++) {
+        const { pageNum, textContent, pageHeight, pageWidth } = allPagesData[i];
 
         // Add page header
         fullText += `\n\n## Page ${pageNum}\n\n`;
 
-        // Extract text items
-        let currentLine = '';
-        let lastY = null;
+        // Extract text with filtering and paragraph detection
+        const pageText = extractPageText(textContent, pageHeight, pageWidth, repetitiveElements);
+        fullText += pageText;
 
-        textContent.items.forEach((item, index) => {
-          const text = item.str;
-          const y = item.transform[5];
-
-          // Detect new line by Y position change
-          if (lastY !== null && Math.abs(y - lastY) > 5) {
-            if (currentLine.trim()) {
-              fullText += currentLine.trim() + '\n';
-            }
-            currentLine = '';
-          }
-
-          currentLine += text;
-          if (item.hasEOL || index === textContent.items.length - 1) {
-            if (currentLine.trim()) {
-              fullText += currentLine.trim() + '\n';
-            }
-            currentLine = '';
-          }
-
-          lastY = y;
-        });
-
-        // Update progress
-        const progress = Math.round((pageNum / numPages) * 100);
+        const progress = 50 + Math.round((i + 1) / numPages * 50);
         document.getElementById('extractionProgress').textContent = `Extracting page ${pageNum}/${numPages} (${progress}%)`;
       }
 
@@ -167,6 +165,129 @@
       loadingDiv.style.display = 'none';
       throw error;
     }
+  }
+
+  function identifyRepetitiveElements(allPagesData) {
+    const repetitiveElements = new Set();
+    const textPositionMap = new Map();
+
+    // Collect text that appears at similar positions across pages
+    allPagesData.forEach(({ textContent, pageHeight }) => {
+      textContent.items.forEach(item => {
+        const text = item.str.trim();
+        const y = item.transform[5];
+        const normalizedY = y / pageHeight; // Normalize position (0-1)
+
+        // Skip empty text
+        if (!text || text.length === 0) return;
+
+        // Check if it's in header/footer region (top 10% or bottom 10%)
+        const isHeaderRegion = normalizedY > 0.9;
+        const isFooterRegion = normalizedY < 0.1;
+
+        if (isHeaderRegion || isFooterRegion) {
+          const key = `${text}:${normalizedY.toFixed(2)}`;
+          textPositionMap.set(key, (textPositionMap.get(key) || 0) + 1);
+        }
+      });
+    });
+
+    // Mark text that appears on multiple pages as repetitive
+    const threshold = Math.max(2, Math.floor(allPagesData.length * 0.3)); // At least 30% of pages
+    textPositionMap.forEach((count, key) => {
+      if (count >= threshold) {
+        const [text] = key.split(':');
+        repetitiveElements.add(text);
+      }
+    });
+
+    // Also filter common page number patterns
+    allPagesData.forEach(({ textContent }) => {
+      textContent.items.forEach(item => {
+        const text = item.str.trim();
+        if (isPageNumber(text)) {
+          repetitiveElements.add(text);
+        }
+      });
+    });
+
+    return repetitiveElements;
+  }
+
+  function isPageNumber(text) {
+    // Match common page number patterns
+    return /^[\d\s\-–—]+$/.test(text) || // Just digits and dashes
+           /^Page\s+\d+$/i.test(text) ||  // "Page N"
+           /^\d+\s*of\s*\d+$/i.test(text) || // "N of M"
+           /^\[\d+\]$/.test(text);        // [N]
+  }
+
+  function extractPageText(textContent, pageHeight, pageWidth, repetitiveElements) {
+    let pageText = '';
+    let currentParagraph = '';
+    let lastY = null;
+    let lastHeight = null;
+    let lastX = null;
+
+    textContent.items.forEach((item, index) => {
+      const text = item.str.trim();
+      const y = item.transform[5];
+      const x = item.transform[4];
+      const height = item.height || 12;
+      const normalizedY = y / pageHeight;
+
+      // Skip if empty
+      if (!text || text.length === 0) return;
+
+      // Filter out repetitive elements (headers/footers/page numbers)
+      if (repetitiveElements.has(text)) {
+        return;
+      }
+
+      // Filter out header/footer regions
+      if (normalizedY > 0.9 || normalizedY < 0.1) {
+        return;
+      }
+
+      // Detect paragraph breaks
+      if (lastY !== null) {
+        const yDiff = Math.abs(y - lastY);
+        const xDiff = lastX !== null ? Math.abs(x - lastX) : 0;
+
+        // Large vertical gap = paragraph break
+        if (yDiff > height * 1.5) {
+          if (currentParagraph.trim()) {
+            pageText += currentParagraph.trim() + '\n\n';
+            currentParagraph = '';
+          }
+        }
+        // Small vertical change = same line or next line in same paragraph
+        else if (yDiff > 2) {
+          // Check if it's a new line within the same paragraph
+          if (currentParagraph && !currentParagraph.endsWith(' ')) {
+            currentParagraph += ' ';
+          }
+        }
+        // Same line, add space if needed
+        else if (xDiff > height * 0.5) {
+          if (currentParagraph && !currentParagraph.endsWith(' ')) {
+            currentParagraph += ' ';
+          }
+        }
+      }
+
+      currentParagraph += text;
+      lastY = y;
+      lastX = x;
+      lastHeight = height;
+    });
+
+    // Add remaining paragraph
+    if (currentParagraph.trim()) {
+      pageText += currentParagraph.trim() + '\n\n';
+    }
+
+    return pageText;
   }
 
   function renderMarkdown(text) {
