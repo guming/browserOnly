@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-interface TabInfo {
+export interface TabInfo {
   id: number;
   title: string;
   url: string;
@@ -8,15 +8,17 @@ interface TabInfo {
 }
 
 interface MultiTabSelectorProps {
-  onTabsSelected: (tabIds: number[]) => void;
+  onTabsSelected: (tabs: TabInfo[]) => void;
   isVisible: boolean;
   onClose: () => void;
+  initialSelectedTabIds?: number[];
 }
 
 export const MultiTabSelector: React.FC<MultiTabSelectorProps> = ({
   onTabsSelected,
   isVisible,
-  onClose
+  onClose,
+  initialSelectedTabIds = []
 }) => {
   const [availableTabs, setAvailableTabs] = useState<TabInfo[]>([]);
   const [selectedTabs, setSelectedTabs] = useState<Set<number>>(new Set());
@@ -58,10 +60,16 @@ export const MultiTabSelector: React.FC<MultiTabSelectorProps> = ({
           id: tab.id!,
           title: tab.title || 'Untitled',
           url: tab.url || '',
-          selected: false
+          selected: initialSelectedTabIds.includes(tab.id!)
         }));
 
       setAvailableTabs(tabInfos);
+
+      // Restore previously selected tabs
+      const initialSelected = new Set(initialSelectedTabIds.filter(id =>
+        tabInfos.some(tab => tab.id === id)
+      ));
+      setSelectedTabs(initialSelected);
     } catch (error) {
       console.error('Error fetching tabs:', error);
     }
@@ -97,9 +105,14 @@ export const MultiTabSelector: React.FC<MultiTabSelectorProps> = ({
     }
   };
 
+  const handleClearAll = () => {
+    setSelectedTabs(new Set());
+    setAvailableTabs(prev => prev.map(tab => ({ ...tab, selected: false })));
+  };
+
   const handleAnalyzeTabs = () => {
-    const selectedTabIds = Array.from(selectedTabs);
-    onTabsSelected(selectedTabIds);
+    const selectedTabsInfo = availableTabs.filter(tab => selectedTabs.has(tab.id));
+    onTabsSelected(selectedTabsInfo);
     onClose();
   };
 
@@ -148,12 +161,25 @@ export const MultiTabSelector: React.FC<MultiTabSelectorProps> = ({
             <div className="text-gray-600">
               {selectedTabs.size} of {availableTabs.length} tabs selected
             </div>
-            <button
-              onClick={handleSelectAll}
-              className="text-sky-600 hover:text-sky-700 font-medium hover:underline transition-colors duration-200"
-            >
-              {selectedTabs.size === availableTabs.length ? 'Deselect All' : 'Select All'}
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleSelectAll}
+                className="text-sky-600 hover:text-sky-700 font-medium hover:underline transition-colors duration-200"
+              >
+                {selectedTabs.size === availableTabs.length ? 'Deselect All' : 'Select All'}
+              </button>
+              {selectedTabs.size > 0 && (
+                <>
+                  <span className="text-gray-300">|</span>
+                  <button
+                    onClick={handleClearAll}
+                    className="text-red-600 hover:text-red-700 font-medium hover:underline transition-colors duration-200"
+                  >
+                    Clear All
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
 

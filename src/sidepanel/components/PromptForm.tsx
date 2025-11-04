@@ -13,7 +13,7 @@ import {
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useEffect, useState } from 'react';
 import TextareaAutosize from 'react-textarea-autosize';
-import { MultiTabSelector } from './MultiTabSelector';
+import { MultiTabSelector, type TabInfo } from './MultiTabSelector';
 
 interface PromptFormProps {
   onSubmit: (prompt: string, role: string, selectedTabIds?: number[]) => void;
@@ -38,14 +38,52 @@ interface Book {
   author: string;
   emoji: string;
   description: string;
+  category: string;
 }
 
+// 定义书籍分类
+interface BookCategory {
+  id: string;
+  name: string;
+  emoji: string;
+  description: string;
+}
+
+const bookCategories: BookCategory[] = [
+  {
+    id: 'thinking',
+    name: 'Thinking & Decision Making',
+    emoji: '🧠',
+    description: 'Master cognitive psychology and make better decisions'
+  },
+  {
+    id: 'productivity',
+    name: 'Productivity & Habits',
+    emoji: '⚡',
+    description: 'Build effective habits and boost personal productivity'
+  },
+  {
+    id: 'business',
+    name: 'Business & Strategy',
+    emoji: '🚀',
+    description: 'Learn entrepreneurship and strategic thinking'
+  },
+  {
+    id: 'growth',
+    name: 'Personal Growth',
+    emoji: '🌟',
+    description: 'Enhance happiness and learning skills'
+  }
+];
+
 const availableBooks: Book[] = [
+  // 🌟 Personal Growth
   {
     id: 'happinessBook',
     title: 'Build the Life You Want',
     author: 'Oprah Winfrey',
     emoji: '🏆',
+    category: 'growth',
     description: `Ready to begin? Share:
 1. Your current situation or specific challenges (e.g., burnt out at work, tense relationships, lack of direction)
 2. Your most important goal (e.g., more fulfillment at work, better communication, feeling calmer)`,
@@ -55,15 +93,19 @@ const availableBooks: Book[] = [
     title: 'How to Read a Book',
     author: 'Mortimer J. Adler',
     emoji: '📖',
+    category: 'growth',
     description: `Ready to improve your reading? Share:
 1. Your main reading goal (e.g., study faster, read classics, extract insights for work)
 2. Your current reading challenge (e.g., difficulty finishing books, remembering key points)`,
   },
+
+  // 🧠 Thinking & Decision Making
   {
     id: 'thinkingFastAndSlow',
     title: 'Thinking, Fast and Slow',
     author: 'Daniel Kahneman',
     emoji: '🧠',
+    category: 'thinking',
     description: `Ready to improve your thinking? Share:
 1. What decisions or judgments are you struggling with? (e.g., investment, relationships, career)
 2. Do you want to strengthen your intuition or improve your analytical accuracy?`,
@@ -73,15 +115,19 @@ const availableBooks: Book[] = [
     title: 'The Art of Thinking Clearly',
     author: 'Rolf Dobelli',
     emoji: '💡',
+    category: 'thinking',
     description: `Ready to think more clearly? Share:
 1. A recent decision or belief that may have been influenced by bias
 2. Your primary goal (e.g., rational business choices, better relationships, independent thinking)`,
   },
+
+  // ⚡ Productivity & Habits
   {
     id: 'gettingThingsDone',
     title: 'Getting Things Done',
     author: 'David Allen',
     emoji: '✅',
+    category: 'productivity',
     description: `Ready to get organized? Share:
 1. Your current productivity challenge (e.g., overwhelm, procrastination, disorganization)
 2. What system or tool you currently use to manage tasks (e.g., Notion, Todoist, pen & paper)`,
@@ -91,6 +137,7 @@ const availableBooks: Book[] = [
     title: 'Deep Work',
     author: 'Cal Newport',
     emoji: '🎯',
+    category: 'productivity',
     description: `Ready to master focus? Share:
 1. What type of work or study requires your deepest focus?
 2. Your main sources of distraction (e.g., notifications, meetings, social media)`,
@@ -100,15 +147,29 @@ const availableBooks: Book[] = [
     title: 'Essentialism: The Disciplined Pursuit of Less',
     author: 'Greg McKeown',
     emoji: '🎪',
+    category: 'productivity',
     description: `Ready to pursue less but better? Share:
 1. What areas of your life feel overloaded or scattered right now?
 2. The one or two goals that truly matter most to you in this season of life`,
   },
   {
+    id: 'atomicHabits',
+    title: 'Atomic Habits',
+    author: 'James Clear',
+    emoji: '⚡',
+    category: 'productivity',
+    description: `Ready to build better habits? Share:
+1. A specific habit you want to build or break (e.g., exercising daily, reducing screen time, journaling)
+2. Your primary motivation or identity goal (e.g., "I want to be healthier", "I want to be more focused")`,
+  },
+
+  // 🚀 Business & Strategy
+  {
     id: 'leanStartup',
     title: 'The Lean Startup',
     author: 'Eric Ries',
     emoji: '🚀',
+    category: 'business',
     description: `Ready to build lean? Share:
 1. Your startup idea or current challenge (e.g., validating demand, defining MVP)
 2. Your primary goal (e.g., faster experimentation, customer validation, product-market fit)`,
@@ -118,6 +179,7 @@ const availableBooks: Book[] = [
     title: 'The Art of Strategy',
     author: 'Avinash K. Dixit & Barry J. Nalebuff',
     emoji: '♟️',
+    category: 'business',
     description: `Ready to think strategically? Share:
 1. A strategic situation you're facing (e.g., business competition, negotiation, decision conflict)
 2. Your desired outcome (e.g., predict moves, strengthen position, design win-win solution)`,
@@ -177,11 +239,15 @@ export const PromptForm: React.FC<PromptFormProps> = ({
   const [mode, setMode] = useState<ModeType>('operator');
   const [role, setRole] = useState<RoleType>('operator');
   const [selectedBook, setSelectedBook] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showBookSelection, setShowBookSelection] = useState(false);
+  const [showBookModal, setShowBookModal] = useState(false);
+  const [bookSearchQuery, setBookSearchQuery] = useState('');
   const [selectedNotebookLMOption, setSelectedNotebookLMOption] = useState<NotebookLMOption>('summary');
   const [showNotebookLMOptions, setShowNotebookLMOptions] = useState(false);
   const [showMultiTabSelector, setShowMultiTabSelector] = useState(false);
   const [selectedTabIds, setSelectedTabIds] = useState<number[]>([]);
+  const [selectedTabs, setSelectedTabs] = useState<TabInfo[]>([]);
 
   // 当模式改变时重置角色
   useEffect(() => {
@@ -203,18 +269,26 @@ export const PromptForm: React.FC<PromptFormProps> = ({
       setShowBookSelection(true);
       setShowNotebookLMOptions(false);
       if (!selectedBook) {
-        setSelectedBook(availableBooks[0].id);
+        // Initialize with first book in default category (growth)
+        const booksInDefaultCategory = availableBooks.filter(book => book.category === 'growth');
+        if (booksInDefaultCategory.length > 0) {
+          setSelectedBook(booksInDefaultCategory[0].id);
+        }
       }
+      // Don't auto-open modal - let user click to open
     } else if (role === 'notebooklm') {
       setShowNotebookLMOptions(true);
       setShowBookSelection(false);
       setSelectedBook('');
+      setShowBookModal(false);
     } else {
       setShowBookSelection(false);
       setShowNotebookLMOptions(false);
       setSelectedBook('');
+      setShowBookModal(false);
     }
   }, [role, selectedBook]);
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -242,9 +316,17 @@ export const PromptForm: React.FC<PromptFormProps> = ({
     onSubmit(`#${option}`, finalRole);
   };
 
-  const handleTabsSelected = (tabIds: number[]) => {
-    setSelectedTabIds(tabIds);
+  const handleTabsSelected = (tabs: TabInfo[]) => {
+    setSelectedTabs(tabs);
+    setSelectedTabIds(tabs.map(tab => tab.id));
     setShowMultiTabSelector(false);
+
+    // Auto-insert URLs into textarea
+    if (tabs.length > 0) {
+      const prefixText = 'Please conduct research on the following URLs, focusing on the topics covered by their content.\n\n';
+      const urlsList = tabs.map(tab => `- ${tab.url} (${tab.title})`).join('\n');
+      setPrompt(prefixText + urlsList);
+    }
   };
 
   const handleMultiTabAnalysis = () => {
@@ -265,6 +347,32 @@ export const PromptForm: React.FC<PromptFormProps> = ({
 
   const getSelectedNotebookLMOption = () => {
     return notebookLMOptions.find(option => option.id === selectedNotebookLMOption);
+  };
+
+  const getBooksByCategory = (categoryId: string) => {
+    if (categoryId === 'all') {
+      return availableBooks;
+    }
+    return availableBooks.filter(book => book.category === categoryId);
+  };
+
+  const getCategoryInfo = (categoryId: string) => {
+    return bookCategories.find(cat => cat.id === categoryId);
+  };
+
+  // Filter books by search query and category
+  const getFilteredBooks = () => {
+    let books = getBooksByCategory(selectedCategory);
+
+    if (bookSearchQuery.trim()) {
+      const query = bookSearchQuery.toLowerCase();
+      books = books.filter(book =>
+        book.title.toLowerCase().includes(query) ||
+        book.author.toLowerCase().includes(query)
+      );
+    }
+
+    return books;
   };
 
   return (
@@ -437,47 +545,55 @@ export const PromptForm: React.FC<PromptFormProps> = ({
           </div>
         )}
 
-        {/* 书籍二级选择 - 只在选择books时显示 */}
+        {/* 书籍选择按钮 - 只在选择books时显示 */}
         {showBookSelection && role === 'books' && (
-          <div className="mb-2 transform transition-all duration-300 ease-in-out">
-            <div className="relative">
-              <select
-                className="w-full bg-gradient-to-r from-amber-50 via-orange-50 to-red-50 border-2 border-amber-200 rounded-2xl px-4 py-2 text-sm font-medium text-gray-800 shadow-lg hover:shadow-xl hover:border-amber-300 focus:outline-none focus:ring-3 focus:ring-amber-300 focus:border-amber-400 transition-all duration-300 backdrop-blur-sm appearance-none cursor-pointer"
-                value={selectedBook}
-                onChange={(e) => setSelectedBook(e.target.value)}
-                disabled={isProcessing || tabStatus === 'detached'}
-                style={{
-                  backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
-                  backgroundPosition: 'right 12px center',
-                  backgroundRepeat: 'no-repeat',
-                  backgroundSize: '16px'
-                }}
-              >
-                {availableBooks.map((book) => (
-                  <option key={book.id} value={book.id} className="bg-white text-gray-800 py-2">
-                    {book.emoji} {book.title} - {book.author}
-                  </option>
-                ))}
-              </select>
-              
-              {/* 装饰性渐变边框 */}
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-amber-400 via-orange-400 to-red-400 opacity-0 hover:opacity-20 transition-opacity duration-300 pointer-events-none -z-10"></div>
-            </div>
-            
-            {/* 选中书籍的描述 */}
-            {selectedBook && (
-              <div className="mt-2 p-3 bg-amber-50/80 backdrop-blur-sm border border-amber-200/50 rounded-xl transform transition-all duration-300 ease-in-out">
-                <div className="text-xs text-amber-700 font-medium">
-                  {getSelectedBookInfo()?.emoji} {getSelectedBookInfo()?.title}
+          <div className="mb-2 transform transition-all duration-200 ease-in-out">
+            <button
+              type="button"
+              onClick={() => setShowBookModal(true)}
+              className="w-full bg-gradient-to-r from-amber-50 via-orange-50 to-red-50 border-2 border-amber-200 rounded-2xl p-3 hover:border-amber-300 hover:shadow-lg transition-all duration-200 text-left"
+              disabled={isProcessing || tabStatus === 'detached'}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <span className="text-2xl flex-shrink-0">{selectedBook ? getSelectedBookInfo()?.emoji : '📚'}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs text-amber-700 font-medium">
+                      {selectedBook ? getCategoryInfo(getSelectedBookInfo()?.category || '')?.name : 'Select a Book'}
+                    </div>
+                    <div className="text-sm font-semibold text-gray-800 truncate">
+                      {selectedBook ? getSelectedBookInfo()?.title : 'Choose from 10 books'}
+                    </div>
+                    {selectedBook && (
+                      <div className="text-xs text-gray-600 truncate">
+                        {getSelectedBookInfo()?.author}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="text-xs text-amber-600 mt-1">
-                  {getSelectedBookInfo()?.description}
+                <div className="flex-shrink-0 text-amber-600">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </div>
+            </button>
+
+            {/* Selected Book Description - Display on main page */}
+            {selectedBook && getSelectedBookInfo() && (
+              <div className="mt-2 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-3 shadow-sm">
+                <div className="text-xs text-gray-700 leading-relaxed space-y-1.5 max-h-32 overflow-y-auto">
+                  {getSelectedBookInfo()?.description.split('\n').map((line, idx) => (
+                    <p key={idx} className={idx === 0 ? 'font-medium text-amber-900' : ''}>
+                      {line}
+                    </p>
+                  ))}
                 </div>
               </div>
             )}
           </div>
         )}
-        
+
         {/* 输入框 */}
         <div className="relative">
           <TextareaAutosize
@@ -550,7 +666,138 @@ export const PromptForm: React.FC<PromptFormProps> = ({
         isVisible={showMultiTabSelector}
         onTabsSelected={handleTabsSelected}
         onClose={() => setShowMultiTabSelector(false)}
+        initialSelectedTabIds={selectedTabIds}
       />
+
+      {/* Book Selection Modal */}
+      {showBookModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => {
+              setShowBookModal(false);
+              setBookSearchQuery('');
+            }}
+          />
+
+          {/* Compact Modal Content */}
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[600px] overflow-hidden animate-slideUp">
+            {/* Compact Header */}
+            <div className="bg-gradient-to-r from-amber-500 to-orange-600 px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">📚</span>
+                <h2 className="text-lg font-bold text-white">Select a Book</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBookModal(false);
+                  setBookSearchQuery('');
+                }}
+                className="text-white hover:bg-white/20 rounded-full p-1.5 transition-colors duration-200"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Filter and Search */}
+            <div className="p-3 border-b border-gray-200 space-y-2">
+              {/* Category Filter Dropdown */}
+              <div className="relative">
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="w-full px-3 py-2 pr-8 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 appearance-none cursor-pointer"
+                >
+                  <option value="all">📚 All Categories ({availableBooks.length} books)</option>
+                  {bookCategories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.emoji} {category.name} ({getBooksByCategory(category.id).length} books)
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Search Input */}
+              <div className="relative">
+                <input
+                  type="text"
+                  value={bookSearchQuery}
+                  onChange={(e) => setBookSearchQuery(e.target.value)}
+                  placeholder="Search by title or author..."
+                  className="w-full px-3 py-2 pr-9 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* Compact Books List */}
+            <div className="overflow-y-auto max-h-[400px]">
+              {getFilteredBooks().length === 0 ? (
+                <div className="p-8 text-center text-gray-500">
+                  <div className="text-4xl mb-2">📚</div>
+                  <p className="text-sm">No books found</p>
+                  <p className="text-xs mt-1">Try adjusting your filters</p>
+                </div>
+              ) : (
+                <div className="p-2">
+                  {getFilteredBooks().map((book) => (
+                    <button
+                      key={book.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedBook(book.id);
+                        setShowBookModal(false);
+                        setBookSearchQuery('');
+                      }}
+                      className={`w-full text-left p-3 mb-2 rounded-lg border transition-all duration-200 ${
+                        selectedBook === book.id
+                          ? 'bg-amber-50 border-amber-400 shadow-md'
+                          : 'bg-white border-gray-200 hover:border-amber-300 hover:bg-amber-50/50 hover:shadow'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl flex-shrink-0">{book.emoji}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-sm text-gray-900 truncate">
+                            {book.title}
+                          </div>
+                          <div className="text-xs text-gray-600 mt-0.5">
+                            by {book.author}
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <span className="text-xs">{getCategoryInfo(book.category)?.emoji}</span>
+                            <span className="text-xs text-gray-500">{getCategoryInfo(book.category)?.name}</span>
+                          </div>
+                        </div>
+                        {selectedBook === book.id && (
+                          <div className="flex-shrink-0 w-5 h-5 bg-amber-500 rounded-full flex items-center justify-center">
+                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
 };

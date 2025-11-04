@@ -10,13 +10,56 @@ import {
   browserPressKey, 
   browserKeyboardType 
 } from "./keyboardTools";
-import { 
-  saveMemory, 
-  lookupMemories, 
-  getAllMemories, 
-  deleteMemory, 
-  clearAllMemories 
+import {
+  saveMemory,
+  lookupMemories,
+  getAllMemories,
+  deleteMemory,
+  clearAllMemories
 } from "./memoryTools";
+
+import {
+  createVectorCollection,
+  listVectorCollections,
+  deleteVectorCollection,
+  storeVector,
+  searchVectors,
+  getVectorDocument,
+  deleteVectorDocument,
+  listVectorDocuments,
+  clearAllVectorData
+} from "./vectorTools";
+
+import {
+  createKnowledgeNode,
+  addKnowledgeEdge,
+  listKnowledgeNodes,
+  searchKnowledge,
+  traverseKnowledgeGraph,
+  hybridKnowledgeQuery,
+  findKnowledgeIntersection,
+  getKnowledgeGraphStats,
+  clearKnowledgeGraph,
+  getKnowledgeNode
+} from "./knowledgeGraphTools";
+
+import {
+  browserReadTextEnhanced,
+  browserGetPageSummary,
+  browserReadMainContent,
+  browserGetCacheStats,
+  browserClearCache
+} from "./enhancedReadTools";
+
+import {
+  browserReadTextAST,
+  browserGetOverview,
+  browserGetSection,
+  browserGetPageSummaryAST,
+  browserGetASTStats,
+  browserGetTopContent,
+  browserManageASTCache
+} from "./astReadTools";
 
 import { 
   browserMoveMouse, 
@@ -104,6 +147,46 @@ export {
   getAllMemories,
   deleteMemory,
   clearAllMemories,
+
+  // Vector database tools
+  createVectorCollection,
+  listVectorCollections,
+  deleteVectorCollection,
+  storeVector,
+  searchVectors,
+  getVectorDocument,
+  deleteVectorDocument,
+  listVectorDocuments,
+  clearAllVectorData,
+
+  // Knowledge graph tools
+  createKnowledgeNode,
+  addKnowledgeEdge,
+  listKnowledgeNodes,
+  searchKnowledge,
+  traverseKnowledgeGraph,
+  hybridKnowledgeQuery,
+  findKnowledgeIntersection,
+  getKnowledgeGraphStats,
+  clearKnowledgeGraph,
+  getKnowledgeNode,
+
+  // Enhanced read tools
+  browserReadTextEnhanced,
+  browserGetPageSummary,
+  browserReadMainContent,
+  browserGetCacheStats,
+  browserClearCache,
+
+  // AST read tools
+  browserReadTextAST,
+  browserGetOverview,
+  browserGetSection,
+  browserGetPageSummaryAST,
+  browserGetASTStats,
+  browserGetTopContent,
+  browserManageASTCache,
+
   // Extract tools
   startExtract
   // Notion tools are exported separately from ./notionTools
@@ -158,6 +241,45 @@ export function getAllTools(page: Page) {
     getAllMemories(page),
     deleteMemory(page),
     clearAllMemories(page),
+
+    // Vector database tools
+    createVectorCollection(page),
+    listVectorCollections(page),
+    deleteVectorCollection(page),
+    storeVector(page),
+    searchVectors(page),
+    getVectorDocument(page),
+    deleteVectorDocument(page),
+    listVectorDocuments(page),
+    clearAllVectorData(page),
+
+    // Knowledge graph tools
+    createKnowledgeNode(page),
+    addKnowledgeEdge(page),
+    listKnowledgeNodes(page),
+    searchKnowledge(page),
+    traverseKnowledgeGraph(page),
+    hybridKnowledgeQuery(page),
+    findKnowledgeIntersection(page),
+    getKnowledgeGraphStats(page),
+    clearKnowledgeGraph(page),
+    getKnowledgeNode(page),
+
+    // Enhanced read tools
+    browserReadTextEnhanced(page),
+    browserGetPageSummary(page),
+    browserReadMainContent(page),
+    browserGetCacheStats(page),
+    browserClearCache(page),
+
+    // AST read tools
+    browserReadTextAST(page),
+    browserGetOverview(page),
+    browserGetSection(page),
+    browserGetPageSummaryAST(page),
+    browserGetASTStats(page),
+    browserGetTopContent(page),
+    browserManageASTCache(page),
 
     // Extract tools
     startExtract(page)

@@ -134,7 +134,7 @@ export function ProviderSelector({ isProcessing }: ProviderSelectorProps) {
   
   // Function to open help documentation
   const openHelpPage = () => {
-    window.open('https://parsaghaffari.github.io/BrowserOnly/', '_blank');
+    window.open('https://github.com/guming/BrowserOnly/', '_blank');
   };
 
   return (

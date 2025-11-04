@@ -46,7 +46,7 @@ export const CANONICAL_SEQUENCE: string = `## CANONICAL SEQUENCE
      • Copy selectors/arguments verbatim.
      • If no suitable memory exists, skip to Step 4.
   
-  4. **Observe** – Use browser_read_text,browser_read_page, browser_snapshot_dom, or browser_screenshot to verify page state.
+  4. **Observe** – Use browser_read_text_ast,browser_read_page, browser_snapshot_dom, or browser_screenshot to verify page state.
      • browser_read_page is used only when the user requests to crawl webpage content. Do not overuse it.
   
   5. **Analyze → Act** – Plan the remainder of the task and execute further tools.

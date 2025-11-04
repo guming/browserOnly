@@ -497,30 +497,28 @@ export function SidePanel() {
         </div>
 
         {/* Bottom Input Section - 减少backdrop-blur */}
-        {!isOutputExpanded && (
-          <div className="mt-3 space-y-3 flex-shrink-0">
-            <div className="bg-white/90 rounded-3xl shadow-lg border border-white/50 p-4">
-              <PromptForm
-                onSubmit={handleSubmit}
-                onCancel={handleCancel}
-                isProcessing={isProcessing}
-                tabStatus={tabStatus}
-              />
-            </div>
-            
-            <div className="bg-white/90 rounded-2xl shadow-lg border border-white/50 p-3">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex-1">
-                  <ProviderSelector isProcessing={isProcessing} />
-                </div>
-                <div className="w-px h-8 bg-gray-300"></div>
-                <div className="flex-shrink-0">
-                  <TokenUsageDisplay />
-                </div>
+        <div className={`mt-3 space-y-3 flex-shrink-0 ${isOutputExpanded ? 'hidden' : ''}`}>
+          <div className="bg-white/90 rounded-3xl shadow-lg border border-white/50 p-4">
+            <PromptForm
+              onSubmit={handleSubmit}
+              onCancel={handleCancel}
+              isProcessing={isProcessing}
+              tabStatus={tabStatus}
+            />
+          </div>
+
+          <div className="bg-white/90 rounded-2xl shadow-lg border border-white/50 p-3">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-1">
+                <ProviderSelector isProcessing={isProcessing} />
+              </div>
+              <div className="w-px h-8 bg-gray-300"></div>
+              <div className="flex-shrink-0">
+                <TokenUsageDisplay />
               </div>
             </div>
           </div>
-        )}
+        </div>
       </>
     ) : (
       /* No Provider State - 优化动画 */
