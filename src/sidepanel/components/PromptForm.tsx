@@ -14,6 +14,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useEffect, useState } from 'react';
 import TextareaAutosize from 'react-textarea-autosize';
 import { MultiTabSelector, type TabInfo } from './MultiTabSelector';
+import { DuckDBService, DuckDBLoadStatus, type TableInfo } from '../../tracking/duckdbService';
 
 interface PromptFormProps {
   onSubmit: (prompt: string, role: string, selectedTabIds?: number[]) => void;
@@ -23,10 +24,10 @@ interface PromptFormProps {
 }
 
 // 定义模式类型
-type ModeType = 'operator' | 'ask';
+type ModeType = 'operator' | 'ask' | 'dataAnalyze';
 
 // 定义角色类型
-type RoleType = 'operator' | 'researcher' | 'lawyer' | 'trader' | 'math' | 'qa' | 'code' | 'health' | 'wiki' | 'books' | 'munger' |'notebooklm';
+type RoleType = 'operator' | 'researcher' | 'lawyer' | 'trader' | 'math' | 'qa' | 'code' | 'health' | 'wiki' | 'books' | 'munger' |'notebooklm' | 'dataAnalyst' | 'dataScientist' | 'statistician';
 
 // 定义NotebookLM选项类型
 type NotebookLMOption = 'summary' | 'study-guide' | 'faq' | 'mindmap';
@@ -199,6 +200,9 @@ const roleIcons: Record<RoleType, any> = {
   wiki: faBook,
   books: faBook,
   munger: faBook,
+  dataAnalyst: faChartLine,
+  dataScientist: faCalculator,
+  statistician: faChartLine,
 };
 
 // NotebookLM选项配置
@@ -248,6 +252,11 @@ export const PromptForm: React.FC<PromptFormProps> = ({
   const [showMultiTabSelector, setShowMultiTabSelector] = useState(false);
   const [selectedTabIds, setSelectedTabIds] = useState<number[]>([]);
   const [selectedTabs, setSelectedTabs] = useState<TabInfo[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [loadedTables, setLoadedTables] = useState<TableInfo[]>([]);
+  const [duckdb] = useState(() => DuckDBService.getInstance());
+  const [duckdbLoadStatus, setDuckdbLoadStatus] = useState<DuckDBLoadStatus>(DuckDBLoadStatus.NotInitialized);
+  const [duckdbProgress, setDuckdbProgress] = useState<{ loaded: number; total: number; percentage: number } | null>(null);
 
   // 当模式改变时重置角色
   useEffect(() => {
@@ -255,13 +264,48 @@ export const PromptForm: React.FC<PromptFormProps> = ({
       setRole('operator');
     } else if (mode === 'ask') {
       setRole('books');
+    } else if (mode === 'dataAnalyze') {
+      setRole('dataAnalyst');
+
+      // Initialize DuckDB when switching to Data Analyze mode
+      const initDuckDB = async () => {
+        if (duckdb.getLoadStatus() === DuckDBLoadStatus.NotInitialized) {
+          try {
+            // Set progress callback
+            duckdb.setProgressCallback((loaded, total, percentage) => {
+              setDuckdbProgress({ loaded, total, percentage });
+            });
+
+            // Update status to Downloading
+            setDuckdbLoadStatus(DuckDBLoadStatus.Downloading);
+
+            // Initialize DuckDB
+            await duckdb.init();
+
+            // Update status to Ready
+            setDuckdbLoadStatus(DuckDBLoadStatus.Ready);
+            setDuckdbProgress(null);
+
+            console.log('DuckDB initialized successfully');
+          } catch (error) {
+            console.error('Failed to initialize DuckDB:', error);
+            setDuckdbLoadStatus(DuckDBLoadStatus.Error);
+            setDuckdbProgress(null);
+          }
+        } else {
+          // Sync status with service
+          setDuckdbLoadStatus(duckdb.getLoadStatus());
+        }
+      };
+
+      initDuckDB();
     }
     // 重置相关状态
     setShowBookSelection(false);
     setShowNotebookLMOptions(false);
     setSelectedBook('');
     setSelectedTabIds([]);
-  }, [mode]);
+  }, [mode, duckdb]);
 
   // 当角色改变时重置相关状态
   useEffect(() => {
@@ -331,6 +375,174 @@ export const PromptForm: React.FC<PromptFormProps> = ({
 
   const handleMultiTabAnalysis = () => {
     setShowMultiTabSelector(true);
+  };
+
+  const parseCSV = (text: string): string => {
+    const lines = text.split('\n').filter(line => line.trim());
+    if (lines.length === 0) return '';
+
+    // Format as markdown table
+    const rows = lines.map(line => line.split(',').map(cell => cell.trim()));
+    let result = '**Data Preview:**\n\n';
+
+    // Header
+    result += '| ' + rows[0].join(' | ') + ' |\n';
+    result += '| ' + rows[0].map(() => '---').join(' | ') + ' |\n';
+
+    // Data rows (limit to first 10 rows)
+    const dataRows = rows.slice(1, Math.min(11, rows.length));
+    dataRows.forEach(row => {
+      result += '| ' + row.join(' | ') + ' |\n';
+    });
+
+    if (rows.length > 11) {
+      result += `\n... and ${rows.length - 11} more rows\n`;
+    }
+
+    result += `\n**Total Rows:** ${rows.length - 1}\n`;
+    result += `**Columns:** ${rows[0].length}\n`;
+
+    return result;
+  };
+
+  const processFile = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = (e) => {
+        try {
+          const content = e.target?.result as string;
+          const extension = file.name.split('.').pop()?.toLowerCase();
+
+          let processed = '';
+
+          switch (extension) {
+            case 'csv':
+              processed = parseCSV(content);
+              break;
+            case 'json':
+              try {
+                const jsonData = JSON.parse(content);
+                processed = `**JSON Data:**\n\n\`\`\`json\n${JSON.stringify(jsonData, null, 2)}\n\`\`\`\n`;
+              } catch (err) {
+                processed = `**Raw JSON Content:**\n\n${content}\n`;
+              }
+              break;
+            case 'txt':
+              processed = `**Text File Content:**\n\n${content}\n`;
+              break;
+            case 'xlsx':
+            case 'xls':
+              processed = `**Excel File Detected:**\n\nPlease convert your Excel file to CSV format for better processing.\nYou can do this by opening the file in Excel and using "Save As" -> "CSV".\n`;
+              break;
+            default:
+              processed = `**File Content:**\n\n${content}\n`;
+          }
+
+          resolve(processed);
+        } catch (error) {
+          reject(error);
+        }
+      };
+
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsText(file);
+    });
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files) {
+      const fileArray = Array.from(files);
+      setUploadedFiles(fileArray);
+
+      // DuckDB should already be initialized (happens when switching to dataAnalyze mode)
+      if (!duckdb.isReady()) {
+        alert('⚠️ Data Analysis engine is not ready. Please wait for initialization to complete.');
+        return;
+      }
+
+      // Load files into DuckDB
+      try {
+        const tableNames: string[] = [];
+
+        for (const file of fileArray) {
+          const extension = file.name.split('.').pop()?.toLowerCase();
+
+          // Read file content
+          const content = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target?.result as string);
+            reader.onerror = () => reject(new Error('Failed to read file'));
+            reader.readAsText(file);
+          });
+
+          // Store in DuckDB based on file type
+          let tableName: string;
+          if (extension === 'csv') {
+            tableName = await duckdb.createTableFromCSV(file.name, content);
+            tableNames.push(tableName);
+          } else if (extension === 'json') {
+            tableName = await duckdb.createTableFromJSON(file.name, content);
+            tableNames.push(tableName);
+          } else {
+            console.warn(`Skipping file ${file.name} - unsupported format for DuckDB`);
+          }
+        }
+
+        // Refresh table list
+        const tables = await duckdb.listTables();
+        setLoadedTables(tables);
+
+        // Generate prompt with table information
+        if (tableNames.length > 0) {
+          let promptText = `Data loaded successfully! The following tables are now available for analysis:\n\n`;
+
+          for (const tableName of tableNames) {
+            const tableInfo = await duckdb.getTableInfo(tableName);
+            if (tableInfo) {
+              promptText += `📊 **${tableName}**\n`;
+              promptText += `   - Rows: ${tableInfo.rowCount}\n`;
+              promptText += `   - Columns: ${tableInfo.columns.map(c => c.name).join(', ')}\n\n`;
+            }
+          }
+
+          promptText += `You can query this data using SQL. For example:\n`;
+          promptText += `- SELECT * FROM ${tableNames[0]} LIMIT 10\n`;
+          promptText += `- SELECT COUNT(*) FROM ${tableNames[0]}\n\n`;
+          promptText += `What would you like to know about this data?`;
+
+          setPrompt(promptText);
+        }
+      } catch (error) {
+        console.error('Error loading files into DuckDB:', error);
+        alert(`Error loading files: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  };
+
+  const handleRemoveFile = async (index: number) => {
+    const file = uploadedFiles[index];
+    if (file) {
+      // Remove table from DuckDB
+      try {
+        const tableName = duckdb['sanitizeTableName']?.(file.name) ||
+                         file.name.replace(/\.(csv|json|txt|xlsx|xls)$/i, '').replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
+        await duckdb.dropTable(tableName);
+
+        // Refresh table list
+        const tables = await duckdb.listTables();
+        setLoadedTables(tables);
+      } catch (error) {
+        console.error('Error removing table:', error);
+      }
+    }
+
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+    // Clear prompt if no files left
+    if (uploadedFiles.length === 1) {
+      setPrompt('');
+    }
   };
 
   useEffect(() => {
@@ -411,45 +623,236 @@ export const PromptForm: React.FC<PromptFormProps> = ({
                 <span>Ask</span>
               </span>
             </button>
+            <button
+              type="button"
+              onClick={() => setMode('dataAnalyze')}
+              className={`flex-1 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+                mode === 'dataAnalyze'
+                  ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+              }`}
+              disabled={isProcessing || tabStatus === 'detached'}
+            >
+              <span className="flex items-center justify-center gap-2">
+                <span>📊</span>
+                <span>Data Analyze</span>
+              </span>
+            </button>
           </div>
         </div>
 
-        {/* Role Selection */}
-        <div className="relative">
-          <select
-            className={`w-full bg-gradient-to-r ${mode === 'operator' ? 'from-sky-50 via-blue-50 to-indigo-50 border-sky-200' : 'from-emerald-50 via-green-50 to-teal-50 border-emerald-200'} border-2 rounded-2xl px-4 text-sm font-medium text-gray-800 shadow-lg hover:shadow-xl hover:border-${mode === 'operator' ? 'sky' : 'emerald'}-300 focus:outline-none focus:ring-3 focus:ring-${mode === 'operator' ? 'sky' : 'emerald'}-300 focus:border-${mode === 'operator' ? 'sky' : 'emerald'}-400 transition-all duration-300 backdrop-blur-sm appearance-none cursor-pointer ${showBookSelection || showNotebookLMOptions ? 'py-2 mb-1' : 'py-2 mb-2'}`}
-            value={role}
-            onChange={(e) => setRole(e.target.value as RoleType)}
-            disabled={isProcessing || tabStatus === 'detached'}
-            style={{
-              backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
-              backgroundPosition: 'right 12px center',
-              backgroundRepeat: 'no-repeat',
-              backgroundSize: '16px'
-            }}
-          >
-            {mode === 'operator' ? (
-              <>
-                <option value="operator" className="bg-white text-gray-800 py-2">⚡ Browser Operator</option>
-                <option value="notebooklm" className="bg-white text-gray-800 py-2">📓 NotebookLM</option>
-                <option value="researcher" className="bg-white text-gray-800 py-2">🔎 Research Analyst</option>
-                <option value="lawyer" className="bg-white text-gray-800 py-2">⚖️ Legal Advisor</option>
-                <option value="math" className="bg-white text-gray-800 py-2">∑ Mathematics Expert</option>
-                <option value="code" className="bg-white text-gray-800 py-2">⌨️ Code Developer</option>
-                <option value="qa" className="bg-white text-gray-800 py-2">✓ TestCase Writer</option>
-                <option value="health" className="bg-white text-gray-800 py-2">⚕️ Medical Consultant</option>
-                <option value="wiki" className="bg-white text-gray-800 py-2">📖 Wiki Assistant</option>
-              </>
-            ) : (
-              <>
-                <option value="books" className="bg-white text-gray-800 py-2">📚 Ask The Books</option>
-                <option value="munger" className="bg-white text-gray-800 py-2">💎 Talk to Charlie Munger</option>
-              </>
-            )}
-          </select>
+        {/* Role Selection - Hidden in Data Analyze mode */}
+        {mode !== 'dataAnalyze' && (
+          <div className="relative">
+            <select
+              className={`w-full bg-gradient-to-r ${
+                mode === 'operator'
+                  ? 'from-sky-50 via-blue-50 to-indigo-50 border-sky-200'
+                  : 'from-emerald-50 via-green-50 to-teal-50 border-emerald-200'
+              } border-2 rounded-2xl px-4 text-sm font-medium text-gray-800 shadow-lg hover:shadow-xl transition-all duration-300 backdrop-blur-sm appearance-none cursor-pointer ${showBookSelection || showNotebookLMOptions ? 'py-2 mb-1' : 'py-2 mb-2'}`}
+              value={role}
+              onChange={(e) => setRole(e.target.value as RoleType)}
+              disabled={isProcessing || tabStatus === 'detached'}
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
+                backgroundPosition: 'right 12px center',
+                backgroundRepeat: 'no-repeat',
+                backgroundSize: '16px'
+              }}
+            >
+              {mode === 'operator' ? (
+                <>
+                  <option value="operator" className="bg-white text-gray-800 py-2">⚡ Browser Operator</option>
+                  <option value="notebooklm" className="bg-white text-gray-800 py-2">📓 NotebookLM</option>
+                  <option value="researcher" className="bg-white text-gray-800 py-2">🔎 Research Analyst</option>
+                  <option value="lawyer" className="bg-white text-gray-800 py-2">⚖️ Legal Advisor</option>
+                  <option value="math" className="bg-white text-gray-800 py-2">∑ Mathematics Expert</option>
+                  <option value="code" className="bg-white text-gray-800 py-2">⌨️ Code Developer</option>
+                  <option value="qa" className="bg-white text-gray-800 py-2">✓ TestCase Writer</option>
+                  <option value="health" className="bg-white text-gray-800 py-2">⚕️ Medical Consultant</option>
+                  <option value="wiki" className="bg-white text-gray-800 py-2">📖 Wiki Assistant</option>
+                </>
+              ) : (
+                <>
+                  <option value="books" className="bg-white text-gray-800 py-2">📚 Ask The Books</option>
+                  <option value="munger" className="bg-white text-gray-800 py-2">💎 Talk to Charlie Munger</option>
+                </>
+              )}
+            </select>
 
-          <div className={`absolute inset-0 rounded-2xl bg-gradient-to-r ${mode === 'operator' ? 'from-sky-400 via-blue-400 to-indigo-400' : 'from-emerald-400 via-green-400 to-teal-400'} opacity-0 hover:opacity-20 transition-opacity duration-300 pointer-events-none -z-10`}></div>
-        </div>
+            <div className={`absolute inset-0 rounded-2xl bg-gradient-to-r ${
+              mode === 'operator'
+                ? 'from-sky-400 via-blue-400 to-indigo-400'
+                : 'from-emerald-400 via-green-400 to-teal-400'
+            } opacity-0 hover:opacity-20 transition-opacity duration-300 pointer-events-none -z-10`}></div>
+          </div>
+        )}
+
+        {/* DuckDB Loading Status - Only in Data Analyze mode */}
+        {mode === 'dataAnalyze' && duckdbLoadStatus === DuckDBLoadStatus.Downloading && (
+          <div className="mb-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl p-4 shadow-lg">
+            <div className="flex flex-col items-center gap-3">
+              {/* Loading Icon */}
+              <div className="relative w-16 h-16">
+                <div className="absolute inset-0 border-4 border-blue-200 rounded-full"></div>
+                <div className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
+                <div className="absolute inset-0 flex items-center justify-center text-2xl">
+                  📦
+                </div>
+              </div>
+
+              {/* Status Text */}
+              <div className="text-center">
+                <p className="text-sm font-semibold text-gray-800 mb-1">
+                  初始化数据分析引擎
+                </p>
+                <p className="text-xs text-gray-600">
+                  从CDN下载 DuckDB WASM (~32MB)
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  需要稳定的网络连接
+                </p>
+              </div>
+
+              {/* Progress Bar */}
+              {duckdbProgress && (
+                <div className="w-full">
+                  <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                    <span>{(duckdbProgress.loaded / 1024 / 1024).toFixed(1)} MB</span>
+                    <span>{duckdbProgress.percentage}%</span>
+                    <span>{(duckdbProgress.total / 1024 / 1024).toFixed(1)} MB</span>
+                  </div>
+                  <div className="w-full h-2 bg-blue-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-300 ease-out"
+                      style={{ width: `${duckdbProgress.percentage}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* DuckDB Error Status */}
+        {mode === 'dataAnalyze' && duckdbLoadStatus === DuckDBLoadStatus.Error && (
+          <div className="mb-3 bg-gradient-to-r from-red-50 to-pink-50 border-2 border-red-200 rounded-2xl p-4 shadow-lg">
+            <div className="flex flex-col items-center gap-3 text-center">
+              <div className="text-4xl">⚠️</div>
+              <div>
+                <p className="text-sm font-semibold text-red-800 mb-1">
+                  数据分析引擎加载失败
+                </p>
+                <p className="text-xs text-red-600 mb-1">
+                  {duckdb.getErrorMessage() || '无法加载 DuckDB WASM'}
+                </p>
+                <p className="text-xs text-gray-600 mb-2">
+                  请检查网络连接，该功能需要从CDN下载约32MB文件
+                </p>
+                <button
+                  onClick={() => {
+                    setDuckdbLoadStatus(DuckDBLoadStatus.NotInitialized);
+                    setDuckdbProgress(null);
+                    // Trigger re-init by simulating mode change
+                    const currentMode = mode;
+                    setMode('operator');
+                    setTimeout(() => setMode(currentMode as ModeType), 0);
+                  }}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-lg transition-colors"
+                >
+                  重试
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Upload Data Button - Only in Data Analyze mode and when DuckDB is ready */}
+        {mode === 'dataAnalyze' && duckdbLoadStatus === DuckDBLoadStatus.Ready && (
+          <div className="mb-2">
+            <input
+              type="file"
+              id="file-upload"
+              multiple
+              accept=".csv,.xlsx,.xls,.json,.txt"
+              onChange={handleFileUpload}
+              className="hidden"
+              disabled={isProcessing || tabStatus === 'detached'}
+            />
+            <label
+              htmlFor="file-upload"
+              className={`block w-full bg-gradient-to-r from-purple-50 via-pink-50 to-rose-50 border-2 border-purple-200 rounded-2xl px-4 py-3 text-center text-sm font-medium text-gray-800 shadow-lg hover:shadow-xl hover:border-purple-300 transition-all duration-300 cursor-pointer ${
+                isProcessing || tabStatus === 'detached' ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              <span className="flex items-center justify-center gap-2">
+                <span className="text-lg">📤</span>
+                <span>Upload Data</span>
+                <span className="text-xs text-gray-500">(CSV, Excel, JSON, TXT)</span>
+              </span>
+            </label>
+
+            {/* Display uploaded files */}
+            {uploadedFiles.length > 0 && (
+              <div className="mt-2 space-y-1">
+                {uploadedFiles.map((file, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between bg-purple-50 border border-purple-200 rounded-lg px-3 py-2"
+                  >
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <span className="text-sm">📄</span>
+                      <span className="text-sm text-gray-700 truncate">{file.name}</span>
+                      <span className="text-xs text-gray-500">
+                        ({(file.size / 1024).toFixed(1)} KB)
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveFile(index)}
+                      className="text-red-500 hover:text-red-700 p-1"
+                      title="Remove file"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Display loaded tables */}
+            {loadedTables.length > 0 && (
+              <div className="mt-3 bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 rounded-2xl p-3 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                    <span>🗄️</span>
+                    <span>Loaded Tables ({loadedTables.length})</span>
+                  </h3>
+                </div>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {loadedTables.map((table, index) => (
+                    <div
+                      key={index}
+                      className="bg-white border border-purple-100 rounded-lg px-3 py-2"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium text-gray-800">{table.name}</span>
+                        <span className="text-xs text-gray-500">{table.rowCount} rows</span>
+                      </div>
+                      <div className="text-xs text-gray-600">
+                        <span className="font-medium">Columns:</span>{' '}
+                        {table.columns.slice(0, 3).map(c => c.name).join(', ')}
+                        {table.columns.length > 3 && ` +${table.columns.length - 3} more`}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* NotebookLM选项按钮 - 只在选择notebooklm时显示 */}
         {showNotebookLMOptions && role === 'notebooklm' && (
@@ -634,10 +1037,10 @@ export const PromptForm: React.FC<PromptFormProps> = ({
               overflow: 'auto'
             } as any}
           />
-          
+
           {isProcessing ? (
-            <button 
-              type="button" 
+            <button
+              type="button"
               onClick={onCancel}
               className="absolute bottom-2 right-2 w-10 h-10 bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white rounded-full shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 flex items-center justify-center"
               title="Cancel"
@@ -647,8 +1050,8 @@ export const PromptForm: React.FC<PromptFormProps> = ({
               </svg>
             </button>
           ) : (
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="absolute bottom-2 right-2 w-10 h-10 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white rounded-full shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:shadow-lg"
               disabled={!prompt.trim() || tabStatus === 'detached'}
               title={tabStatus === 'detached' ? "Refresh tab to continue" : "Send message"}

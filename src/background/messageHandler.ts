@@ -739,6 +739,7 @@ async function handlePdfAiChat(
   }
 }
 
+
 /**
  * Set up message listeners
  */

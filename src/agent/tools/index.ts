@@ -100,6 +100,15 @@ import {
 
 import { startExtract } from "./extractHtml";
 
+import {
+  queryData,
+  listDataTables,
+  describeDataTable,
+  previewDataTable,
+  dropDataTable,
+  clearAllDataTables
+} from "./duckdbTools";
+
 // Export all tools
 export {
   // Navigation tools
@@ -188,7 +197,15 @@ export {
   browserManageASTCache,
 
   // Extract tools
-  startExtract
+  startExtract,
+
+  // DuckDB data query tools
+  queryData,
+  listDataTables,
+  describeDataTable,
+  previewDataTable,
+  dropDataTable,
+  clearAllDataTables
   // Notion tools are exported separately from ./notionTools
 };
 
@@ -282,10 +299,18 @@ export function getAllTools(page: Page) {
     browserManageASTCache(page),
 
     // Extract tools
-    startExtract(page)
+    startExtract(page),
+
+    // DuckDB data query tools
+    queryData(page),
+    listDataTables(page),
+    describeDataTable(page),
+    previewDataTable(page),
+    dropDataTable(page),
+    clearAllDataTables(page)
     // Notion tools are not included here as they require a NotionMCPClient instance
     // Use getAllNotionTools(client) from ./notionTools for Notion-specific tools
   ];
-  
+
   return tools;
 }

@@ -21,7 +21,7 @@
   },
   "web_accessible_resources": [
   {
-    "resources": ["mermaid.min.js","initMermaid.js", "pdf-viewer.html", "pdf-proxy-viewer.html", "viewer.mjs", "pdf.mjs", "pdf.worker.mjs", "viewer.css", "pdf-text-extract.css", "pdf-text-extract.js", "marked.min.js", "pdf.min.js", "pdf.worker.min.js", "*.js", "*.mjs", "*.map", "*.css"],
+    "resources": ["mermaid.min.js","initMermaid.js", "pdf-viewer.html", "pdf-proxy-viewer.html", "viewer.mjs", "pdf.mjs", "pdf.worker.mjs", "viewer.css", "pdf-text-extract.css", "pdf-text-extract.js", "marked.min.js", "pdf.min.js", "pdf.worker.min.js", "duckdb/*.wasm", "duckdb/*.js", "*.js", "*.mjs", "*.map", "*.css"],
     "matches": ["<all_urls>"]
   }],
   "content_security_policy": {
@@ -31,7 +31,7 @@
     "default_path": "sidepanel.html"
   },
   "options_page": "options.html",
-  "permissions": ["debugger", "tabs", "sidePanel", "storage", "activeTab", "commands", "downloads", "contextMenus"],
+  "permissions": ["debugger", "tabs", "sidePanel", "storage", "activeTab", "commands", "downloads", "contextMenus", "scripting"],
   "host_permissions": ["<all_urls>"],
   "content_scripts": [
     {
