@@ -159,8 +159,51 @@ export function SidePanel() {
     startNewSegment,
     completeStreaming,
     clearMessages,
-    currentSegmentId
+    currentSegmentId,
+    loadConversation,
+    saveConversation,
+    deleteConversation
   } = useMessageManagement();
+
+  // Track current tab URL for conversation persistence
+  const [currentTabUrl, setCurrentTabUrl] = useState<string>('');
+
+  // Load conversation when tab changes
+  useEffect(() => {
+    const loadTabConversation = async () => {
+      if (currentSelectedTabId) {
+        try {
+          // Get tab info to fetch URL
+          const tab = await chrome.tabs.get(currentSelectedTabId);
+          if (tab.url && tab.url !== currentTabUrl) {
+            // Save current conversation before switching
+            if (currentTabUrl) {
+              await saveConversation(currentTabUrl, tabTitle);
+            }
+
+            // Load new conversation
+            setCurrentTabUrl(tab.url);
+            await loadConversation(tab.url, tab.title);
+          }
+        } catch (error) {
+          console.error('Failed to load tab conversation:', error);
+        }
+      }
+    };
+
+    loadTabConversation();
+  }, [currentSelectedTabId]);
+
+  // Auto-save conversation when messages change (debounced)
+  useEffect(() => {
+    if (currentTabUrl && messages.length > 0) {
+      const timeoutId = setTimeout(() => {
+        saveConversation(currentTabUrl, tabTitle);
+      }, 2000); // Save 2 seconds after last message change
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [messages, streamingSegments, currentTabUrl, tabTitle]);
 
   // Heartbeat interval for checking agent status
   useEffect(() => {
@@ -317,9 +360,14 @@ export function SidePanel() {
   };
 
   // Handle clearing history
-  const handleClearHistory = () => {
+  const handleClearHistory = async () => {
     clearMessages();
     clearHistory();
+
+    // Delete conversation from storage
+    if (currentTabUrl) {
+      await deleteConversation(currentTabUrl);
+    }
 
     const tokenTracker = TokenTrackingService.getInstance();
     tokenTracker.reset();
@@ -467,11 +515,14 @@ export function SidePanel() {
               </div>
             </div>
             
-            {/* 优化滚动容器 */}
+            {/* 优化滚动容器 - 固定高度防止信息显示不全 */}
             <div
               ref={outputRef}
-              className={`p-6 overflow-auto flex-1 bg-gradient-to-b from-white/50 to-sky-50/30 ${isOutputExpanded ? 'h-full max-h-full' : ''}`}
-              style={isOutputExpanded ? { height: 'calc(100vh - 200px)', maxHeight: 'calc(100vh - 200px)' } : { maxHeight: 'calc(100% - 60px)' }}
+              className={`p-6 overflow-y-auto bg-gradient-to-b from-white/50 to-sky-50/30 ${isOutputExpanded ? '' : ''}`}
+              style={isOutputExpanded
+                ? { height: 'calc(100vh - 200px)', maxHeight: 'calc(100vh - 200px)' }
+                : { height: '400px', minHeight: '400px', maxHeight: '400px' }
+              }
             >
               <MessageDisplay
                 messages={messages}

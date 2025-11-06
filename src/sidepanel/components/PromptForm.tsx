@@ -590,51 +590,51 @@ export const PromptForm: React.FC<PromptFormProps> = ({
   return (
     <form onSubmit={handleSubmit} className="mt-2 relative">
       <div className="w-full">
-        {/* Mode Switch */}
+        {/* Mode Switch - Compact & Friendly */}
         <div className="mb-3">
-          <div className="flex items-center justify-center bg-gray-50 rounded-2xl p-1 border border-gray-200">
+          <div className="flex items-center justify-center bg-gray-50 rounded-xl p-0.5 border border-gray-200 gap-0.5">
             <button
               type="button"
               onClick={() => setMode('operator')}
-              className={`flex-1 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+              className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                 mode === 'operator'
-                  ? 'bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-lg'
-                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+                  ? 'bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-md scale-[1.02]'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100/80'
               }`}
               disabled={isProcessing || tabStatus === 'detached'}
             >
-              <span className="flex items-center justify-center gap-2">
-                <span>⚡</span>
+              <span className="flex items-center justify-center gap-1">
+                <span className="text-sm">⚡</span>
                 <span>Operator</span>
               </span>
             </button>
             <button
               type="button"
               onClick={() => setMode('ask')}
-              className={`flex-1 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+              className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                 mode === 'ask'
-                  ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-lg'
-                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+                  ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-md scale-[1.02]'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100/80'
               }`}
               disabled={isProcessing || tabStatus === 'detached'}
             >
-              <span className="flex items-center justify-center gap-2">
-                <span>🤔</span>
+              <span className="flex items-center justify-center gap-1">
+                <span className="text-sm">🤔</span>
                 <span>Ask</span>
               </span>
             </button>
             <button
               type="button"
               onClick={() => setMode('dataAnalyze')}
-              className={`flex-1 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+              className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                 mode === 'dataAnalyze'
-                  ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg'
-                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+                  ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-md scale-[1.02]'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100/80'
               }`}
               disabled={isProcessing || tabStatus === 'detached'}
             >
-              <span className="flex items-center justify-center gap-2">
-                <span>📊</span>
+              <span className="flex items-center justify-center gap-1">
+                <span className="text-sm">📊</span>
                 <span>Data Analyze</span>
               </span>
             </button>
