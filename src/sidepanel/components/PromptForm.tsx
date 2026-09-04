@@ -1,16 +1,4 @@
 import { faPaperPlane, faXmark } from '@fortawesome/free-solid-svg-icons';
-import {
-  faUserTie,
-  faSearch,
-  faBalanceScale,
-  faChartLine,
-  faCalculator,
-  faVial,
-  faCode,
-  faHeartbeat,
-  faBook
-} from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useEffect, useState } from 'react';
 import TextareaAutosize from 'react-textarea-autosize';
 import { MultiTabSelector, type TabInfo } from './MultiTabSelector';
@@ -28,6 +16,23 @@ type ModeType = 'operator' | 'ask' | 'dataAnalyze';
 
 // 定义角色类型
 type RoleType = 'operator' | 'researcher' | 'lawyer' | 'trader' | 'math' | 'qa' | 'code' | 'health' | 'wiki' | 'books' | 'munger' |'notebooklm' | 'dataAnalyst' | 'dataScientist' | 'statistician';
+
+type OperatorRoleType = Extract<RoleType, 'operator' | 'notebooklm' | 'researcher' | 'health' | 'wiki'>;
+
+const operatorRoleOptions = [
+  { value: 'operator', label: 'Browser Operator', emoji: '⚡' },
+  { value: 'notebooklm', label: 'NotebookLM', emoji: '📓' },
+  { value: 'researcher', label: 'Research Analyst', emoji: '🔎' },
+  { value: 'health', label: 'Medical Assistant', emoji: '⚕️' },
+  { value: 'wiki', label: 'Wiki Assistant', emoji: '📖' },
+] as const satisfies ReadonlyArray<{
+  value: OperatorRoleType;
+  label: string;
+  emoji: string;
+}>;
+
+const isOperatorRole = (value: string): value is OperatorRoleType =>
+  operatorRoleOptions.some(option => option.value === value);
 
 // 定义NotebookLM选项类型
 type NotebookLMOption = 'summary' | 'study-guide' | 'faq' | 'mindmap';
@@ -187,24 +192,6 @@ const availableBooks: Book[] = [
   },
 ];
 
-const roleIcons: Record<RoleType, any> = {
-  operator: faUserTie,
-  researcher: faSearch,
-  lawyer: faBalanceScale,
-  trader: faChartLine,
-  notebooklm: faBook,
-  math: faCalculator,
-  qa: faVial,
-  code: faCode,
-  health: faHeartbeat,
-  wiki: faBook,
-  books: faBook,
-  munger: faBook,
-  dataAnalyst: faChartLine,
-  dataScientist: faCalculator,
-  statistician: faChartLine,
-};
-
 // NotebookLM选项配置
 const notebookLMOptions = [
   {
@@ -351,6 +338,15 @@ export const PromptForm: React.FC<PromptFormProps> = ({
     const tabIds = role === 'researcher' && selectedTabIds.length > 0 ? selectedTabIds : undefined;
     onSubmit(prompt, finalRole, tabIds);
     setPrompt(''); // Clear the prompt after submission
+  };
+
+  const handleRoleChange = (value: string) => {
+    if (mode === 'operator') {
+      setRole(isOperatorRole(value) ? value : 'operator');
+      return;
+    }
+
+    setRole(value === 'munger' ? 'munger' : 'books');
   };
 
   const handleNotebookLMOptionClick = (option: NotebookLMOption) => {
@@ -645,13 +641,14 @@ export const PromptForm: React.FC<PromptFormProps> = ({
         {mode !== 'dataAnalyze' && (
           <div className="relative">
             <select
+              aria-label="Assistant role"
               className={`w-full bg-gradient-to-r ${
                 mode === 'operator'
                   ? 'from-sky-50 via-blue-50 to-indigo-50 border-sky-200'
                   : 'from-emerald-50 via-green-50 to-teal-50 border-emerald-200'
               } border-2 rounded-2xl px-4 text-sm font-medium text-gray-800 shadow-lg hover:shadow-xl transition-all duration-300 backdrop-blur-sm appearance-none cursor-pointer ${showBookSelection || showNotebookLMOptions ? 'py-2 mb-1' : 'py-2 mb-2'}`}
               value={role}
-              onChange={(e) => setRole(e.target.value as RoleType)}
+              onChange={(e) => handleRoleChange(e.target.value)}
               disabled={isProcessing || tabStatus === 'detached'}
               style={{
                 backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
@@ -662,15 +659,15 @@ export const PromptForm: React.FC<PromptFormProps> = ({
             >
               {mode === 'operator' ? (
                 <>
-                  <option value="operator" className="bg-white text-gray-800 py-2">⚡ Browser Operator</option>
-                  <option value="notebooklm" className="bg-white text-gray-800 py-2">📓 NotebookLM</option>
-                  <option value="researcher" className="bg-white text-gray-800 py-2">🔎 Research Analyst</option>
-                  <option value="lawyer" className="bg-white text-gray-800 py-2">⚖️ Legal Advisor</option>
-                  <option value="math" className="bg-white text-gray-800 py-2">∑ Mathematics Expert</option>
-                  <option value="code" className="bg-white text-gray-800 py-2">⌨️ Code Developer</option>
-                  <option value="qa" className="bg-white text-gray-800 py-2">✓ TestCase Writer</option>
-                  <option value="health" className="bg-white text-gray-800 py-2">⚕️ Medical Consultant</option>
-                  <option value="wiki" className="bg-white text-gray-800 py-2">📖 Wiki Assistant</option>
+                  {operatorRoleOptions.map(option => (
+                    <option
+                      key={option.value}
+                      value={option.value}
+                      className="bg-white text-gray-800 py-2"
+                    >
+                      {option.emoji} {option.label}
+                    </option>
+                  ))}
                 </>
               ) : (
                 <>
