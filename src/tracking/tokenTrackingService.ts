@@ -40,28 +40,29 @@ export class TokenTrackingService {
       const config = await this.configManager.getProviderConfig();
       this.currentProvider = config.provider;
       this.currentModelId = config.apiModelId || '';
-      this.updateCost(); // Recalculate with new provider/model
     } catch (error) {
       console.error('Failed to get provider config:', error);
     }
   }
 
   public trackInputTokens(tokens: number, cacheTokens?: { write?: number, read?: number }, windowId?: number): void {
-    this.inputTokens += tokens;
+    const cacheWriteTokens = cacheTokens?.write || 0;
+    const cacheReadTokens = cacheTokens?.read || 0;
+    const pricing = this.getCurrentPricing();
 
-    // Add cache tokens to the total if provided
-    if (cacheTokens) {
-      if (cacheTokens.write) this.inputTokens += cacheTokens.write;
-      if (cacheTokens.read) this.inputTokens += cacheTokens.read;
-    }
-
-    this.updateCost();
+    this.inputTokens += tokens + cacheWriteTokens + cacheReadTokens;
+    this.cost += (
+      tokens * pricing.inputPrice +
+      cacheWriteTokens * pricing.cacheWritesPrice +
+      cacheReadTokens * pricing.cacheReadsPrice
+    ) / 1_000_000;
     this.notifySubscribers(windowId);
   }
 
   public trackOutputTokens(tokens: number, windowId?: number): void {
+    const pricing = this.getCurrentPricing();
     this.outputTokens += tokens;
-    this.updateCost();
+    this.cost += (tokens * pricing.outputPrice) / 1_000_000;
     this.notifySubscribers(windowId);
   }
 
@@ -91,57 +92,57 @@ export class TokenTrackingService {
   public updateProviderAndModel(provider: string, modelId: string, windowId?: number): void {
     this.currentProvider = provider;
     this.currentModelId = modelId;
-    this.updateCost();
     this.notifySubscribers(windowId);
   }
 
-  private updateCost(): void {
-    let inputPrice = 0;
-    let outputPrice = 0;
+  private getCurrentPricing(): {
+    inputPrice: number;
+    outputPrice: number;
+    cacheWritesPrice: number;
+    cacheReadsPrice: number;
+  } {
+    let model: {
+      inputPrice: number;
+      outputPrice: number;
+      cacheWritesPrice?: number;
+      cacheReadsPrice?: number;
+    } | undefined;
 
-    // Get pricing based on current provider and model
     switch (this.currentProvider) {
       case 'anthropic':
         if (this.currentModelId && this.currentModelId in anthropicModels) {
-          const model = anthropicModels[this.currentModelId as keyof typeof anthropicModels];
-          inputPrice = model.inputPrice;
-          outputPrice = model.outputPrice;
+          model = anthropicModels[this.currentModelId as keyof typeof anthropicModels];
         }
         break;
       case 'openai':
         if (this.currentModelId && this.currentModelId in openaiModels) {
-          const model = openaiModels[this.currentModelId as keyof typeof openaiModels];
-          inputPrice = model.inputPrice;
-          outputPrice = model.outputPrice;
+          model = openaiModels[this.currentModelId as keyof typeof openaiModels];
         }
         break;
       case 'deepseek':
         if (this.currentModelId && this.currentModelId in deepseekModels) {
-          const model = deepseekModels[this.currentModelId as keyof typeof deepseekModels];
-          inputPrice = model.inputPrice;
-          outputPrice = model.outputPrice;
+          model = deepseekModels[this.currentModelId as keyof typeof deepseekModels];
         }
         break;
       case 'gemini':
         if (this.currentModelId && this.currentModelId in geminiModels) {
-          const model = geminiModels[this.currentModelId as keyof typeof geminiModels];
-          inputPrice = model.inputPrice;
-          outputPrice = model.outputPrice;
+          model = geminiModels[this.currentModelId as keyof typeof geminiModels];
         }
         break;
       case 'ollama':
         if (this.currentModelId && this.currentModelId in ollamaModels) {
-          const model = ollamaModels[this.currentModelId as keyof typeof ollamaModels];
-          inputPrice = model.inputPrice;
-          outputPrice = model.outputPrice;
+          model = ollamaModels[this.currentModelId as keyof typeof ollamaModels];
         }
         break;
     }
 
-    // Calculate cost based on price per million tokens
-    const inputCost = (inputPrice / 1_000_000) * this.inputTokens;
-    const outputCost = (outputPrice / 1_000_000) * this.outputTokens;
-    this.cost = inputCost + outputCost;
+    const inputPrice = model?.inputPrice || 0;
+    return {
+      inputPrice,
+      outputPrice: model?.outputPrice || 0,
+      cacheWritesPrice: model?.cacheWritesPrice ?? inputPrice,
+      cacheReadsPrice: model?.cacheReadsPrice ?? inputPrice,
+    };
   }
 
   private notifySubscribers(windowId?: number): void {

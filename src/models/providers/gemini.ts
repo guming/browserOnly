@@ -381,12 +381,19 @@ export class GeminiProvider implements LLMProvider {
 
       // Yield final usage information
       if (lastUsageMetadata) {
+        // Gemini's prompt count includes cached content. Split it out so the
+        // tracker does not charge cached tokens once as regular input and a
+        // second time as cache usage.
+        const cacheReadTokens = lastUsageMetadata.cachedContentTokenCount || 0;
+        const inputTokens = Math.max(
+          (lastUsageMetadata.promptTokenCount || 0) - cacheReadTokens,
+          0
+        );
         yield {
           type: "usage",
-          inputTokens: lastUsageMetadata.promptTokenCount || 0,
+          inputTokens,
           outputTokens: lastUsageMetadata.candidatesTokenCount || 0,
-          cacheWriteTokens: lastUsageMetadata.cachedContentTokenCount || 0,
-          cacheReadTokens: useCache ? (lastUsageMetadata.promptTokenCount || 0) : 0,
+          cacheReadTokens,
         };
       } else {
         // Fallback to estimated token usage if no metadata available
