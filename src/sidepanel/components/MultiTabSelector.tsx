@@ -127,17 +127,17 @@ export const MultiTabSelector: React.FC<MultiTabSelectorProps> = ({
   if (!isVisible) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/30 p-4">
       <div
         ref={modalRef}
-        className="bg-white rounded-2xl shadow-2xl border border-white/50 w-full max-w-2xl max-h-[80vh] overflow-hidden"
+        className="max-h-[80vh] w-full max-w-2xl overflow-hidden rounded-xl border border-stone-200 bg-white shadow-[0_18px_45px_rgba(37,37,34,0.16)]"
       >
         {/* Header */}
-        <div className="bg-gradient-to-r from-sky-50 to-blue-50 border-b border-sky-100 p-4">
+        <div className="border-b border-stone-200 bg-[#eeeee9] p-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                <span className="text-2xl">🔍</span>
+                <span className="text-sm font-medium text-stone-500">Search tabs</span>
                 Select Tabs for Research Analysis
               </h2>
               <p className="text-sm text-gray-600 mt-1">
@@ -187,14 +187,14 @@ export const MultiTabSelector: React.FC<MultiTabSelectorProps> = ({
         <div className="flex-1 overflow-y-auto p-4 space-y-2 max-h-96">
           {availableTabs.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
-              <div className="text-4xl mb-2">📭</div>
+              <div className="mb-2 text-sm font-medium text-stone-500">No tabs found</div>
               <div>No tabs available for analysis</div>
             </div>
           ) : (
             availableTabs.map(tab => (
               <div
                 key={tab.id}
-                className={`flex items-center p-3 rounded-xl border cursor-pointer transition-all duration-200 hover:shadow-md ${
+                className={`flex cursor-pointer items-center rounded-md border p-3 transition-colors duration-150 ${
                   tab.selected
                     ? 'bg-sky-50 border-sky-200 shadow-sm'
                     : 'bg-white border-gray-200 hover:bg-gray-50'
@@ -248,14 +248,13 @@ export const MultiTabSelector: React.FC<MultiTabSelectorProps> = ({
               <button
                 onClick={handleAnalyzeTabs}
                 disabled={selectedTabs.size === 0}
-                className={`px-6 py-2 rounded-xl font-medium transition-all duration-200 ${
+                className={`rounded-md px-6 py-2 font-medium transition-colors duration-150 ${
                   selectedTabs.size === 0
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white shadow-lg hover:shadow-xl transform hover:scale-105'
+                    : 'bg-[#315a78] text-white hover:bg-[#274a64]'
                 }`}
               >
                 <span className="flex items-center gap-2">
-                  <span>🔍</span>
                   Analyze Selected Tabs
                 </span>
               </button>

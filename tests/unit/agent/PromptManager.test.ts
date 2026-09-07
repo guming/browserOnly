@@ -117,6 +117,19 @@ describe('PromptManager', () => {
   });
 
   describe('getSystemPrompt', () => {
+    it.each([
+      ['munger', 'Mental Model Toolbox'],
+      ['marks', 'Second-Level Thinking'],
+      ['kovach', 'Discipline of Verification'],
+      ['kotler', 'Segmentation'],
+      ['tukey', 'Exploratory Data Analysis'],
+    ])('returns a focused prompt for the %s expert', (role, framework) => {
+      const systemPrompt = promptManager.getSystemPrompt(role);
+
+      expect(systemPrompt).toContain(framework);
+      expect(systemPrompt).not.toContain('You have access to these tools:');
+    });
+
     it('should generate system prompt with tool descriptions', () => {
       const systemPrompt = promptManager.getSystemPrompt('operator');
 

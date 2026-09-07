@@ -6,6 +6,7 @@ import {
   MEMORY_FORMAT,
 } from "./prompts";
 import { BrowserTool } from "./tools/types";
+import { EXPERT_ROLE_IDS } from "./prompts/expertPrompts";
 
 /**
  * PromptManager handles system prompt generation and prompt templates.
@@ -64,8 +65,8 @@ If a request matches any Special Command, skip planning and tool selection. Imme
 
   console.log("basePrompt is ", basePrompt, mode, subRole);
 
-  // If mode is 'munger' or 'books', return only the basePrompt
-  if (mode === 'munger' || mode === 'books') {
+  // Advisory modes use their focused prompt without browser automation instructions.
+  if (mode === 'books' || EXPERT_ROLE_IDS.includes(mode as typeof EXPERT_ROLE_IDS[number])) {
     return basePrompt;
   }
 

@@ -14,15 +14,15 @@ export const OutputHeader: React.FC<OutputHeaderProps> = ({
   isProcessing
 }) => {
   return (
-<div className="flex justify-between items-center p-4">
-  <div className="text-xl font-bold text-gray-800">
+<div className="flex items-center justify-between border-b border-slate-200 bg-[#f2f5f7] px-4 py-2">
+  <div className="text-xl font-semibold text-stone-900">
     Output
   </div>
   <div className="flex items-center gap-3">
     <div className="tooltip tooltip-bottom" data-tip="Reflect and learn from this session">
       <button 
         onClick={onReflectAndLearn}
-        className="btn btn-sm bg-gradient-to-r from-sky-500 to-blue-600 border-0 text-white hover:from-sky-600 hover:to-blue-700 shadow-lg rounded-xl transform hover:scale-105 transition-all duration-200"
+        className="btn btn-sm border border-stone-300 bg-white text-stone-700 transition-colors duration-150 hover:border-stone-500 hover:bg-stone-50"
         disabled={isProcessing}
       >
         <FontAwesomeIcon icon={faBrain} className="w-4 h-4" />
@@ -31,7 +31,7 @@ export const OutputHeader: React.FC<OutputHeaderProps> = ({
     <div className="tooltip tooltip-bottom" data-tip="Clear conversation history and LLM context">
       <button 
         onClick={onClearHistory}
-        className="btn btn-sm bg-white/70 backdrop-blur-sm border border-gray-200 text-gray-700 hover:bg-white/90 hover:border-gray-300 shadow-md rounded-xl transform hover:scale-105 transition-all duration-200"
+        className="btn btn-sm border border-stone-300 bg-white text-stone-700 transition-colors duration-150 hover:border-stone-500 hover:bg-stone-50"
         disabled={isProcessing}
       >
         <FontAwesomeIcon icon={faTrash} className="w-4 h-4" />

@@ -2,22 +2,6 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { PromptForm } from '../../../src/sidepanel/components/PromptForm';
 
-jest.mock('../../../src/tracking/duckdbService', () => ({
-  DuckDBLoadStatus: {
-    NotInitialized: 'not_initialized',
-    Downloading: 'downloading',
-    Ready: 'ready',
-    Error: 'error',
-  },
-  DuckDBService: {
-    getInstance: () => ({
-      getLoadStatus: jest.fn(() => 'not_initialized'),
-      setProgressCallback: jest.fn(),
-      init: jest.fn().mockResolvedValue(undefined),
-    }),
-  },
-}));
-
 jest.mock('../../../src/sidepanel/components/MultiTabSelector', () => ({
   MultiTabSelector: ({ isVisible, onTabsSelected }: {
     isVisible: boolean;
@@ -76,11 +60,11 @@ describe('PromptForm operator roles', () => {
       'wiki',
     ]);
     expect(options.map(option => option.textContent)).toEqual([
-      '⚡ Browser Operator',
-      '📓 NotebookLM',
-      '🔎 Research Analyst',
-      '⚕️ Medical Assistant',
-      '📖 Wiki Assistant',
+      'Browser Operator',
+      'NotebookLM',
+      'Research Analyst',
+      'Medical Assistant',
+      'Wiki Assistant',
     ]);
     expect(screen.queryByText(/Legal Advisor|Mathematics Expert|Code Developer|TestCase Writer/)).not.toBeInTheDocument();
   });
@@ -147,7 +131,7 @@ describe('PromptForm operator roles', () => {
     );
   });
 
-  it('resets the role when switching between modes', async () => {
+  it('resets the operator role after returning from Ask mode', async () => {
     renderPromptForm();
 
     selectRole('health');
@@ -155,14 +139,136 @@ describe('PromptForm operator roles', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Ask/ }));
     await waitFor(() => {
-      expect(screen.getByRole('combobox', { name: 'Assistant role' })).toHaveValue('books');
+      expect(screen.queryByRole('combobox', { name: 'Assistant role' })).not.toBeInTheDocument();
     });
-    expect(screen.getByRole('option', { name: /Ask The Books/ })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: /Talk to Charlie Munger/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Ask The Books' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Operator/ }));
     await waitFor(() => {
       expect(screen.getByRole('combobox', { name: 'Assistant role' })).toHaveValue('operator');
     });
+  });
+});
+
+describe('PromptForm Ask The Books mode', () => {
+  const openAskMode = () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
+  };
+
+  it('shows only Operator and Ask modes', () => {
+    renderPromptForm();
+
+    const modeNavigation = screen.getByRole('navigation', { name: 'Mode' });
+    expect(within(modeNavigation).getAllByRole('button').map(button => button.textContent)).toEqual([
+      'Operator',
+      'Ask',
+    ]);
+    expect(screen.queryByRole('button', { name: /Data Analyze/ })).not.toBeInTheDocument();
+  });
+
+  it('renders the selected book guide as static numbered content', () => {
+    renderPromptForm();
+    openAskMode();
+
+    expect(screen.getByText('Ready to begin? Share:')).toBeInTheDocument();
+    expect(screen.getByText(/Your current situation or specific challenges/)).toBeInTheDocument();
+    expect(screen.getByText(/Your most important goal/)).toBeInTheDocument();
+    expect(screen.queryByText('Suggested starting points')).not.toBeInTheDocument();
+    expect(screen.queryByText('What is the central idea?')).not.toBeInTheDocument();
+  });
+
+  it('updates the guide after selecting another book', async () => {
+    renderPromptForm();
+    openAskMode();
+
+    fireEvent.click(screen.getByRole('button', { name: /Build the Life You Want.*Change book/ }));
+    const search = screen.getByRole('searchbox', { name: 'Search by title or author' });
+    fireEvent.change(search, { target: { value: 'Deep Work' } });
+    fireEvent.click(screen.getByRole('button', { name: /Deep Work.*Cal Newport/ }));
+
+    expect(await screen.findByText('Ready to master focus? Share:')).toBeInTheDocument();
+    expect(screen.getByText('What type of work or study requires your deepest focus?')).toBeInTheDocument();
+  });
+
+  it('submits with the selected book role', async () => {
+    const { onSubmit } = renderPromptForm();
+    openAskMode();
+
+    await waitFor(() => expect(screen.queryByRole('combobox', { name: 'Assistant role' })).not.toBeInTheDocument());
+    submitPrompt('I want to improve my work habits');
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      'I want to improve my work habits',
+      'books-happinessBook',
+      undefined,
+    );
+  });
+
+  it('disables Ask interactions while processing', () => {
+    render(
+      <PromptForm
+        onSubmit={jest.fn()}
+        onCancel={jest.fn()}
+        isProcessing
+        tabStatus="attached"
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Ask' })).toBeDisabled();
+  });
+
+  it('offers Experts in Ask mode and defaults to Munger', () => {
+    renderPromptForm();
+    openAskMode();
+
+    expect(screen.getByRole('button', { name: 'Books' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Experts' }));
+
+    expect(screen.getByRole('heading', { name: 'Experts' })).toBeInTheDocument();
+    expect(screen.getByText('Charlie Munger')).toBeInTheDocument();
+    expect(screen.getByText('To get a useful answer, share:')).toBeInTheDocument();
+    expect(screen.getByText(/The decision, problem, or belief/)).toBeInTheDocument();
+    expect(screen.getByText(/constraints, alternatives, and outcome/)).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Assistant role' })).not.toBeInTheDocument();
+  });
+
+  it('submits Munger prompts with the munger role', () => {
+    const { onSubmit } = renderPromptForm();
+    openAskMode();
+    fireEvent.click(screen.getByRole('button', { name: 'Experts' }));
+
+    submitPrompt('Should I change direction?');
+
+    expect(onSubmit).toHaveBeenCalledWith('Should I change direction?', 'munger', undefined);
+  });
+
+  it.each([
+    ['Howard Marks', 'marks', 'The financial decision or market situation'],
+    ['Bill Kovach', 'kovach', 'The news report or claim'],
+    ['Philip Kotler', 'kotler', 'The product or service'],
+    ['John Tukey', 'tukey', 'The question the data'],
+  ])('selects %s and submits the corresponding role', (name, expectedRole, guideText) => {
+    const { onSubmit } = renderPromptForm();
+    openAskMode();
+    fireEvent.click(screen.getByRole('button', { name: 'Experts' }));
+    fireEvent.click(screen.getByRole('button', { name: /Charlie Munger.*Change expert/ }));
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(name) }));
+
+    expect(screen.getByText(name)).toBeInTheDocument();
+    expect(screen.getByText(new RegExp(guideText))).toBeInTheDocument();
+    submitPrompt('Please examine this situation');
+
+    expect(onSubmit).toHaveBeenCalledWith('Please examine this situation', expectedRole, undefined);
+  });
+
+  it('keeps draft text when changing experts', () => {
+    renderPromptForm();
+    openAskMode();
+    fireEvent.click(screen.getByRole('button', { name: 'Experts' }));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Keep this draft' } });
+    fireEvent.click(screen.getByRole('button', { name: /Charlie Munger.*Change expert/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Philip Kotler/ }));
+
+    expect(screen.getByRole('textbox')).toHaveValue('Keep this draft');
   });
 });

@@ -302,7 +302,7 @@ export function SidePanel() {
       addSystemMessage(`Switched to tab: ${title} (${url})`);
     },
     onPageDialog: (tabId, dialogInfo) => {
-      addSystemMessage(`📢 Dialog: ${dialogInfo.type} - ${dialogInfo.message}`);
+      addSystemMessage(`Dialog: ${dialogInfo.type} - ${dialogInfo.message}`);
     },
     onPageError: (tabId, error) => {
       addSystemMessage(`❌ Page Error: ${error}`);
@@ -380,7 +380,7 @@ export function SidePanel() {
       tabId
     });
 
-    addSystemMessage("🧠 Reflecting on this session to learn useful patterns...");
+    addSystemMessage("Reflecting on this session to learn useful patterns...");
   };
 
   // Function to navigate to the options page
@@ -393,58 +393,20 @@ export function SidePanel() {
     setIsOutputExpanded(!isOutputExpanded);
   };
 
-  // Get dynamic gradient based on status - now with bright colors
-  const getStatusGradient = () => {
-    switch (tabStatus) {
-      case 'running':
-        return 'from-sky-300 via-blue-300 to-indigo-300';
-      case 'error':
-        return 'from-rose-300 via-pink-300 to-red-300';
-      case 'idle':
-        return 'from-emerald-300 via-teal-300 to-cyan-300';
-      default:
-        return 'from-sky-200 via-blue-200 to-indigo-200';
-    }
-  };
-
-  // Get status accent color
-  const getStatusAccent = () => {
-    switch (tabStatus) {
-      case 'running':
-        return 'from-blue-500 to-indigo-500';
-      case 'error':
-        return 'from-rose-500 to-red-500';
-      case 'idle':
-        return 'from-emerald-500 to-teal-500';
-      default:
-        return 'from-sky-500 to-blue-500';
-    }
-  };
-
   return (
-    <div className="flex flex-col h-screen relative overflow-hidden bg-gradient-to-br from-sky-50 to-blue-100">
-  {/* 简化后的静态背景 - 减少GPU负载 */}
-  <div className={`absolute inset-0 bg-gradient-to-br ${getStatusGradient()} opacity-60 z-0`}>
-    <div className="absolute inset-0 bg-gradient-to-t from-white/30 to-transparent"></div>
-    {/* 简化浮动形状，移除所有动画效果 */}
-    <div className="absolute top-10 left-10 w-20 h-20 bg-white/15 rounded-full"></div>
-    <div className="absolute bottom-20 right-10 w-16 h-16 bg-sky-200/20 rounded-full"></div>
-  </div>
+    <div className="flex h-screen flex-col overflow-hidden bg-[#fafbfc] text-slate-900">
 
   {/* Main Container */}
-  <div className="relative z-10 flex flex-col h-full p-3">
+  <div className="relative z-10 flex h-full flex-col p-3">
     
     {/* Header - 移除不必要的动画 */}
     {!isOutputExpanded && (
       <header className="mb-3">
-        <div className="flex items-center justify-between mb-3">
+        <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br ${getStatusAccent()} shadow-lg flex items-center justify-center transition-transform duration-300 hover:scale-105`}>
-              <span className="text-xl">🤖</span>
-            </div>
             <div>
-              <h1 className="text-2xl font-black text-gray-800 tracking-tight">BrowserOnly</h1>
-              <div className="text-xs text-sky-600 font-semibold">Your AI Browser Assistant</div>
+              <h1 className="text-xl font-semibold tracking-tight text-stone-900">BrowserOnly</h1>
+              <div className="text-xs text-stone-500">Browser assistant</div>
             </div>
           </div>
           <div className="relative z-50">
@@ -460,12 +422,12 @@ export function SidePanel() {
     {hasConfiguredProviders ? (
       <>
         {/* Main Content Area - 优化动画性能 */}
-        <div className={`flex-grow flex flex-col gap-3 ${isOutputExpanded ? 'fixed inset-4 z-50 bg-sky-50/95 backdrop-blur-sm rounded-3xl p-4 overflow-hidden' : 'overflow-hidden min-h-0 z-20'}`}>
+        <div className={`flex-grow flex flex-col gap-3 ${isOutputExpanded ? 'fixed inset-4 z-50 overflow-hidden rounded-xl border border-slate-200 bg-[#fafbfc] p-4' : 'min-h-0 overflow-hidden z-20'}`}>
           
           {/* Chat Display Area - 减少backdrop-blur使用 */}
-          <div className={`${isOutputExpanded ? 'flex-1' : 'flex-1 min-h-0'} bg-white/90 rounded-3xl shadow-lg border border-white/50 overflow-hidden will-change-transform relative z-30`}>
-            <div className="bg-gradient-to-r from-sky-50 to-blue-50 border-b border-sky-100 flex items-center justify-between px-4 py-2">
-              <div className="text-xl font-bold text-gray-800">
+          <div className={`${isOutputExpanded ? 'flex-1' : 'flex-1 min-h-0'} relative z-30 overflow-hidden rounded-xl border border-stone-200 bg-white`}>
+            <div className="flex items-center justify-between border-b border-slate-200 bg-[#f2f5f7] px-4 py-2">
+              <div className="text-xl font-semibold text-stone-900">
                 Output
               </div>
               
@@ -474,7 +436,7 @@ export function SidePanel() {
                 <div className="tooltip tooltip-bottom" data-tip="Reflect and learn from this session">
                   <button 
                     onClick={handleReflectAndLearn}
-                    className="btn btn-sm bg-gradient-to-r from-sky-500 to-blue-600 border-0 text-white hover:from-sky-600 hover:to-blue-700 hover:scale-105 shadow-lg rounded-xl transition-all duration-200"
+                    className="btn btn-sm border border-slate-300 bg-white text-slate-700 transition-colors duration-150 hover:border-slate-500 hover:bg-slate-50"
                     disabled={isProcessing}
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -486,7 +448,7 @@ export function SidePanel() {
                 <div className="tooltip tooltip-bottom" data-tip="Clear conversation history and LLM context">
                   <button 
                     onClick={handleClearHistory}
-                    className="btn btn-sm bg-white/80 border border-gray-200 text-gray-700 hover:bg-white hover:border-gray-300 hover:scale-105 shadow-md rounded-xl transition-all duration-200"
+                    className="btn btn-sm border border-slate-300 bg-white text-slate-700 transition-colors duration-150 hover:border-slate-500 hover:bg-slate-50"
                     disabled={isProcessing}
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -499,7 +461,7 @@ export function SidePanel() {
                 
                 <button
                   onClick={toggleOutputExpansion}
-                  className={`btn btn-sm btn-circle ${isOutputExpanded ? 'bg-red-500 hover:bg-red-600 text-white border-0' : 'bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white border-0'} shadow-lg hover:scale-110 transition-all duration-200 z-50 pointer-events-auto`}
+                  className="btn btn-sm btn-circle border border-slate-300 bg-white text-slate-700 transition-colors duration-150 hover:border-slate-500 hover:bg-slate-50 z-50 pointer-events-auto"
                   title={isOutputExpanded ? 'Minimize window' : 'Expand window'}
                 >
                   {isOutputExpanded ? (
@@ -518,7 +480,7 @@ export function SidePanel() {
             {/* 优化滚动容器 - 固定高度防止信息显示不全 */}
             <div
               ref={outputRef}
-              className={`p-6 overflow-y-auto bg-gradient-to-b from-white/50 to-sky-50/30 ${isOutputExpanded ? '' : ''}`}
+              className="overflow-y-auto bg-white p-6"
               style={isOutputExpanded
                 ? { height: 'calc(100vh - 200px)', maxHeight: 'calc(100vh - 200px)' }
                 : { height: '400px', minHeight: '400px', maxHeight: '400px' }
@@ -534,7 +496,7 @@ export function SidePanel() {
 
           {/* Approval Requests - 移除backdrop-blur */}
           {!isOutputExpanded && approvalRequests.map(req => (
-            <div key={req.requestId} className="bg-amber-100/90 rounded-2xl shadow-lg border border-amber-200/50 p-4">
+            <div key={req.requestId} className="rounded-xl border border-[#d8c7a7] bg-[#fbf5e8] p-4">
               <ApprovalRequest
                 requestId={req.requestId}
                 toolName={req.toolName}
@@ -549,7 +511,7 @@ export function SidePanel() {
 
         {/* Bottom Input Section - 减少backdrop-blur */}
         <div className={`mt-3 space-y-3 flex-shrink-0 ${isOutputExpanded ? 'hidden' : ''}`}>
-          <div className="bg-white/90 rounded-3xl shadow-lg border border-white/50 p-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
             <PromptForm
               onSubmit={handleSubmit}
               onCancel={handleCancel}
@@ -558,7 +520,7 @@ export function SidePanel() {
             />
           </div>
 
-          <div className="bg-white/90 rounded-2xl shadow-lg border border-white/50 p-3">
+          <div className="rounded-xl border border-slate-200 bg-white p-3">
             <div className="flex items-center justify-between gap-4">
               <div className="flex-1">
                 <ProviderSelector isProcessing={isProcessing} />
@@ -575,39 +537,25 @@ export function SidePanel() {
       /* No Provider State - 优化动画 */
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center max-w-sm">
-          <div className="w-32 h-32 mx-auto mb-8 rounded-3xl bg-white/90 shadow-2xl border border-white/50 flex items-center justify-center transition-transform duration-300 hover:scale-105">
-            <span className="text-6xl">⚙️</span>
-          </div>
-          
-          <h2 className="text-3xl font-bold text-gray-800 mb-4">Let's Get Started!</h2>
-          <p className="text-gray-600 mb-8 leading-relaxed text-lg">
+          <div className="mx-auto mb-6 h-16 w-16 rounded-xl border border-slate-300 bg-white"></div>
+          <h2 className="mb-4 text-2xl font-semibold text-stone-900">Let&apos;s get started</h2>
+          <p className="mb-8 text-base leading-relaxed text-stone-600">
             Configure your AI provider to unlock powerful browser automation and assistance features.
           </p>
           
           <button
             onClick={navigateToOptions}
-            className="btn btn-lg bg-gradient-to-r from-sky-500 to-blue-600 border-0 text-white hover:from-sky-600 hover:to-blue-700 shadow-2xl rounded-2xl transition-transform duration-300 hover:scale-105"
+            className="btn btn-lg rounded-lg border-0 bg-[#315a78] text-white transition-colors duration-150 hover:bg-[#274a64]"
           >
-            <span className="mr-3 text-xl">🚀</span>
             Configure Providers
           </button>
           
           {/* 简化加载动画 */}
-          <div className="mt-6 flex justify-center space-x-4">
-            <div className="w-2 h-2 bg-sky-400 rounded-full opacity-75"></div>
-            <div className="w-2 h-2 bg-blue-400 rounded-full opacity-60"></div>
-            <div className="w-2 h-2 bg-indigo-400 rounded-full opacity-45"></div>
-          </div>
         </div>
       </div>
     )}
 
     {/* 简化浮动元素 - 移除大部分动画 */}
-    <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-40">
-      <div className="absolute top-16 left-16 w-2 h-2 bg-sky-400/60 rounded-full"></div>
-      <div className="absolute bottom-32 left-24 w-3 h-3 bg-indigo-300/40 rounded-full"></div>
-      <div className="absolute bottom-16 right-16 w-2 h-2 bg-sky-300/60 rounded-full"></div>
-    </div>
   </div>
 
 

@@ -326,7 +326,7 @@ export const LlmContent: React.FC<LlmContentProps> = ({
           {/* Header with controls */}
           <div className="flex justify-between items-center mb-3 pb-2 border-b border-base-300">
             <div className="text-sm font-medium text-base-content/80">
-              🤖 LLM Response
+              LLM Response
             </div>
             <div className="flex gap-2">
               <button
@@ -334,7 +334,7 @@ export const LlmContent: React.FC<LlmContentProps> = ({
                 className="btn btn-xs btn-outline"
                 title="Copy to clipboard"
               >
-                📋 Copy
+                Copy
               </button>
               
               {/* Notion Sync Button */}
@@ -358,7 +358,7 @@ export const LlmContent: React.FC<LlmContentProps> = ({
                 ) : syncStatus === 'error' ? (
                   <>✗ Failed</>
                 ) : (
-                  <>📝 Notion</>
+                  <>Notion</>
                 )}
               </button>
 
@@ -378,7 +378,7 @@ export const LlmContent: React.FC<LlmContentProps> = ({
                   {isLoadingDatabases ? (
                     <span className="loading loading-spinner loading-xs"></span>
                   ) : (
-                    '⚙️'
+                    'Settings'
                   )}
                 </button>
               )}
@@ -421,7 +421,7 @@ export const LlmContent: React.FC<LlmContentProps> = ({
                         selectedDatabaseId === db.id ? 'bg-primary/10 border border-primary' : ''
                       }`}
                     >
-                      📄 {db.title}
+                      {db.title}
                       {selectedDatabaseId === db.id && <span className="text-primary ml-2">✓</span>}
                     </button>
                   ))}

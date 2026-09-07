@@ -1,7 +1,7 @@
 {
   "name": "browserOnly",
   "description": "Control your browser with natural language",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "type": "module",
   "keywords": [
     "browser-automation",
@@ -76,8 +76,8 @@
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
     "@vitejs/plugin-react": "^4.4.0",
-    "@vitest/coverage-v8": "^4.0.6",
-    "@vitest/ui": "^4.0.6",
+    "@vitest/coverage-v8": "^3.2.4",
+    "@vitest/ui": "^3.2.4",
     "daisyui": "^5.0.27",
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-react": "^7.37.5",

@@ -30,6 +30,7 @@ import wikiPrompt from './wikiPrompt.ts';
 import mungerPrompt from './mungerPrompt.ts';
 import dataAnalystPrompt from './dataAnalystPrompt.ts';
 import studyGuidePrompt from './notebooklmPrompt.ts'
+import { kovachPrompt, kotlerPrompt, marksPrompt, tukeyPrompt } from './expertPrompts.ts';
 
 // Export a function that takes the dynamic prompts as parameters
 export const createModePrompts = (
@@ -52,6 +53,10 @@ export const createModePrompts = (
     health: healthPrompt,
     wiki: wikiPrompt,
     munger: mungerPrompt,
+    marks: marksPrompt,
+    kovach: kovachPrompt,
+    kotler: kotlerPrompt,
+    tukey: tukeyPrompt,
     dataAnalyst: dataAnalystPrompt,
     books: booksPromptData.happinessBook.prompt, // Default book prompt
     ...bookPrompts, // Spread all book-specific prompts

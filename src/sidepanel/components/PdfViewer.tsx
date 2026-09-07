@@ -48,18 +48,17 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
   };
 
   return (
-    <div className={`bg-white/90 rounded-3xl shadow-lg border border-white/50 overflow-hidden will-change-transform relative ${
+    <div className={`relative overflow-hidden rounded-xl border border-stone-200 bg-white ${
       isExpanded ? 'fixed inset-4 z-50' : 'h-full'
     }`}>
       {/* Header - Match SidePanel output header style */}
-      <div className="bg-gradient-to-r from-sky-50 to-blue-50 border-b border-sky-100 flex items-center justify-between px-4 py-2">
+      <div className="flex items-center justify-between border-b border-slate-200 bg-[#f2f5f7] px-4 py-2">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 shadow-lg flex items-center justify-center transition-transform duration-300 hover:scale-105">
-            <span className="text-xl">📄</span>
+          <div className="h-8 w-8 rounded-md border border-stone-300 bg-white">
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-xl font-bold text-gray-800 truncate">{pdfTitle}</div>
-            <div className="text-xs text-sky-600 font-semibold truncate">PDF Document</div>
+            <div className="truncate text-xl font-semibold text-stone-900">{pdfTitle}</div>
+            <div className="truncate text-xs font-medium text-stone-500">PDF Document</div>
           </div>
         </div>
 
@@ -68,7 +67,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
           <div className="tooltip tooltip-bottom" data-tip="Copy PDF URL">
             <button
               onClick={copyPdfUrl}
-              className="btn btn-sm bg-white/80 border border-gray-200 text-gray-700 hover:bg-white hover:border-gray-300 hover:scale-105 shadow-md rounded-xl transition-all duration-200"
+              className="btn btn-sm border border-stone-300 bg-white text-stone-700 transition-colors duration-150 hover:border-stone-500 hover:bg-stone-50"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -79,7 +78,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
           <div className="tooltip tooltip-bottom" data-tip="Open in new tab">
             <button
               onClick={openInNewTab}
-              className="btn btn-sm bg-white/80 border border-gray-200 text-gray-700 hover:bg-white hover:border-gray-300 hover:scale-105 shadow-md rounded-xl transition-all duration-200"
+              className="btn btn-sm border border-stone-300 bg-white text-stone-700 transition-colors duration-150 hover:border-stone-500 hover:bg-stone-50"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -90,7 +89,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
           <div className="tooltip tooltip-bottom" data-tip="Download PDF">
             <button
               onClick={downloadPdf}
-              className="btn btn-sm bg-white/80 border border-gray-200 text-gray-700 hover:bg-white hover:border-gray-300 hover:scale-105 shadow-md rounded-xl transition-all duration-200"
+              className="btn btn-sm border border-stone-300 bg-white text-stone-700 transition-colors duration-150 hover:border-stone-500 hover:bg-stone-50"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -103,7 +102,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
           {onClose && (
             <button
               onClick={onClose}
-              className={`btn btn-sm btn-circle ${isExpanded ? 'bg-red-500 hover:bg-red-600 text-white border-0' : 'bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white border-0'} shadow-lg hover:scale-110 transition-all duration-200 z-50 pointer-events-auto`}
+              className="btn btn-sm btn-circle z-50 border border-stone-300 bg-white text-stone-700 transition-colors duration-150 hover:border-stone-500 hover:bg-stone-50 pointer-events-auto"
               title={isExpanded ? 'Close expanded view' : 'Close PDF viewer'}
             >
               {isExpanded ? (
@@ -121,50 +120,43 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
       </div>
 
       {/* PDF Content - Match SidePanel content area style */}
-      <div className="p-6 overflow-auto flex-1 bg-gradient-to-b from-white/50 to-sky-50/30 relative" style={isExpanded ? { height: 'calc(100vh - 200px)', maxHeight: 'calc(100vh - 200px)' } : { maxHeight: 'calc(100% - 60px)' }}>
+      <div className="relative flex-1 overflow-auto bg-[#fafbfc] p-6" style={isExpanded ? { height: 'calc(100vh - 200px)', maxHeight: 'calc(100vh - 200px)' } : { maxHeight: 'calc(100% - 60px)' }}>
         {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-white/50 to-sky-50/30 z-10">
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#f5f4f0]">
             <div className="text-center">
               <div className="w-32 h-32 mx-auto mb-8 rounded-3xl bg-white/90 shadow-2xl border border-white/50 flex items-center justify-center transition-transform duration-300 hover:scale-105">
-                <span className="text-6xl">📄</span>
               </div>
-              <h2 className="text-3xl font-bold text-gray-800 mb-4">Loading PDF...</h2>
-              <p className="text-gray-600 mb-8 leading-relaxed text-lg">
+              <h2 className="mb-4 text-2xl font-semibold text-stone-900">Loading PDF...</h2>
+              <p className="mb-8 text-base leading-relaxed text-stone-600">
                 Please wait while the document loads
               </p>
               {/* Match SidePanel loading animation */}
               <div className="mt-6 flex justify-center space-x-4">
-                <div className="w-2 h-2 bg-sky-400 rounded-full opacity-75 animate-bounce"></div>
-                <div className="w-2 h-2 bg-blue-400 rounded-full opacity-60 animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-2 h-2 bg-indigo-400 rounded-full opacity-45 animate-bounce" style={{ animationDelay: '0.2s' }}></div>
               </div>
             </div>
           </div>
         )}
 
         {hasError && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-white/50 to-sky-50/30 z-10">
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#f5f4f0]">
             <div className="text-center max-w-sm">
               <div className="w-32 h-32 mx-auto mb-8 rounded-3xl bg-white/90 shadow-2xl border border-white/50 flex items-center justify-center transition-transform duration-300 hover:scale-105">
-                <span className="text-6xl">⚠️</span>
               </div>
-              <h2 className="text-3xl font-bold text-gray-800 mb-4">Cannot Load PDF</h2>
-              <p className="text-gray-600 mb-8 leading-relaxed text-lg">
+              <h2 className="mb-4 text-2xl font-semibold text-stone-900">Cannot Load PDF</h2>
+              <p className="mb-8 text-base leading-relaxed text-stone-600">
                 The PDF could not be displayed. This might be due to browser security restrictions.
               </p>
               <div className="space-y-3">
                 <button
                   onClick={openInNewTab}
-                  className="btn btn-lg bg-gradient-to-r from-sky-500 to-blue-600 border-0 text-white hover:from-sky-600 hover:to-blue-700 shadow-2xl rounded-2xl transition-transform duration-300 hover:scale-105 w-full"
+                  className="btn btn-lg w-full rounded-lg border-0 bg-[#315a78] text-white transition-colors duration-150 hover:bg-[#274a64]"
                 >
-                  <span className="mr-3 text-xl">🔗</span>
                   Open PDF in New Tab
                 </button>
                 <button
                   onClick={downloadPdf}
-                  className="btn btn-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-xl rounded-2xl transition-transform duration-300 hover:scale-105 w-full"
+                  className="btn btn-lg w-full rounded-lg border border-stone-300 bg-white text-stone-700 transition-colors duration-150 hover:border-stone-500 hover:bg-stone-50"
                 >
-                  <span className="mr-3 text-xl">📥</span>
                   Download PDF
                 </button>
               </div>
@@ -172,7 +164,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
           </div>
         )}
 
-        <div className="bg-white/90 rounded-2xl shadow-lg border border-white/50 overflow-hidden h-full">
+        <div className="h-full overflow-hidden rounded-lg border border-stone-200 bg-white">
           <iframe
             src={`chrome-extension://${chrome.runtime.id}/pdf-proxy-viewer.html?file=${encodeURIComponent(pdfMetadata.originalUrl)}`}
             className="w-full h-full border-0"

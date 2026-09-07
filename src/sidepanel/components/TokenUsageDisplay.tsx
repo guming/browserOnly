@@ -97,7 +97,7 @@ export function TokenUsageDisplay() {
   // };
 
   return (
-    <div className="card bg-base-100 shadow-sm p-3 mt-2 text-xs">
+    <div className="mt-2 rounded-md border border-stone-200 bg-[#eeeee9] p-3 text-xs text-stone-700">
       <div className="flex justify-between items-center">
         <span className="font-medium">Token Usage:</span>
         <span><FontAwesomeIcon icon={faArrowUp} /> {formatTokenCount(usage.inputTokens)} <FontAwesomeIcon icon={faArrowDown} /> {formatTokenCount(usage.outputTokens)}</span>

@@ -124,7 +124,10 @@ function monitorPdfLinks() {
     });
   });
 
-  observer.observe(document.body, { childList: true, subtree: true });
+  const observationTarget = document.body ?? document.documentElement;
+  if (observationTarget) {
+    observer.observe(observationTarget, { childList: true, subtree: true });
+  }
 }
 
 /**
@@ -209,8 +212,5 @@ if (document.readyState === 'loading') {
 } else {
   initializePdfInterceptor();
 }
-
-// Also initialize immediately in case we missed DOMContentLoaded
-initializePdfInterceptor();
 
 export {};

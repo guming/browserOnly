@@ -1,5 +1,3 @@
-import { faSync } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useState, useEffect } from 'react';
 
 interface TabStatusBarProps {
@@ -94,7 +92,7 @@ export const TabStatusBar: React.FC<TabStatusBarProps> = ({
   };
   
   return (
-    <div className="text-sm bg-white/80 backdrop-blur-sm rounded-xl px-3 py-2 border border-white/50 shadow-md flex items-center justify-between max-w-[240px] transition-all duration-200 hover:shadow-lg">
+    <div className="flex max-w-[240px] items-center justify-between rounded-md border border-stone-200 bg-white px-3 py-2 text-sm">
       <div className="flex items-center flex-grow overflow-hidden">
       <div className={`w-2.5 h-2.5 rounded-full mr-3 flex-shrink-0 shadow-sm ${
         tabStatus === 'attached' ? 'bg-emerald-500 shadow-emerald-200 animate-pulse' : 
@@ -120,7 +118,7 @@ export const TabStatusBar: React.FC<TabStatusBarProps> = ({
     
       <div className="flex items-center ml-3">
       <button 
-        className="px-2 py-1 bg-gradient-to-r from-sky-100 to-blue-100 hover:from-sky-200 hover:to-blue-200 text-sky-700 hover:text-sky-800 rounded-lg text-xs border border-sky-200 hover:border-sky-300 shadow-sm hover:shadow transition-all duration-200 transform hover:scale-105"
+          className="rounded-md border border-stone-300 bg-white px-2 py-1 text-xs text-stone-700 transition-colors duration-150 hover:border-stone-500 hover:text-stone-900"
         onClick={handleRefresh}
         disabled={isRefreshing}
         title="Attach to current tab"
