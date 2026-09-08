@@ -77,6 +77,15 @@ export interface ReflectAndLearnMessage {
   windowId?: number;
 }
 
+export interface RunWorkflowMessage {
+  action: 'runWorkflow';
+  workflowId: string;
+  versionId: string;
+  variables?: Record<string, unknown>;
+  tabId?: number;
+  windowId?: number;
+}
+
 // UI Message types
 export interface UpdateOutputMessage {
   action: 'updateOutput';
@@ -256,6 +265,7 @@ export type BackgroundMessage =
   | GetTokenUsageMessage
   | ApprovalResponseMessage
   | ReflectAndLearnMessage
+  | RunWorkflowMessage
   | TokenUsageUpdatedMessage
   | UpdateOutputMessage
   | ProviderConfigChangedMessage

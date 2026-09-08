@@ -9,8 +9,10 @@ import { ConfigManager } from './configManager';
 import { triggerReflection } from './reflectionController';
 import { attachToTab, getTabState, getWindowForTab, forceResetPlaywright } from './tabManager';
 import { BackgroundMessage, DownloadMarkdownMessage } from './types';
-import { logWithTimestamp, handleError } from './utils';
+import { logWithTimestamp, handleError, sendUIMessage } from './utils';
 import { SimpleChatAgent } from '../agent/SimpleChatAgent';
+import { WorkflowStore } from '../workflows/WorkflowStore';
+import { WorkflowService } from '../workflows/WorkflowService';
 /**
  * Handle messages from the UI
  * @param message The message to handle
@@ -36,6 +38,10 @@ export function handleMessage(
       case 'executePrompt':
         handleExecutePrompt(message, sendResponse);
         return true; // Keep the message channel open for async response
+
+      case 'runWorkflow':
+        handleRunWorkflow(message, sendResponse).catch(error => sendResponse({ success: false, error: String(error) }));
+        return true;
 
       case 'cancelExecution':
         handleCancelExecution(message, sendResponse);
@@ -190,6 +196,7 @@ function isBackgroundMessage(message: any): message is BackgroundMessage {
     'action' in message &&
     (
       message.action === 'executePrompt' ||
+      message.action === 'runWorkflow' ||
       message.action === 'cancelExecution' ||
       message.action === 'clearHistory' ||
       message.action === 'initializeTab' ||
@@ -218,6 +225,66 @@ function isBackgroundMessage(message: any): message is BackgroundMessage {
       message.action === 'pdfAiChat'
     )
   );
+}
+
+async function handleRunWorkflow(
+  message: Extract<BackgroundMessage, { action: 'runWorkflow' }>,
+  sendResponse: (response?: any) => void
+): Promise<void> {
+  let tabId = message.tabId;
+  try {
+    tabId ??= (await chrome.tabs.query({ active: true, lastFocusedWindow: true }))[0]?.id;
+    if (!tabId) throw new Error('No active tab');
+    const workflow = await WorkflowStore.getInstance().getWorkflow(message.workflowId);
+    if (!workflow) throw new Error('Workflow not found');
+    const version = await WorkflowStore.getInstance().getVersion(message.versionId || workflow.activeVersionId);
+    if (!version) throw new Error('Workflow version not found');
+    if (workflow.status === 'archived') throw new Error('Archived workflows cannot be run');
+    const windowId = getWindowForTab(tabId);
+    let tabState = getTabState(tabId);
+    if (!tabState?.page) {
+      await attachToTab(tabId, windowId);
+      tabState = getTabState(tabId);
+    }
+    if (!tabState?.page) throw new Error('Workflow could not connect to this tab. Refresh the tab and try again.');
+
+    sendUIMessage('updateOutput', { type: 'system', content: `▶ Running automation: ${workflow.name}` }, tabId, windowId);
+    // This message is initiated by the user pressing Run. Trigger domains are
+    // for unattended/automatic runs and must not block an explicit manual run
+    // against the current tab.
+    let lastStepResult = '';
+    const run = await new WorkflowService().run(workflow.id, version, tabState.page, {
+      variables: message.variables,
+      context: { tabId, windowId },
+      callbacks: {
+        onStepEnd: (_step, result) => {
+          // Read-only workflow steps (for example, page summaries) return
+          // useful output that must be surfaced in the conversation UI.
+          if (result.trim()) lastStepResult = result;
+        },
+      },
+    });
+    if (lastStepResult) {
+      sendUIMessage('updateOutput', { type: 'llm', content: lastStepResult }, tabId, windowId);
+    }
+    sendUIMessage('updateOutput', { type: 'system', content: `Automation ${run.status}: ${workflow.name}${run.failureMessage ? `\n${run.failureMessage}` : ''}` }, tabId, windowId);
+    sendUIMessage('processingComplete', null, tabId, windowId);
+    sendResponse({ success: run.status === 'succeeded', run });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('[runWorkflow] failed', {
+      workflowId: message.workflowId,
+      versionId: message.versionId,
+      tabId,
+      message: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    if (tabId) {
+      sendUIMessage('updateOutput', { type: 'system', content: `Automation failed: ${errorMessage}` }, tabId);
+      sendUIMessage('processingComplete', null, tabId);
+    }
+    sendResponse({ success: false, error: errorMessage });
+  }
 }
 
 /**
@@ -343,46 +410,61 @@ function handleInitializeTab(
  * @param message The message to handle
  * @param sendResponse The function to send a response
  */
-function handleSwitchToTab(
+async function handleSwitchToTab(
   message: Extract<BackgroundMessage, { action: 'switchToTab' }>,
   sendResponse: (response?: any) => void
-): void {
+): Promise<void> {
   if (message.tabId) {
     // Get the window ID for this tab if available
     const windowId = getWindowForTab(message.tabId);
     
     // Focus the window first if we have a window ID
-    if (windowId) {
-      chrome.windows.update(windowId, { focused: true });
+    try {
+      if (windowId) await chrome.windows.update(windowId, { focused: true });
+      await activateTabSafely(message.tabId);
+      logWithTimestamp(`Switched to tab ${message.tabId} in window ${windowId || 'unknown'}`);
+    } catch (error) {
+      logWithTimestamp(`Could not switch to tab ${message.tabId}: ${error instanceof Error ? error.message : String(error)}`, 'warn');
+      sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) });
+      return;
     }
-    
-    // Then focus the tab
-    chrome.tabs.update(message.tabId, { active: true });
-    
-    logWithTimestamp(`Switched to tab ${message.tabId} in window ${windowId || 'unknown'}`);
   }
   sendResponse({ success: true });
 }
 
-function handleRefreshTab(
+async function handleRefreshTab(
   message: Extract<BackgroundMessage, { action: 'refreshTab' }>,
   sendResponse: (response?: any) => void
-): void {
+): Promise<void> {
   if (message.tabId) {
     // Get the window ID for this tab if available
     const windowId = getWindowForTab(message.tabId);
     
     // Focus the window first if we have a window ID
-    if (windowId) {
-      chrome.windows.update(windowId, { focused: true });
+    try {
+      if (windowId) await chrome.windows.update(windowId, { focused: true });
+      await activateTabSafely(message.tabId);
+      logWithTimestamp(`Refreshed focus on tab ${message.tabId} in window ${windowId || 'unknown'}`);
+    } catch (error) {
+      logWithTimestamp(`Could not refresh tab ${message.tabId}: ${error instanceof Error ? error.message : String(error)}`, 'warn');
+      sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) });
+      return;
     }
-    
-    // Then focus the tab
-    chrome.tabs.update(message.tabId, { active: true });
-    
-    logWithTimestamp(`Switched to tab ${message.tabId} in window ${windowId || 'unknown'}`);
   }
   sendResponse({ success: true });
+}
+
+async function activateTabSafely(tabId: number): Promise<void> {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await chrome.tabs.update(tabId, { active: true });
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/cannot be edited right now|dragging a tab/i.test(message) || attempt === 2) throw error;
+      await new Promise(resolve => setTimeout(resolve, 150 * (attempt + 1)));
+    }
+  }
 }
 
 /**

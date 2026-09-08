@@ -6,14 +6,31 @@ import { ApprovalRequest } from './components/ApprovalRequest';
 import { MessageDisplay } from './components/MessageDisplay';
 import { MultiTabStatusBar } from './components/MultiTabStatusBar';
 import { PromptForm } from './components/PromptForm';
-import { ProviderSelector } from './components/ProviderSelector';
-import { TokenUsageDisplay } from './components/TokenUsageDisplay';
 import { useChromeMessaging } from './hooks/useChromeMessaging';
 import { useMessageManagement } from './hooks/useMessageManagement';
 import { useTabManagement } from './hooks/useTabManagement';
 import { useTabSelection } from './hooks/useTabSelection'; 
+import { ModelStatusBar } from './components/ModelStatusBar';
+import { WorkspaceSwitcher, type WorkspaceView } from './components/WorkspaceSwitcher';
+import { WorkflowListView } from './components/WorkflowListView';
+import { RunListView } from './components/RunListView';
+import { WorkflowStore } from '../workflows';
 
 export function SidePanel() {
+  const [activeView, setActiveView] = useState<WorkspaceView>('tasks');
+  const [workflowCount, setWorkflowCount] = useState(0);
+  const [failedRunCount, setFailedRunCount] = useState(0);
+  useEffect(() => {
+    const refreshCounts = async () => {
+      const store = WorkflowStore.getInstance();
+      const [workflows, runs] = await Promise.all([store.listWorkflows().catch(() => []), store.listRuns().catch(() => [])]);
+      setWorkflowCount(workflows.filter(workflow => workflow.status !== 'archived').length);
+      setFailedRunCount(runs.filter(run => run.status === 'failed').length);
+    };
+    refreshCounts();
+    const timer = window.setInterval(refreshCounts, 3000);
+    return () => window.clearInterval(timer);
+  }, []);
   // State for tab status
   const [tabStatus, setTabStatus] = useState<'attached' | 'detached' | 'unknown' | 'running' | 'idle' | 'error'>('unknown');
 
@@ -425,10 +442,10 @@ export function SidePanel() {
         <div className={`flex-grow flex flex-col gap-3 ${isOutputExpanded ? 'fixed inset-4 z-50 overflow-hidden rounded-xl border border-slate-200 bg-[#fafbfc] p-4' : 'min-h-0 overflow-hidden z-20'}`}>
           
           {/* Chat Display Area - 减少backdrop-blur使用 */}
-          <div className={`${isOutputExpanded ? 'flex-1' : 'flex-1 min-h-0'} relative z-30 overflow-hidden rounded-xl border border-stone-200 bg-white`}>
+          <div className={`${isOutputExpanded ? 'flex-1' : 'flex-1 min-h-0'} relative z-30 flex min-h-0 flex-col overflow-visible rounded-xl border border-stone-200 bg-white`}>
             <div className="flex items-center justify-between border-b border-slate-200 bg-[#f2f5f7] px-4 py-2">
-              <div className="text-xl font-semibold text-stone-900">
-                Output
+              <div className="flex items-center gap-2 text-sm font-semibold text-stone-900">
+                <WorkspaceSwitcher value={activeView} onChange={setActiveView} workflowCount={workflowCount} failedRunCount={failedRunCount} />
               </div>
               
               <div className="flex items-center gap-2">
@@ -480,17 +497,12 @@ export function SidePanel() {
             {/* 优化滚动容器 - 固定高度防止信息显示不全 */}
             <div
               ref={outputRef}
-              className="overflow-y-auto bg-white p-6"
-              style={isOutputExpanded
-                ? { height: 'calc(100vh - 200px)', maxHeight: 'calc(100vh - 200px)' }
-                : { height: '400px', minHeight: '400px', maxHeight: '400px' }
-              }
+              className="min-h-0 flex-1 overflow-y-auto bg-white p-4 sm:p-6"
+              style={isOutputExpanded ? { height: 'calc(100vh - 200px)' } : undefined}
             >
-              <MessageDisplay
-                messages={messages}
-                streamingSegments={streamingSegments}
-                isStreaming={isStreaming}
-              />
+              {activeView === 'tasks' ? (
+                <MessageDisplay messages={messages} streamingSegments={streamingSegments} isStreaming={isStreaming} />
+              ) : activeView === 'workflows' ? <WorkflowListView onRunStarted={() => { setActiveView('tasks'); setIsProcessing(true); setTabStatus('running'); addSystemMessage('▶ Automation started. Running the saved steps…'); }} /> : <RunListView />}
             </div>
           </div>
 
@@ -512,25 +524,15 @@ export function SidePanel() {
         {/* Bottom Input Section - 减少backdrop-blur */}
         <div className={`mt-3 space-y-3 flex-shrink-0 ${isOutputExpanded ? 'hidden' : ''}`}>
           <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <PromptForm
+            {activeView === 'tasks' && <PromptForm
               onSubmit={handleSubmit}
               onCancel={handleCancel}
               isProcessing={isProcessing}
               tabStatus={tabStatus}
-            />
+            />}
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-3">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex-1">
-                <ProviderSelector isProcessing={isProcessing} />
-              </div>
-              <div className="w-px h-8 bg-gray-300"></div>
-              <div className="flex-shrink-0">
-                <TokenUsageDisplay />
-              </div>
-            </div>
-          </div>
+          {activeView === 'tasks' && <ModelStatusBar isProcessing={isProcessing} />}
         </div>
       </>
     ) : (

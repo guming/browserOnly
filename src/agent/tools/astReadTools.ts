@@ -5,6 +5,7 @@ import { ASTContentExtractor } from "../../tracking/astContentExtractor";
 import { SemanticAnalyzer } from "../../tracking/semanticAnalyzer";
 import { ASTCacheService } from "../../tracking/astCacheService";
 import { withActivePage } from "./utils";
+import type { PageAST } from "../../tracking/domAST";
 
 type ToolFactory = (page: Page) => DynamicTool;
 
@@ -25,7 +26,29 @@ async function parsePageWithCache(page: Page) {
   }
 
   // Cache miss - parse page
-  const ast = await DOMParser.parsePage(page);
+  let ast: PageAST;
+  try {
+    ast = await DOMParser.parsePage(page);
+  } catch (error) {
+    // Some extension/isolated-world contexts do not expose every DOM global
+    // to the evaluated parser. Fall back to a minimal AST so workflows can
+    // still read the page instead of failing with "window is not defined".
+    const [title, content] = await Promise.all([
+      page.title().catch(() => ''),
+      page.locator('body').innerText().catch(() => ''),
+    ]);
+    ast = {
+      url,
+      title,
+      mainContent: [{
+        type: 'paragraph', tag: 'body', text: content, children: [],
+        metadata: { xpath: '//body', importance: 1, wordCount: content.split(/\s+/).filter(Boolean).length, depth: 0, isMainContent: true },
+      }],
+      supplementary: [],
+      navigation: [],
+      metadata: { totalWords: content.split(/\s+/).filter(Boolean).length, estimatedReadingTime: 1, contentDensity: 1, structureScore: 0, mainContentArea: { selector: 'body', confidence: 0.2 } },
+    } as PageAST;
+  }
 
   // Store in cache (3 minute TTL by default)
   await astCache.set(url, ast);

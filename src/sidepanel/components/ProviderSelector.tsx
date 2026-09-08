@@ -12,9 +12,10 @@ interface ProviderOption {
 
 interface ProviderSelectorProps {
   isProcessing: boolean;
+  compact?: boolean;
 }
 
-export function ProviderSelector({ isProcessing }: ProviderSelectorProps) {
+export function ProviderSelector({ isProcessing, compact = false }: ProviderSelectorProps) {
   const [options, setOptions] = useState<ProviderOption[]>([]);
   const [currentProvider, setCurrentProvider] = useState<string>('');
   const [currentModel, setCurrentModel] = useState<string>('');
@@ -125,6 +126,24 @@ export function ProviderSelector({ isProcessing }: ProviderSelectorProps) {
   
   if (isLoading || options.length === 0) {
     return null;
+  }
+
+  if (compact) {
+    return (
+      <select
+        aria-label="Model"
+        className="h-7 max-w-[150px] min-w-0 rounded-md border border-stone-300 bg-white px-2 text-xs font-medium text-stone-700 outline-none hover:border-stone-500 focus:border-[#315a78] focus:ring-2 focus:ring-[#315a78]/10"
+        value={`${currentProvider}|${currentModel}`}
+        onChange={handleChange}
+        disabled={isProcessing}
+      >
+        {options.map(option => option.models.map(model => (
+          <option key={`${option.provider}|${model.id}`} value={`${option.provider}|${model.id}`}>
+            {model.name}
+          </option>
+        )))}
+      </select>
+    );
   }
   
   // Function to open options page in a new tab

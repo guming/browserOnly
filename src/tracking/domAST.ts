@@ -402,7 +402,10 @@ export class DOMParser {
       const suppElements = detectSupplementary(mainContent);
 
       return {
-        url: window.location.href,
+        // `page.evaluate` normally provides `window`, but Chromium extension
+        // isolated worlds and test runners can expose only `globalThis`.
+        // Keep the AST parser usable in both contexts.
+        url: globalThis.location?.href ?? '',
         title: document.title,
         mainContent: parseSection(mainContent, true),
         supplementary: suppElements.flatMap(el => parseSection(el, false)),

@@ -6,6 +6,7 @@ import { PromptManager } from "./PromptManager";
 import { trimHistory } from "./TokenManager";
 import { ToolManager } from "./ToolManager";
 import { requestApproval } from "./approvalManager";
+import type { ToolTraceEvent } from "../workflows/types";
 
 // Constants
 const MAX_STEPS = 50;            // prevent infinite loops
@@ -22,6 +23,7 @@ export interface ExecutionCallbacks {
   onError?: (error: any) => void;
   onToolStart?: (toolName: string, toolInput: string) => void;
   onToolEnd?: (result: string) => void;
+  onToolEvent?: (event: ToolTraceEvent) => void;
   onSegmentComplete?: (segment: string) => void;
   onFallbackStarted?: () => void;
 }
@@ -48,6 +50,7 @@ class CallbackAdapter {
       onError: this.originalCallbacks.onError,
       onToolStart: this.originalCallbacks.onToolStart,
       onToolEnd: this.originalCallbacks.onToolEnd,
+      onToolEvent: this.originalCallbacks.onToolEvent,
       onSegmentComplete: this.originalCallbacks.onSegmentComplete,
       onFallbackStarted: this.originalCallbacks.onFallbackStarted
     };
@@ -219,7 +222,7 @@ export class ExecutionEngine {
   private async processLlmStream(
     messages: any[],
     adaptedCallbacks: ExecutionCallbacks,
-    role:string
+    role:string = 'operator'
   ): Promise<{ accumulatedText: string, toolCallDetected: boolean }> {
     let accumulatedText = "";
     let streamBuffer = "";
@@ -531,6 +534,12 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
           adaptedCallbacks.onToolOutput(`🕹️ tool: ${toolName} | args: ${toolInput}`);
 
           let result: string;
+          const traceEvent: ToolTraceEvent = {
+            executionId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            toolName,
+            input: this.parseToolInput(toolInput),
+            startedAt: Date.now()
+          };
 
           if (requiresApproval) {
             // Notify the user that approval is required
@@ -571,6 +580,10 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
             result = await tool.func(toolInput);
             console.log("tool func result: " ,result)
           }
+
+          traceEvent.endedAt = Date.now();
+          traceEvent.result = this.normalizeToolResult(result);
+          adaptedCallbacks.onToolEvent?.(traceEvent);
 
           // Signal that tool execution is complete
           if (adaptedCallbacks.onToolEnd) {
@@ -692,6 +705,22 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
           adaptedCallbacks.onComplete();
         }
       }
+    }
+  }
+
+  private parseToolInput(input: string): unknown {
+    try { return JSON.parse(input); } catch { return input; }
+  }
+
+  private normalizeToolResult(result: string): ToolTraceEvent['result'] {
+    const safeResult = typeof result === 'string' ? result : String(result ?? '');
+    try {
+      const parsed = JSON.parse(safeResult);
+      if (parsed && typeof parsed === 'object' && 'ok' in parsed) return parsed;
+      return { ok: true, data: parsed };
+    } catch {
+      const failed = /^error\b|^Error\b|^Action cancelled/i.test(safeResult.trim());
+      return { ok: !failed, data: failed ? undefined : safeResult, error: failed ? { code: 'UNKNOWN', message: safeResult, repairable: false } : undefined };
     }
   }
 }

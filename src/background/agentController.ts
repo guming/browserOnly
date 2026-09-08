@@ -2,6 +2,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createBrowserAgent, executePromptWithFallback, needsReinitialization } from "../agent/AgentCore";
 import { ExecutionCallbacks } from "../agent/ExecutionEngine";
+import { compileTrace, TraceRecorder, WorkflowStore } from "../workflows";
 import { setCurrentPage } from "../agent/PageContextManager"
 import { contextTokenCount } from "../agent/TokenManager";
 import { ScreenshotManager } from "../tracking/screenshotManager";
@@ -584,11 +585,14 @@ export async function executePrompt(prompt: string, tabId?: number, isReflection
       logWithTimestamp(`Error updating PageContextManager in executePrompt: ${error instanceof Error ? error.message : String(error)}`, 'warn');
     }
 
+    let currentDomain = 'current-site';
+
     // Add current page context to history if we have a page
     if (updatedTabState.page) {
       try {
         const currentUrl = await updatedTabState.page.url();
         const currentTitle = await updatedTabState.page.title();
+        try { currentDomain = new URL(currentUrl).hostname; } catch { /* keep fallback */ }
         
         // Add a more explicit system message about the current page
         const pageContextMessage = `Current page: ${currentUrl} (${currentTitle}) - Consider this context when executing commands. If asked to summarize, read content, create tables, or analyze options without specific references, assume the request refers to content on this page.`;
@@ -834,6 +838,8 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
     }
     
     // Create callbacks for the agent
+    const traceRecorder = new TraceRecorder();
+    traceRecorder.start();
     const callbacks: ExecutionCallbacks = {
       onLlmChunk: (chunk) => {
         if (useStreaming) {
@@ -1001,6 +1007,9 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
           startNewSegment(getCurrentSegmentId(), targetTabId, windowId);
         }
       },
+      onToolEvent: (event) => {
+        traceRecorder.record({ ...event, tabId: targetTabId, windowId: updatedTabState.windowId });
+      },
       onComplete: () => {
         // Get the window ID for this tab
         const windowId = getWindowForTab(targetTabId);
@@ -1028,6 +1037,16 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
         // Set agent status to IDLE
         if (windowId) {
           setAgentStatus(windowId, AgentStatus.IDLE);
+        }
+
+        const trace = traceRecorder.finish();
+        if (trace.length > 0 && !isReflectionPrompt && !isMultiTabAnalysis) {
+          const domain = currentDomain;
+          const candidate = compileTrace(trace, domain, prompt.slice(0, 60) || 'Recorded workflow');
+          void WorkflowStore.getInstance().saveVersion(candidate.version)
+            .then(() => WorkflowStore.getInstance().saveWorkflow(candidate.workflow))
+            .then(() => sendUIMessage('updateOutput', { type: 'system', content: `Workflow draft created: ${candidate.workflow.name}` }, targetTabId))
+            .catch(error => logWithTimestamp(`Could not save workflow draft: ${String(error)}`, 'warn'));
         }
         
         sendUIMessage('processingComplete', null, targetTabId, windowId);
