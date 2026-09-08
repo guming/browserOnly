@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import type { AskContextMode } from '../components/PromptForm';
 import { ChromeMessage } from '../types';
 
 interface UseChromeMessagingProps {
@@ -60,7 +61,8 @@ export const useChromeMessaging = ({
       // If the message has a tabId, check if it matches this tab's ID
       // If the message has a windowId, check if it matches this window's ID
       // If the message doesn't have a tabId or windowId, process it (for backward compatibility)
-      if ((message.tabId && message.tabId !== tabId) ||
+      const workflowMessage = Boolean(message.runId);
+      if ((!workflowMessage && message.tabId && message.tabId !== tabId) ||
           (message.windowId && windowId && message.windowId !== windowId)) {
         return false; // Skip messages for other tabs or windows
       }
@@ -226,7 +228,7 @@ export const useChromeMessaging = ({
     onAgentStatusUpdate
   ]);
 
-  const executePrompt = (prompt: string, role: string, selectedTabIds?: number[]) => {
+  const executePrompt = (prompt: string, role: string, selectedTabIds?: number[], contextMode?: AskContextMode) => {
     return new Promise<void>((resolve, reject) => {
       try {
         // Send message to background script with tab ID and optional multitab IDs
@@ -234,6 +236,7 @@ export const useChromeMessaging = ({
           action: 'executePrompt',
           prompt,
           role,
+          contextMode,
           tabId,
           windowId
         };

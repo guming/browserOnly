@@ -45,12 +45,13 @@ export class WorkflowStore {
 
   async listWorkflows(): Promise<Workflow[]> {
     const db = await this.open();
-    return this.readAll<Workflow>(db, 'workflows');
+    return (await this.readAll<Workflow>(db, 'workflows')).map(normalizeWorkflow);
   }
 
   async getWorkflow(id: string): Promise<Workflow | undefined> {
     const db = await this.open();
-    return this.read<Workflow>(db, 'workflows', id);
+    const workflow = await this.read<Workflow>(db, 'workflows', id);
+    return workflow ? normalizeWorkflow(workflow) : undefined;
   }
 
   async saveWorkflow(workflow: Workflow): Promise<void> {
@@ -137,4 +138,9 @@ export class WorkflowStore {
       request.onerror = () => reject(request.error);
     });
   }
+}
+
+/** Apply compatibility defaults without rewriting legacy IndexedDB records. */
+function normalizeWorkflow(workflow: Workflow): Workflow {
+  return workflow.executionMode ? workflow : { ...workflow, executionMode: 'current_tab' };
 }

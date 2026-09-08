@@ -1,5 +1,6 @@
 export type WorkflowStatus = 'draft' | 'active' | 'archived';
 export type WorkflowRunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled' | 'repairing';
+export type WorkflowExecutionMode = 'new_tab' | 'current_tab';
 
 export type WorkflowVariableType = 'string' | 'number' | 'date' | 'boolean' | 'secret';
 
@@ -59,6 +60,8 @@ export interface Workflow {
   triggerDomains: string[];
   variables: WorkflowVariable[];
   activeVersionId: string;
+  startUrl?: string;
+  executionMode?: WorkflowExecutionMode;
   createdAt: number;
   updatedAt: number;
 }
@@ -85,6 +88,9 @@ export interface WorkflowRun {
   inputTokens: number;
   outputTokens: number;
   cost: number;
+  ownerTabId?: number;
+  executionTabId?: number;
+  executionWindowId?: number;
   failureStepId?: string;
   failureMessage?: string;
 }

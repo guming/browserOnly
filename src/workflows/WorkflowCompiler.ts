@@ -31,6 +31,7 @@ export function compileTrace(trace: ToolTraceEvent[], domain: string, name = 'Re
   const workflow: Workflow = {
     id: version.workflowId, name, description: `Recorded on ${domain}`,
     schemaVersion: 1, status: 'draft', triggerDomains: [domain], variables: [],
+    executionMode: 'new_tab',
     activeVersionId: version.id, createdAt: now(), updatedAt: now()
   };
   return { workflow, version };
@@ -40,6 +41,6 @@ export function createBlankWorkflow(name = 'New workflow', domain = 'current-sit
   const versionId = id('version');
   const workflowId = id('workflow');
   const version: WorkflowVersion = { id: versionId, workflowId, version: 1, source: 'manual_edit', steps: [], finalAssertions: [], createdAt: now() };
-  const workflow: Workflow = { id: workflowId, name, description: '', schemaVersion: 1, status: 'draft', triggerDomains: [domain], variables: [], activeVersionId: versionId, createdAt: now(), updatedAt: now() };
+  const workflow: Workflow = { id: workflowId, name, description: '', schemaVersion: 1, status: 'draft', triggerDomains: [domain], variables: [], executionMode: 'new_tab', activeVersionId: versionId, createdAt: now(), updatedAt: now() };
   return { workflow, version };
 }

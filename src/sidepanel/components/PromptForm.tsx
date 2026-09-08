@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import TextareaAutosize from 'react-textarea-autosize';
-import { AskBooksPanel } from './AskBooksPanel';
-import { availableBooks } from './askBooksData';
-import { ExpertPanel } from './ExpertPanel';
-import { getExpert, type ExpertId } from './expertData';
+import { BookPicker } from './BookPicker';
+import { ExpertPicker } from './ExpertPicker';
 import { MultiTabSelector, type TabInfo } from './MultiTabSelector';
+import { availableBooks } from './askBooksData';
+import { getExpert, type ExpertId } from './expertData';
 
 interface PromptFormProps {
-  onSubmit: (prompt: string, role: string, selectedTabIds?: number[]) => void;
+  onSubmit: (prompt: string, role: string, selectedTabIds?: number[], contextMode?: AskContextMode) => void;
   onCancel: () => void;
   isProcessing: boolean;
   tabStatus: 'attached' | 'detached' | 'unknown' | 'running' | 'idle' | 'error';
@@ -15,6 +15,7 @@ interface PromptFormProps {
 
 type ModeType = 'operator' | 'ask';
 type AskTarget = 'books' | 'experts';
+export type AskContextMode = 'current-tab' | 'standalone';
 type OperatorRoleType = 'operator' | 'notebooklm' | 'researcher' | 'health' | 'wiki';
 type RoleType = OperatorRoleType | 'books' | ExpertId;
 type NotebookLMOption = 'summary' | 'study-guide' | 'faq' | 'mindmap';
@@ -44,6 +45,11 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
   const [askTarget, setAskTarget] = useState<AskTarget>('books');
   const [selectedBookId, setSelectedBookId] = useState(availableBooks[0].id);
   const [selectedExpertId, setSelectedExpertId] = useState<ExpertId>('munger');
+  const [isBookPickerOpen, setBookPickerOpen] = useState(false);
+  const [isExpertPickerOpen, setExpertPickerOpen] = useState(false);
+  const [isAskGuideOpen, setAskGuideOpen] = useState(false);
+  const [isAskExpanded, setAskExpanded] = useState(false);
+  const [askContextMode, setAskContextMode] = useState<AskContextMode>('current-tab');
   const [selectedNotebookLMOption, setSelectedNotebookLMOption] = useState<NotebookLMOption>('summary');
   const [showMultiTabSelector, setShowMultiTabSelector] = useState(false);
   const [selectedTabIds, setSelectedTabIds] = useState<number[]>([]);
@@ -79,7 +85,11 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
           ? `notebooklm-${selectedNotebookLMOption}`
           : role;
     const tabIds = role === 'researcher' && selectedTabIds.length > 0 ? selectedTabIds : undefined;
-    onSubmit(prompt, finalRole, tabIds);
+    if (mode === 'ask') {
+      onSubmit(prompt, finalRole, tabIds, askTarget === 'books' ? 'standalone' : askContextMode);
+    } else {
+      onSubmit(prompt, finalRole, tabIds);
+    }
     setPrompt('');
   };
 
@@ -94,15 +104,15 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
   };
 
   return (
-    <form className="relative mt-2" onSubmit={handleSubmit}>
-      <nav aria-label="Mode" className="mb-5 grid grid-cols-2 border-b border-stone-200">
+    <form className="relative" onSubmit={handleSubmit}>
+      <nav aria-label="Mode" className="mb-3 flex gap-1 border-b border-stone-200 pb-2">
         {(['operator', 'ask'] as const).map(item => (
           <button
             aria-current={mode === item ? 'page' : undefined}
-            className={`relative min-h-10 px-3 pb-2 pt-1 text-xs font-medium transition-colors duration-150 active:scale-[0.98] motion-reduce:transform-none ${
+            className={`min-h-8 rounded-md px-3 text-xs font-semibold transition-[background-color,color,transform] duration-150 active:scale-[0.98] motion-reduce:transform-none ${
               mode === item
-                ? 'text-slate-900 after:absolute after:inset-x-[24%] after:-bottom-px after:h-0.5 after:bg-[#315a78]'
-                : 'text-stone-500 hover:text-stone-900'
+                ? 'bg-[#eaf2f7] text-[#315a78]'
+                : 'text-stone-500 hover:bg-stone-100 hover:text-stone-900'
             }`}
             disabled={isDisabled}
             key={item}
@@ -116,13 +126,15 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
 
       {mode === 'ask' ? (
         <>
-          <nav aria-label="Ask type" className="mb-5 flex gap-5 border-b border-stone-200">
+          <div className="mb-2 flex min-w-0 items-center gap-1.5">
+            <span aria-hidden="true" className="text-sm text-[#315a78]">✦</span>
+            <nav aria-label="Ask type" className="flex shrink-0 rounded-md bg-stone-100 p-0.5">
             {(['books', 'experts'] as const).map(item => (
               <button
                 aria-current={askTarget === item ? 'page' : undefined}
-                className={`relative min-h-9 pb-2 text-xs font-medium transition-colors duration-150 active:scale-[0.98] motion-reduce:transform-none ${
+                className={`min-h-7 rounded px-2 text-[11px] font-semibold transition-colors duration-150 active:scale-[0.98] motion-reduce:transform-none ${
                   askTarget === item
-                    ? 'text-slate-900 after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:bg-[#315a78]'
+                    ? 'bg-white text-stone-900 shadow-sm'
                     : 'text-stone-500 hover:text-stone-900'
                 }`}
                 disabled={isDisabled}
@@ -136,11 +148,80 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
               {item === 'books' ? 'Books' : 'Experts'}
               </button>
             ))}
-          </nav>
-          {askTarget === 'books' ? (
-            <AskBooksPanel book={selectedBook} disabled={isDisabled} onSelectBook={setSelectedBookId} />
-          ) : (
-            <ExpertPanel expert={selectedExpert} disabled={isDisabled} onSelectExpert={setSelectedExpertId} />
+            </nav>
+
+            <span aria-hidden="true" className="h-4 w-px shrink-0 bg-stone-200" />
+            <button
+              aria-label={askTarget === 'books'
+                ? `${selectedBook.title} by ${selectedBook.author}. Change book`
+                : `${selectedExpert.name}, ${selectedExpert.field}. Change expert`}
+              className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left transition-colors duration-150 hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={isDisabled}
+              onClick={() => askTarget === 'books' ? setBookPickerOpen(true) : setExpertPickerOpen(true)}
+              type="button"
+            >
+              {askTarget === 'experts' && (
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[#315a78] text-[9px] font-bold tracking-[0.04em] text-white">
+                  {selectedExpert.initials}
+                </span>
+              )}
+              <span className="min-w-0 truncate text-xs font-semibold text-stone-800">
+                {askTarget === 'books' ? selectedBook.title : selectedExpert.name}
+              </span>
+              <svg aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
+              </svg>
+            </button>
+
+            <span className="flex-1" />
+            <button
+              aria-expanded={isAskGuideOpen}
+              className="min-h-8 shrink-0 rounded-md px-2 text-[11px] font-medium text-stone-500 transition-colors duration-150 hover:bg-stone-100 hover:text-stone-900"
+              onClick={() => setAskGuideOpen(value => !value)}
+              type="button"
+            >
+              {isAskGuideOpen ? 'Hide help' : 'What to include?'}
+            </button>
+          </div>
+
+          <div className="mb-2 flex items-center justify-between gap-3 text-[11px]">
+            <span className="font-medium text-stone-500">Context</span>
+            {askTarget === 'experts' ? (
+              <div aria-label="Expert context" className="flex rounded-md bg-stone-100 p-0.5" role="group">
+                {([
+                  ['current-tab', 'Current tab'],
+                  ['standalone', 'Standalone'],
+                ] as const).map(([value, label]) => (
+                  <button
+                    aria-pressed={askContextMode === value}
+                    className={`min-h-7 rounded px-2.5 font-semibold transition-colors duration-150 ${
+                      askContextMode === value
+                        ? 'bg-white text-[#315a78] shadow-sm'
+                        : 'text-stone-500 hover:text-stone-900'
+                    }`}
+                    disabled={isDisabled}
+                    key={value}
+                    onClick={() => setAskContextMode(value)}
+                    type="button"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <span className="rounded-md bg-stone-100 px-2.5 py-1.5 font-semibold text-stone-500" title="Book conversations do not use browser tab content">
+                Standalone
+              </span>
+            )}
+          </div>
+
+          {isAskGuideOpen && (
+            <aside className="mb-2 rounded-r-md border-l-2 border-[#91aabd] bg-stone-100 px-3 py-2 text-xs leading-5 text-stone-600">
+              <strong className="font-semibold text-stone-800">
+                {askTarget === 'books' ? selectedBook.guideIntro : selectedExpert.guideIntro}
+              </strong>{' '}
+              {(askTarget === 'books' ? selectedBook.guideQuestions : selectedExpert.guideQuestions).join(' ')}
+            </aside>
           )}
         </>
       ) : (
@@ -219,16 +300,16 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
         </div>
       )}
 
-      <div className={mode === 'ask' ? 'mt-5' : 'mt-3'}>
+      <div className={mode === 'ask' ? 'mt-1' : 'mt-3'}>
         {tabStatus === 'detached' && <p className="mb-2 text-xs text-red-700" role="status">Tab connection lost. Refresh the tab to continue.</p>}
         <div className="relative rounded-[11px] border border-stone-300 bg-white transition-[border-color,box-shadow] duration-150 focus-within:border-[#315a78] focus-within:ring-2 focus-within:ring-[#315a78]/10">
           <TextareaAutosize
             aria-label="Prompt"
             autoFocus
-            className={`block w-full resize-none bg-transparent px-3.5 pb-12 pr-14 pt-3 text-sm leading-6 text-stone-800 outline-none placeholder:text-stone-400 ${mode === 'ask' ? 'min-h-24' : 'min-h-12'}`}
+            className="block min-h-12 w-full resize-none bg-transparent px-3.5 pb-12 pr-14 pt-3 text-sm leading-6 text-stone-800 outline-none placeholder:text-stone-400"
             disabled={isDisabled}
-            maxRows={10}
-            minRows={mode === 'ask' ? 3 : 1}
+            maxRows={isAskExpanded ? 12 : 6}
+            minRows={mode === 'ask' && isAskExpanded ? 6 : 1}
             onChange={event => setPrompt(event.target.value)}
             onKeyDown={event => {
               if (event.key === 'Enter' && !event.shiftKey) {
@@ -250,7 +331,19 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
             value={prompt}
           />
           <div className="absolute inset-x-3 bottom-2 flex items-center justify-between text-[11px] text-stone-400">
-            <span>Shift + Enter for a new line</span>
+            <span className="flex items-center gap-1">
+              <span className="hidden sm:inline">Shift + Enter for a new line</span>
+              {mode === 'ask' && (
+                <button
+                  aria-label={isAskExpanded ? 'Collapse Ask input' : 'Expand Ask input'}
+                  className="rounded px-1.5 py-1 text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-900"
+                  onClick={() => setAskExpanded(value => !value)}
+                  type="button"
+                >
+                  {isAskExpanded ? 'Collapse' : 'Expand'}
+                </button>
+              )}
+            </span>
             {isProcessing ? (
               <button aria-label="Cancel" className="min-h-8 rounded-md bg-stone-900 px-3 text-xs font-semibold text-white transition-colors duration-150 hover:bg-stone-700 active:scale-96 motion-reduce:transform-none" onClick={onCancel} type="button">
                 Cancel
@@ -269,6 +362,18 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
         isVisible={showMultiTabSelector}
         onClose={() => setShowMultiTabSelector(false)}
         onTabsSelected={handleTabsSelected}
+      />
+      <BookPicker
+        isOpen={isBookPickerOpen}
+        onClose={() => setBookPickerOpen(false)}
+        onSelect={setSelectedBookId}
+        selectedBookId={selectedBookId}
+      />
+      <ExpertPicker
+        isOpen={isExpertPickerOpen}
+        onClose={() => setExpertPickerOpen(false)}
+        onSelect={setSelectedExpertId}
+        selectedExpertId={selectedExpertId}
       />
     </form>
   );

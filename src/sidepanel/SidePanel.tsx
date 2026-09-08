@@ -5,7 +5,7 @@ import { TokenTrackingService } from '../tracking/tokenTrackingService';
 import { ApprovalRequest } from './components/ApprovalRequest';
 import { MessageDisplay } from './components/MessageDisplay';
 import { MultiTabStatusBar } from './components/MultiTabStatusBar';
-import { PromptForm } from './components/PromptForm';
+import { PromptForm, type AskContextMode } from './components/PromptForm';
 import { useChromeMessaging } from './hooks/useChromeMessaging';
 import { useMessageManagement } from './hooks/useMessageManagement';
 import { useTabManagement } from './hooks/useTabManagement';
@@ -342,7 +342,7 @@ export function SidePanel() {
   });
 
   // Handle form submission
-  const handleSubmit = async (prompt: string, role: string, selectedTabIds?: number[]) => {
+  const handleSubmit = async (prompt: string, role: string, selectedTabIds?: number[], contextMode?: AskContextMode) => {
     setIsProcessing(true);
     setTabStatus('running');
 
@@ -353,7 +353,7 @@ export function SidePanel() {
     }
 
     try {
-      await executePrompt(prompt, role, selectedTabIds);
+      await executePrompt(prompt, role, selectedTabIds, contextMode);
     } catch (error) {
       console.error('Error:', error);
       addSystemMessage('Error: ' + (error instanceof Error ? error.message : String(error)));

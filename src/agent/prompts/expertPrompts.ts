@@ -1,6 +1,8 @@
+import { withExpertContract } from './expertContract';
+
 export const EXPERT_ROLE_IDS = ['munger', 'marks', 'kovach', 'kotler', 'tukey'] as const;
 
-export const marksPrompt = `
+export const marksPrompt = withExpertContract(`
 You are an AI advisor applying the publicly documented investment principles associated with **Howard Marks**. You are not Howard Marks and must not imply endorsement or invent his views.
 
 ## Communication Style:
@@ -42,9 +44,9 @@ You are an AI advisor applying the publicly documented investment principles ass
 - No tools, searches, or memory.
 
 == Begin by applying the framework, without impersonating Howard Marks ==
-`.trim();
+`);
 
-export const kovachPrompt = `
+export const kovachPrompt = withExpertContract(`
 You are an AI advisor applying the publicly documented journalism principles associated with **Bill Kovach**. You are not Bill Kovach and must not imply endorsement or invent his views.
 
 ## Communication Style:
@@ -88,9 +90,9 @@ You are an AI advisor applying the publicly documented journalism principles ass
 - No tools, searches, or memory.
 
 == Begin by applying the framework, without impersonating Bill Kovach ==
-`.trim();
+`);
 
-export const kotlerPrompt = `
+export const kotlerPrompt = withExpertContract(`
 You are an AI advisor applying the publicly documented marketing frameworks associated with **Philip Kotler**. You are not Philip Kotler and must not imply endorsement or invent his views.
 
 ## Communication Style:
@@ -134,9 +136,9 @@ You are an AI advisor applying the publicly documented marketing frameworks asso
 - No tools, searches, or memory.
 
 == Begin by applying the framework, without impersonating Philip Kotler ==
-`.trim();
+`);
 
-export const tukeyPrompt = `
+export const tukeyPrompt = withExpertContract(`
 You are an AI advisor applying the publicly documented exploratory data analysis principles associated with **John Tukey**. You are not John Tukey and must not imply endorsement or invent his views.
 
 ## Communication Style:
@@ -181,4 +183,4 @@ You are an AI advisor applying the publicly documented exploratory data analysis
 - No tools, searches, or memory.
 
 == Begin by applying the framework, without impersonating John Tukey ==
-`.trim();
+`);

@@ -5,7 +5,8 @@ const pendingApprovals = new Map<string, {
   resolve: (approved: boolean) => void,
   toolName: string,
   toolInput: string,
-  reason: string
+  reason: string,
+  runId?: string
 }>();
 
 /**
@@ -22,11 +23,12 @@ export async function requestApproval(
   toolName: string,
   toolInput: string,
   reason: string,
-  windowId?: number
+  windowId?: number,
+  metadata?: { runId?: string; workflowId?: string; executionTabId?: number; ownerTabId?: number }
 ): Promise<boolean> {
   return new Promise((resolve) => {
     const requestId = generateUniqueId();
-    pendingApprovals.set(requestId, { resolve, toolName, toolInput, reason });
+    pendingApprovals.set(requestId, { resolve, toolName, toolInput, reason, runId: metadata?.runId });
     
     // Get the window ID if not provided
     if (!windowId) {
@@ -39,15 +41,19 @@ export async function requestApproval(
     }
     
     // Send approval request to UI with a callback to handle errors
-    chrome.runtime.sendMessage({
+    const approvalMessage: Record<string, unknown> = {
       action: 'requestApproval',
-      tabId,
+      tabId: metadata?.ownerTabId ?? tabId,
       windowId, // Include window ID in the message
       requestId,
       toolName,
       toolInput,
       reason
-    }, (response) => {
+    };
+    if (metadata?.runId) approvalMessage.runId = metadata.runId;
+    if (metadata?.workflowId) approvalMessage.workflowId = metadata.workflowId;
+    if (metadata?.executionTabId !== undefined) approvalMessage.executionTabId = metadata.executionTabId;
+    chrome.runtime.sendMessage(approvalMessage, (response) => {
       // Handle any potential errors
       if (chrome.runtime.lastError) {
         console.error('Error sending approval request:', chrome.runtime.lastError);
@@ -64,9 +70,9 @@ export async function requestApproval(
  * @param requestId The ID of the approval request
  * @param approved Whether the request was approved
  */
-export function handleApprovalResponse(requestId: string, approved: boolean): void {
+export function handleApprovalResponse(requestId: string, approved: boolean, runId?: string): void {
   const pendingApproval = pendingApprovals.get(requestId);
-  if (pendingApproval) {
+  if (pendingApproval && (!pendingApproval.runId || pendingApproval.runId === runId)) {
     pendingApproval.resolve(approved);
     pendingApprovals.delete(requestId);
   } else {

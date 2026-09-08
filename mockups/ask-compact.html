@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BrowserOnly · Compact Ask mock</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #171a1d;
+      --muted: #74716c;
+      --line: #dedbd6;
+      --wash: #f3f5f6;
+      --paper: #fbfbfa;
+      --white: #fff;
+      --blue: #315a78;
+      --blue-soft: #eaf2f7;
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      height: 100vh;
+      overflow: hidden;
+      color: var(--ink);
+      background: #e6e5e2;
+    }
+    button, textarea { font: inherit; }
+    button { color: inherit; }
+
+    .app {
+      height: 100vh;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      gap: 12px;
+      padding: 18px;
+      background: var(--paper);
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-width: 0;
+      gap: 24px;
+    }
+    .brand h1 { margin: 0; font-size: 25px; letter-spacing: -.045em; }
+    .brand p { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
+    .tab-context {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      max-width: 54%;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: var(--white);
+      box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+      font-size: 14px;
+      font-weight: 650;
+    }
+    .status-dot { width: 9px; height: 9px; flex: 0 0 auto; border-radius: 50%; background: #36b77b; }
+    .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .icon-button {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      flex: 0 0 auto;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: var(--white);
+      cursor: pointer;
+    }
+    .icon-button:hover { background: #f7f7f5; border-color: #bbb8b2; }
+
+    .workspace {
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: var(--white);
+    }
+    .workspace-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+      background: var(--wash);
+    }
+    .segmented { display: inline-flex; gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: #efefed; }
+    .segment { border: 0; border-radius: 7px; padding: 8px 12px; background: transparent; color: var(--muted); font-size: 13px; font-weight: 650; cursor: pointer; }
+    .segment.active { color: var(--ink); background: var(--white); box-shadow: 0 1px 3px rgb(0 0 0 / 10%); }
+    .workspace-actions { display: flex; gap: 7px; }
+    .messages { min-height: 0; overflow: auto; padding: 22px; }
+    .day { margin: 0 0 18px; color: #98948e; font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
+    .message { max-width: 78%; margin-bottom: 14px; padding: 12px 14px; border-radius: 4px 13px 13px; background: #f2f2ef; font-size: 14px; line-height: 1.55; }
+    .message.user { margin-left: auto; border-radius: 13px 4px 13px 13px; color: white; background: var(--blue); }
+    .message p { margin: 0; }
+    .message .meta { margin-top: 7px; color: #8b8881; font-size: 11px; }
+    .message.user .meta { color: #d9e6ee; }
+    .empty-hint { display: flex; align-items: center; gap: 8px; margin-top: 26px; color: #8c8881; font-size: 12px; }
+    .empty-hint::before { content: ""; width: 24px; height: 1px; background: #c9c5be; }
+
+    .ask-shell {
+      position: relative;
+      border: 1px solid #cfd7de;
+      border-radius: 14px;
+      background: var(--white);
+      box-shadow: 0 -8px 30px rgb(24 36 45 / 7%), 0 1px 2px rgb(0 0 0 / 5%);
+      transition: box-shadow 160ms ease, border-color 160ms ease;
+    }
+    .ask-shell:focus-within { border-color: #7290a6; box-shadow: 0 -10px 34px rgb(24 36 45 / 9%), 0 0 0 3px rgb(49 90 120 / 9%); }
+    .drag-handle { width: 38px; height: 4px; margin: 7px auto 2px; border-radius: 99px; background: #d8d6d1; cursor: ns-resize; }
+    .composer-head { display: flex; align-items: center; gap: 8px; padding: 7px 11px 4px; }
+    .mode-button, .expert-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 0;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      cursor: pointer;
+    }
+    .mode-button { padding: 6px 7px; font-size: 12px; font-weight: 750; }
+    .mode-mark { color: var(--blue); font-size: 15px; }
+    .divider { width: 1px; height: 18px; background: var(--line); }
+    .expert-button { padding: 5px 7px; color: #55524d; font-size: 12px; }
+    .avatar { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 6px; color: white; background: var(--blue); font-size: 9px; font-weight: 800; }
+    .chevron { color: #918d87; font-size: 10px; }
+    .head-spacer { flex: 1; }
+    .quiet-button { border: 0; border-radius: 7px; padding: 6px 8px; color: #74716c; background: transparent; font-size: 12px; cursor: pointer; }
+    .quiet-button:hover, .mode-button:hover, .expert-button:hover { background: #f3f3f0; color: var(--ink); }
+    .guide {
+      display: none;
+      margin: 5px 12px 2px;
+      padding: 10px 12px;
+      border-left: 3px solid #9fb5c5;
+      border-radius: 0 8px 8px 0;
+      color: #5d5a55;
+      background: #f4f5f3;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .guide.open { display: block; animation: reveal 150ms ease-out; }
+    .guide strong { color: #302e2a; }
+    .guide p { margin: 3px 0; }
+    .composer-row { display: flex; align-items: flex-end; gap: 9px; padding: 5px 10px 10px 13px; }
+    textarea {
+      width: 100%;
+      min-height: 31px;
+      max-height: 180px;
+      resize: none;
+      border: 0;
+      outline: 0;
+      padding: 6px 0 4px;
+      color: var(--ink);
+      background: transparent;
+      font-size: 14px;
+      line-height: 21px;
+    }
+    textarea::placeholder { color: #aaa69f; }
+    .send { min-width: 66px; height: 36px; border: 0; border-radius: 9px; color: white; background: var(--blue); font-size: 12px; font-weight: 750; cursor: pointer; }
+    .send:disabled { cursor: default; background: #b7c3cc; }
+    .footer { display: flex; align-items: center; justify-content: space-between; margin-top: -4px; padding: 4px 2px 0; color: #77736d; font-size: 11px; }
+    .footer select { border: 0; outline: 0; color: #56534e; background: transparent; font-weight: 650; }
+
+    .picker {
+      display: none;
+      position: absolute;
+      left: 72px;
+      bottom: calc(100% - 48px);
+      z-index: 10;
+      width: min(330px, calc(100% - 90px));
+      padding: 7px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--white);
+      box-shadow: 0 15px 45px rgb(20 26 31 / 18%);
+    }
+    .picker.open { display: block; animation: rise 150ms ease-out; }
+    .picker-label { padding: 7px 9px 5px; color: #8a867f; font-size: 10px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+    .picker-option { display: flex; width: 100%; align-items: center; gap: 10px; border: 0; border-radius: 8px; padding: 9px; background: transparent; text-align: left; cursor: pointer; }
+    .picker-option:hover, .picker-option.selected { background: var(--blue-soft); }
+    .picker-option span:last-child { display: grid; gap: 2px; font-size: 12px; font-weight: 700; }
+    .picker-option small { color: #77736d; font-size: 11px; font-weight: 450; }
+
+    @keyframes reveal { from { opacity: 0; transform: translateY(-4px); } }
+    @keyframes rise { from { opacity: 0; transform: translateY(5px); } }
+
+    @media (max-width: 560px) {
+      .app { gap: 9px; padding: 10px; }
+      .brand h1 { font-size: 20px; }
+      .brand p { display: none; }
+      .tab-context { max-width: 62%; padding: 8px 9px; }
+      .messages { padding: 16px; }
+      .message { max-width: 90%; }
+      .workspace-actions .icon-button:first-child { display: none; }
+      .expert-field { display: none; }
+      .footer { padding-inline: 2px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand">
+        <h1>BrowserOnly</h1>
+        <p>Browser assistant</p>
+      </div>
+      <div class="tab-context" title="DeepSeek - Into the unknown">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span class="truncate">DeepSeek - Into the unknown</span>
+        <button class="icon-button" aria-label="Choose browser tab">⌄</button>
+      </div>
+    </header>
+
+    <section class="workspace" aria-label="Tasks workspace">
+      <div class="workspace-bar">
+        <div class="segmented" aria-label="Workspace view">
+          <button class="segment active">Tasks</button>
+          <button class="segment">Automations <span style="color:#aaa59d">3</span></button>
+        </div>
+        <div class="workspace-actions">
+          <button class="icon-button" title="Reflect and learn">✦</button>
+          <button class="icon-button" title="Clear conversation">⌫</button>
+          <button class="icon-button" title="Expand workspace">↗</button>
+        </div>
+      </div>
+      <div class="messages">
+        <p class="day">Current page · News analysis</p>
+        <article class="message user">
+          <p>Check whether the claims on this page are well supported.</p>
+          <div class="meta">You · 10:42</div>
+        </article>
+        <article class="message">
+          <p>I found three central claims. Two cite primary sources, while the claim about market growth relies on an undated secondary summary.</p>
+          <div class="meta">Bill Kovach · Evidence review</div>
+        </article>
+        <article class="message">
+          <p>Want me to trace the original source for that market figure?</p>
+        </article>
+        <div class="empty-hint">Ask stays available without hiding your working context.</div>
+      </div>
+    </section>
+
+    <section aria-label="Ask composer">
+      <form class="ask-shell" id="askForm">
+        <div class="drag-handle" title="Drag to resize" aria-hidden="true"></div>
+        <div class="composer-head">
+          <button class="mode-button" id="modeButton" type="button" aria-label="Change Ask mode">
+            <span class="mode-mark">✦</span> Ask
+          </button>
+          <span class="divider" aria-hidden="true"></span>
+          <button class="expert-button" id="expertButton" type="button" aria-expanded="false">
+            <span class="avatar">BK</span>
+            <span class="truncate"><strong>Bill Kovach</strong><span class="expert-field"> · News verification</span></span>
+            <span class="chevron">⌃</span>
+          </button>
+          <span class="head-spacer"></span>
+          <button class="quiet-button" id="helpButton" type="button" aria-expanded="false">What to include?</button>
+          <button class="quiet-button" id="expandButton" type="button" title="Expand Ask">↗</button>
+        </div>
+
+        <aside class="guide" id="guide" aria-live="polite">
+          <strong>For a stronger verification:</strong>
+          <p>Paste the claim, then add any sources or page context you already have.</p>
+        </aside>
+
+        <div class="composer-row">
+          <textarea id="prompt" rows="1" aria-label="Ask Bill Kovach" placeholder="Paste a claim or ask about the current page…"></textarea>
+          <button class="send" id="sendButton" disabled>Send</button>
+        </div>
+
+        <div class="picker" id="picker" role="dialog" aria-label="Choose expert">
+          <div class="picker-label">Thinking framework</div>
+          <button class="picker-option selected" type="button" data-name="Bill Kovach" data-initials="BK" data-field="News verification">
+            <span class="avatar">BK</span><span>Bill Kovach<small>News verification</small></span>
+          </button>
+          <button class="picker-option" type="button" data-name="Charlie Munger" data-initials="CM" data-field="Clear reasoning">
+            <span class="avatar" style="background:#69543d">CM</span><span>Charlie Munger<small>Clear reasoning</small></span>
+          </button>
+          <button class="picker-option" type="button" data-name="Richard Feynman" data-initials="RF" data-field="Explain and test">
+            <span class="avatar" style="background:#4d6654">RF</span><span>Richard Feynman<small>Explain and test</small></span>
+          </button>
+        </div>
+      </form>
+      <footer class="footer">
+        <select aria-label="Model"><option>deepseek-reasoner</option><option>deepseek-chat</option></select>
+        <span>$0.0484 · 155.5k tokens</span>
+      </footer>
+    </section>
+  </main>
+
+  <script>
+    const prompt = document.querySelector('#prompt');
+    const send = document.querySelector('#sendButton');
+    const help = document.querySelector('#helpButton');
+    const guide = document.querySelector('#guide');
+    const expert = document.querySelector('#expertButton');
+    const picker = document.querySelector('#picker');
+    const expand = document.querySelector('#expandButton');
+    const shell = document.querySelector('.ask-shell');
+
+    function sizePrompt() {
+      prompt.style.height = 'auto';
+      prompt.style.height = Math.min(prompt.scrollHeight, 180) + 'px';
+      send.disabled = !prompt.value.trim();
+    }
+    prompt.addEventListener('input', sizePrompt);
+    prompt.addEventListener('focus', () => shell.dataset.engaged = 'true');
+
+    help.addEventListener('click', () => {
+      const open = guide.classList.toggle('open');
+      help.setAttribute('aria-expanded', String(open));
+      help.textContent = open ? 'Hide guidance' : 'What to include?';
+    });
+
+    expert.addEventListener('click', () => {
+      const open = picker.classList.toggle('open');
+      expert.setAttribute('aria-expanded', String(open));
+    });
+
+    document.querySelectorAll('.picker-option').forEach(option => {
+      option.addEventListener('click', () => {
+        document.querySelectorAll('.picker-option').forEach(item => item.classList.remove('selected'));
+        option.classList.add('selected');
+        expert.querySelector('.avatar').textContent = option.dataset.initials;
+        expert.querySelector('.truncate').innerHTML = `<strong>${option.dataset.name}</strong><span class="expert-field"> · ${option.dataset.field}</span>`;
+        picker.classList.remove('open');
+        expert.setAttribute('aria-expanded', 'false');
+        prompt.setAttribute('aria-label', `Ask ${option.dataset.name}`);
+        prompt.focus();
+      });
+    });
+
+    let expanded = false;
+    expand.addEventListener('click', () => {
+      expanded = !expanded;
+      prompt.style.height = expanded ? '180px' : '31px';
+      expand.textContent = expanded ? '↙' : '↗';
+      expand.title = expanded ? 'Collapse Ask' : 'Expand Ask';
+      if (expanded) prompt.focus();
+    });
+
+    document.querySelector('#askForm').addEventListener('submit', event => {
+      event.preventDefault();
+      if (!prompt.value.trim()) return;
+      send.textContent = 'Sent';
+      setTimeout(() => { send.textContent = 'Send'; }, 900);
+    });
+
+    document.addEventListener('click', event => {
+      if (!picker.contains(event.target) && !expert.contains(event.target)) {
+        picker.classList.remove('open');
+        expert.setAttribute('aria-expanded', 'false');
+      }
+    });
+  </script>
+</body>
+</html>

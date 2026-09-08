@@ -14,11 +14,15 @@ export interface WorkflowRunnerOptions {
   variables?: Record<string, unknown>;
   allowedDomains?: string[];
   callbacks?: WorkflowRunnerCallbacks;
-  context?: { tabId?: number; windowId?: number };
+  context?: { tabId?: number; windowId?: number; ownerTabId?: number; runId?: string; cancelReason?: string };
+  runner?: WorkflowRunner;
+  pageRef?: { current: any };
+  onPageHandoff?: (page: any, tabId?: number) => void;
 }
 
 export class WorkflowRunner {
   private cancelled = false;
+  currentRunId?: string;
   private readonly store = WorkflowStore.getInstance();
 
   cancel(): void { this.cancelled = true; }
@@ -34,8 +38,12 @@ export class WorkflowRunner {
       llmCalls: 0,
       inputTokens: 0,
       outputTokens: 0,
-      cost: 0
+      cost: 0,
+      ownerTabId: options.context?.ownerTabId,
+      executionTabId: options.context?.tabId,
+      executionWindowId: options.context?.windowId
     };
+    this.currentRunId = run.id;
     await this.store.saveRun(run);
     options.callbacks?.onStatus?.('running');
 
@@ -62,8 +70,18 @@ export class WorkflowRunner {
         const tool = options.tools.find(candidate => candidate.name === step.toolName);
         if (!tool) throw new Error(`Tool not found: ${step.toolName}`);
         const input = substituteVariables(step.input, options.variables ?? {});
+        const pagesBefore = step.toolName === 'browser_click' && options.pageRef?.current?.context
+          ? options.pageRef.current.context().pages()
+          : undefined;
         if ((step.risk === 'write' || step.risk === 'irreversible') && options.context?.tabId) {
-          const approved = await requestApproval(options.context.tabId, step.toolName, typeof input === 'string' ? input : JSON.stringify(input), `Workflow step requires approval: ${step.label}`);
+          const approved = await requestApproval(
+            options.context.tabId,
+            step.toolName,
+            typeof input === 'string' ? input : JSON.stringify(input),
+            `Workflow step requires approval: ${step.label}`,
+            options.context.windowId,
+            { runId: run.id, workflowId, executionTabId: options.context.tabId, ownerTabId: options.context.ownerTabId },
+          );
           if (!approved) throw new Error('Action rejected by user');
         }
         const candidates = step.locator ? locatorCandidates(step.locator, input) : [input];
@@ -105,6 +123,24 @@ export class WorkflowRunner {
         }
         if (!result && lastError) throw lastError;
         if (/^error\b|^Error\b|^Action cancelled/i.test(result.trim())) throw new Error(result);
+        if (pagesBefore && options.pageRef?.current?.context) {
+          const pagesAfter = options.pageRef.current.context().pages();
+          const newPages = pagesAfter.filter((candidate: any) => !pagesBefore.includes(candidate));
+          const openerPages = [];
+          for (const candidate of newPages) {
+            const opener = await candidate.opener?.().catch(() => undefined);
+            if (!opener || opener === options.pageRef.current) openerPages.push(candidate);
+          }
+          if (openerPages.length > 1) throw new Error('AMBIGUOUS_NEW_TABS: multiple pages opened by workflow step');
+          if (openerPages.length === 1) {
+            const nextPage = openerPages[0];
+            await nextPage.waitForLoadState?.('domcontentloaded').catch(() => {});
+            options.pageRef.current = nextPage;
+            const tabId = await findTabIdForPage(nextPage, options.context?.windowId);
+            if (tabId !== undefined && options.context) options.context.tabId = tabId;
+            options.onPageHandoff?.(nextPage, tabId);
+          }
+        }
         for (const assertion of step.postconditions ?? []) {
           if (!(await evaluateAssertion(assertion, options.tools))) throw new Error(`Postcondition failed: ${assertion.type}`);
         }
@@ -143,10 +179,20 @@ export class WorkflowRunner {
       }
     }
     run.endedAt = Date.now();
+    run.executionTabId = options.context?.tabId ?? run.executionTabId;
+    run.executionWindowId = options.context?.windowId ?? run.executionWindowId;
     await this.store.saveRun(run);
     options.callbacks?.onStatus?.(run.status);
     return run;
   }
+}
+
+async function findTabIdForPage(page: any, windowId?: number): Promise<number | undefined> {
+  try {
+    const url = page.url?.();
+    const tabs = await chrome.tabs.query(windowId === undefined ? {} : { windowId });
+    return tabs.find(tab => tab.url === url)?.id;
+  } catch { return undefined; }
 }
 
 async function resolveActiveHostname(options: WorkflowRunnerOptions): Promise<string> {

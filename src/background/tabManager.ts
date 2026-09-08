@@ -502,6 +502,26 @@ export async function attachToTab(tabId: number, windowId?: number, retryCount: 
  * @returns Promise resolving to the new tab ID
  */
 export async function createNewTab(windowId: number, url?: string): Promise<number> {
+  const created = await createTabPage(windowId, url, true);
+  return created.tabId;
+}
+
+export interface WorkflowExecutionTab {
+  page: any;
+  tabId: number;
+  windowId: number;
+}
+
+/** Create and attach a visible tab for a Workflow run. */
+export async function createWorkflowExecutionTab(windowId: number, startUrl: string): Promise<WorkflowExecutionTab> {
+  const parsed = new URL(startUrl);
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('INVALID_START_URL: Workflow start URL must use http or https');
+  }
+  return createTabPage(windowId, startUrl, true);
+}
+
+async function createTabPage(windowId: number, url: string | undefined, active: boolean): Promise<WorkflowExecutionTab> {
   try {
     logWithTimestamp(`Creating new tab in window ${windowId}${url ? ` with URL ${url}` : ''}`);
     
@@ -509,20 +529,23 @@ export async function createNewTab(windowId: number, url?: string): Promise<numb
     const crxApp = await getCrxApp(windowId);
     
     // Create a new tab using Playwright-CRX's newPage method with the windowId
-    const page = await crxApp.newPage({ windowId, url: url || undefined });
+    const page = await crxApp.newPage({ windowId, url: url || undefined, active });
     
     // Get the tab ID from the page
-    const tabId = await getTabIdFromPage(page);
+    const tabId = await getTabIdFromPage(page, windowId);
     
-    if (!tabId) {
+    if (tabId === undefined) {
       throw new Error('Could not determine tab ID for new page');
     }
     
     // Store the window ID for this tab
     storeWindowForTab(tabId, windowId);
-    
+    setTabState(tabId, { page, windowId, title: await page.title().catch(() => 'New Tab') });
+    addAttachedTab(tabId);
+    if (active) setCurrentTabId(tabId);
+
     logWithTimestamp(`Created new tab ${tabId} in window ${windowId}`);
-    return tabId;
+    return { page, tabId, windowId };
   } catch (error) {
     handleError(error, 'creating new tab');
     throw error;
@@ -534,14 +557,14 @@ export async function createNewTab(windowId: number, url?: string): Promise<numb
  * @param page The page object
  * @returns Promise resolving to the tab ID or undefined if not found
  */
-async function getTabIdFromPage(page: any): Promise<number | undefined> {
+async function getTabIdFromPage(page: any, windowId?: number): Promise<number | undefined> {
   try {
     // Try to use internal Playwright-CRX APIs to get the tab ID
     if (page._session && page._session._connection && page._session._connection._transport) {
       const transport = page._session._connection._transport;
       
       // If this is a CrxTransport, it might have a _tabId property
-      if (transport._tabId) {
+      if (transport._tabId !== undefined) {
         return transport._tabId;
       }
     }
@@ -555,14 +578,10 @@ async function getTabIdFromPage(page: any): Promise<number | undefined> {
       // Get all Chrome tabs
       const chromeTabs = await chrome.tabs.query({});
       
-      // Find the most recently created tab
-      const newestTab = chromeTabs.sort((a, b) => {
-        return (b.id || 0) - (a.id || 0);
-      })[0];
-      
-      if (newestTab && newestTab.id) {
-        return newestTab.id;
-      }
+      const pageUrl = page.url();
+      const matchingTab = chromeTabs.find(tab => tab.windowId === windowId && tab.url === pageUrl)
+        ?? chromeTabs.filter(tab => tab.url === pageUrl).sort((a, b) => (b.id || 0) - (a.id || 0))[0];
+      if (matchingTab?.id !== undefined) return matchingTab.id;
     }
   } catch (error) {
     handleError(error, 'getting tab ID from page');

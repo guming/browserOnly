@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { BrowserAgent } from "../agent/AgentCore";
+import type { WorkflowExecutionMode } from '../workflows/types';
 
 // Provider types
 export type ProviderType = 'anthropic' | 'openai' | 'gemini' | 'ollama' | 'openai-compatible' | 'deepseek';
@@ -25,12 +26,18 @@ export interface ExecutePromptMessage {
   tabId?: number;
   windowId?: number;
   role?: string;
+  contextMode?: 'current-tab' | 'standalone';
 }
 
 export interface CancelExecutionMessage {
   action: 'cancelExecution';
   tabId?: number;
   windowId?: number;
+}
+
+export interface CancelWorkflowMessage {
+  action: 'cancelWorkflow';
+  runId: string;
 }
 
 export interface ClearHistoryMessage {
@@ -69,6 +76,7 @@ export interface ApprovalResponseMessage {
   approved: boolean;
   tabId?: number;
   windowId?: number;
+  runId?: string;
 }
 
 export interface ReflectAndLearnMessage {
@@ -82,8 +90,11 @@ export interface RunWorkflowMessage {
   workflowId: string;
   versionId: string;
   variables?: Record<string, unknown>;
+  ownerTabId?: number;
+  ownerWindowId?: number;
+  executionMode?: WorkflowExecutionMode;
+  /** @deprecated Use ownerTabId/ownerWindowId. Kept for message compatibility during migration. */
   tabId?: number;
-  windowId?: number;
 }
 
 // UI Message types
@@ -97,6 +108,9 @@ export interface UpdateOutputMessage {
   };
   tabId?: number;
   windowId?: number;
+  runId?: string;
+  workflowId?: string;
+  executionTabId?: number;
 }
 
 export interface UpdateStreamingChunkMessage {
@@ -140,6 +154,9 @@ export interface ProcessingCompleteMessage {
   content: null;
   tabId?: number;
   windowId?: number;
+  runId?: string;
+  workflowId?: string;
+  executionTabId?: number;
 }
 
 export interface RateLimitMessage {
@@ -201,6 +218,9 @@ export interface RequestApprovalMessage {
   reason: string;
   tabId?: number;
   windowId?: number;
+  runId?: string;
+  workflowId?: string;
+  executionTabId?: number;
 }
 
 export interface CheckAgentStatusMessage {
@@ -258,6 +278,7 @@ export interface PdfAiChatMessage {
 export type BackgroundMessage =
   | ExecutePromptMessage
   | CancelExecutionMessage
+  | CancelWorkflowMessage
   | ClearHistoryMessage
   | InitializeTabMessage
   | SwitchToTabMessage

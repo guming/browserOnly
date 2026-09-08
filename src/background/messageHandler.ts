@@ -7,12 +7,16 @@ import { clearMessageHistory } from './agentController';
 import { initializeAgent } from './agentController';
 import { ConfigManager } from './configManager';
 import { triggerReflection } from './reflectionController';
-import { attachToTab, getTabState, getWindowForTab, forceResetPlaywright } from './tabManager';
+import { attachToTab, createWorkflowExecutionTab, getTabState, getWindowForTab, forceResetPlaywright } from './tabManager';
 import { BackgroundMessage, DownloadMarkdownMessage } from './types';
 import { logWithTimestamp, handleError, sendUIMessage } from './utils';
 import { SimpleChatAgent } from '../agent/SimpleChatAgent';
 import { WorkflowStore } from '../workflows/WorkflowStore';
 import { WorkflowService } from '../workflows/WorkflowService';
+import { WorkflowRunner } from '../workflows/WorkflowRunner';
+
+const workflowRunners = new Map<string, { runner: WorkflowRunner; executionTabId?: number; ownerTabId: number; context?: { tabId?: number; windowId?: number; ownerTabId?: number; cancelReason?: string } }>();
+const workflowRunByExecutionTab = new Map<number, WorkflowRunner>();
 /**
  * Handle messages from the UI
  * @param message The message to handle
@@ -47,6 +51,11 @@ export function handleMessage(
         handleCancelExecution(message, sendResponse);
         return true;
 
+      case 'cancelWorkflow':
+        workflowRunners.get(message.runId)?.runner.cancel();
+        sendResponse({ success: true });
+        return true;
+
       case 'clearHistory':
         // Handle async function and keep message channel open
         handleClearHistory(message, sendResponse)
@@ -76,7 +85,7 @@ export function handleMessage(
         return true;
         
       case 'approvalResponse':
-        handleApprovalResponse(message.requestId, message.approved);
+        handleApprovalResponse(message.requestId, message.approved, message.runId);
         sendResponse({ success: true });
         return true;
         
@@ -198,6 +207,7 @@ function isBackgroundMessage(message: any): message is BackgroundMessage {
       message.action === 'executePrompt' ||
       message.action === 'runWorkflow' ||
       message.action === 'cancelExecution' ||
+      message.action === 'cancelWorkflow' ||
       message.action === 'clearHistory' ||
       message.action === 'initializeTab' ||
       message.action === 'switchToTab' ||
@@ -231,7 +241,8 @@ async function handleRunWorkflow(
   message: Extract<BackgroundMessage, { action: 'runWorkflow' }>,
   sendResponse: (response?: any) => void
 ): Promise<void> {
-  let tabId = message.tabId;
+  let tabId = message.ownerTabId ?? message.tabId;
+  let executionTabId: number | undefined;
   try {
     tabId ??= (await chrome.tabs.query({ active: true, lastFocusedWindow: true }))[0]?.id;
     if (!tabId) throw new Error('No active tab');
@@ -240,22 +251,45 @@ async function handleRunWorkflow(
     const version = await WorkflowStore.getInstance().getVersion(message.versionId || workflow.activeVersionId);
     if (!version) throw new Error('Workflow version not found');
     if (workflow.status === 'archived') throw new Error('Archived workflows cannot be run');
-    const windowId = getWindowForTab(tabId);
-    let tabState = getTabState(tabId);
-    if (!tabState?.page) {
-      await attachToTab(tabId, windowId);
-      tabState = getTabState(tabId);
+    const ownerTab = await chrome.tabs.get(tabId);
+    const ownerWindowId = message.ownerWindowId ?? ownerTab.windowId ?? getWindowForTab(tabId);
+    if (ownerWindowId === undefined) throw new Error('Workflow owner window is unavailable');
+    const executionMode = message.executionMode ?? workflow.executionMode ?? 'current_tab';
+    const startUrl = resolveWorkflowStartUrl(workflow.startUrl, version.steps);
+    let executionPage: any;
+    let executionWindowId = ownerWindowId;
+    if (executionMode === 'new_tab') {
+      if (!startUrl) throw new Error('INVALID_START_URL: Workflow requires an HTTP(S) start URL for new-tab execution');
+      const created = await createWorkflowExecutionTab(ownerWindowId, startUrl);
+      executionTabId = created.tabId;
+      executionWindowId = created.windowId;
+      executionPage = created.page;
+    } else {
+      executionTabId = tabId;
+      let tabState = getTabState(tabId);
+      if (!tabState?.page) {
+        await attachToTab(tabId, ownerWindowId);
+        tabState = getTabState(tabId);
+      }
+      executionPage = tabState?.page;
     }
-    if (!tabState?.page) throw new Error('Workflow could not connect to this tab. Refresh the tab and try again.');
+    if (!executionPage || executionTabId === undefined) throw new Error('TAB_ATTACH_FAILED: Workflow could not connect to its execution tab.');
 
-    sendUIMessage('updateOutput', { type: 'system', content: `▶ Running automation: ${workflow.name}` }, tabId, windowId);
+    sendUIMessage('updateOutput', { type: 'system', content: `▶ Running automation: ${workflow.name}` }, tabId, executionWindowId);
     // This message is initiated by the user pressing Run. Trigger domains are
     // for unattended/automatic runs and must not block an explicit manual run
     // against the current tab.
     let lastStepResult = '';
-    const run = await new WorkflowService().run(workflow.id, version, tabState.page, {
+    const runner = new WorkflowRunner();
+    const runContext = { tabId: executionTabId, windowId: executionWindowId, ownerTabId: tabId };
+    const pageRef = { current: executionPage };
+    workflowRunners.set(`pending:${executionTabId}`, { runner, executionTabId, ownerTabId: tabId });
+    workflowRunByExecutionTab.set(executionTabId, runner);
+    const runPromise = new WorkflowService().run(workflow.id, version, executionPage, {
       variables: message.variables,
-      context: { tabId, windowId },
+      context: runContext,
+      pageRef,
+      runner,
       callbacks: {
         onStepEnd: (_step, result) => {
           // Read-only workflow steps (for example, page summaries) return
@@ -264,11 +298,18 @@ async function handleRunWorkflow(
         },
       },
     });
+    if (runner.currentRunId) workflowRunners.set(runner.currentRunId, { runner, executionTabId, ownerTabId: tabId, context: runContext });
+    // The runner creates the durable run ID; register the execution tab as soon as it is available.
+    const run = await runPromise;
+    if (runner.currentRunId) workflowRunners.set(runner.currentRunId, { runner, executionTabId, ownerTabId: tabId, context: runContext });
+    workflowRunners.delete(`pending:${executionTabId}`);
+    workflowRunners.delete(run.id);
+    if (run.executionTabId !== undefined) workflowRunByExecutionTab.delete(run.executionTabId);
     if (lastStepResult) {
-      sendUIMessage('updateOutput', { type: 'llm', content: lastStepResult }, tabId, windowId);
+      sendUIMessage('updateOutput', { type: 'llm', content: lastStepResult }, tabId, executionWindowId, { runId: run.id, workflowId: workflow.id, executionTabId: run.executionTabId });
     }
-    sendUIMessage('updateOutput', { type: 'system', content: `Automation ${run.status}: ${workflow.name}${run.failureMessage ? `\n${run.failureMessage}` : ''}` }, tabId, windowId);
-    sendUIMessage('processingComplete', null, tabId, windowId);
+    sendUIMessage('updateOutput', { type: 'system', content: `Automation ${run.status}: ${workflow.name}${run.failureMessage ? `\n${run.failureMessage}` : ''}` }, tabId, executionWindowId, { runId: run.id, workflowId: workflow.id, executionTabId: run.executionTabId });
+    sendUIMessage('processingComplete', null, tabId, executionWindowId, { runId: run.id, workflowId: workflow.id, executionTabId: run.executionTabId });
     sendResponse({ success: run.status === 'succeeded', run });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -287,6 +328,24 @@ async function handleRunWorkflow(
   }
 }
 
+if (typeof chrome !== 'undefined' && chrome.tabs?.onRemoved) {
+  chrome.tabs.onRemoved.addListener((removedTabId) => {
+    const runner = workflowRunByExecutionTab.get(removedTabId);
+    if (runner) runner.cancel();
+  });
+}
+
+function resolveWorkflowStartUrl(explicitUrl: string | undefined, steps: Array<{ type: string; input?: unknown }>): string | undefined {
+  const candidate = explicitUrl ?? steps.find(step => step.type === 'navigate' && typeof step.input === 'string')?.input as string | undefined;
+  if (!candidate) return undefined;
+  try {
+    const parsed = new URL(candidate);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Handle the executePrompt message
  * @param message The message to handle
@@ -300,9 +359,9 @@ function handleExecutePrompt(
   if (message.tabId) {
     // Check if this is a multitab analysis request
     if ((message as any).multiTabAnalysis && (message as any).selectedTabIds) {
-      executePrompt(message.prompt, message.tabId, false, message.role, (message as any).selectedTabIds);
+      executePrompt(message.prompt, message.tabId, false, message.role, (message as any).selectedTabIds, message.contextMode);
     } else {
-      executePrompt(message.prompt, message.tabId, false, message.role);
+      executePrompt(message.prompt, message.tabId, false, message.role, undefined, message.contextMode);
     }
   } else {
     executePrompt(message.prompt);

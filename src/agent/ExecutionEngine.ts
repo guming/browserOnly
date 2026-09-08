@@ -103,6 +103,63 @@ export class ExecutionEngine {
   }
 
   /**
+   * Execute a browser reading tool with a narrow extension-context fallback.
+   * Some Chromium extension pages do not expose `window` inside page.evaluate.
+   * In that case a plain DOM text read still provides useful input to the
+   * expert instead of aborting the entire conversation.
+   */
+  private async executeToolWithContextFallback(
+    toolName: string,
+    toolInput: string,
+    execute: () => Promise<string>
+  ): Promise<string> {
+    let result: string;
+
+    try {
+      result = await execute();
+    } catch (error) {
+      if (!this.isWindowContextError(error) || !this.isPageReadTool(toolName)) {
+        throw error;
+      }
+      return this.readPageTextFallback(toolInput, toolName);
+    }
+
+    if (this.isWindowContextError(result) && this.isPageReadTool(toolName)) {
+      return this.readPageTextFallback(toolInput, toolName);
+    }
+
+    return result;
+  }
+
+  private isPageReadTool(toolName: string): boolean {
+    return toolName === 'browser_read_text_ast'
+      || toolName === 'browser_read_text_enhanced'
+      || toolName === 'browser_read_text'
+      || toolName === 'browser_read_page';
+  }
+
+  private isWindowContextError(value: unknown): boolean {
+    return /window is not defined/i.test(value instanceof Error ? value.message : String(value));
+  }
+
+  private async readPageTextFallback(input: string, failedToolName: string): Promise<string> {
+    const fallbackTool = this.toolManager.findTool('browser_read_text');
+    if (!fallbackTool || failedToolName === 'browser_read_text') {
+      return `Unable to read the page in the current browser context: window is not defined. Please provide the page text or reload the tab.`;
+    }
+
+    try {
+      const result = await fallbackTool.func(input);
+      if (this.isWindowContextError(result)) {
+        return `Unable to read the page in the current browser context: window is not defined. Please provide the page text or reload the tab.`;
+      }
+      return `[Fallback: plain page text]\n${result}`;
+    } catch (error) {
+      return `Unable to read the page after fallback: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  }
+
+  /**
    * Main execution method with fallback support
    */
   async executePromptWithFallback(
@@ -564,7 +621,11 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
                 };
 
                 // Execute the tool with the context
-                result = await tool.func(toolInput, context);
+                result = await this.executeToolWithContextFallback(
+                  toolName,
+                  toolInput,
+                  () => tool.func(toolInput, context)
+                );
               } else {
                 // User rejected, skip execution
                 result = "Action cancelled by user.";
@@ -577,7 +638,11 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
             }
           } else {
             // No approval required, execute the tool normally
-            result = await tool.func(toolInput);
+            result = await this.executeToolWithContextFallback(
+              toolName,
+              toolInput,
+              () => tool.func(toolInput)
+            );
             console.log("tool func result: " ,result)
           }
 

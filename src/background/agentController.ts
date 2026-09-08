@@ -31,6 +31,7 @@ import {
 } from "./tabManager";
 import { ProviderType, AgentStatus, AgentStatusInfo } from "./types";
 import { sendUIMessage, logWithTimestamp, handleError } from "./utils";
+import { EXPERT_ROLE_IDS } from "../agent/prompts/expertPrompts";
 
 // Generic message format that works with all providers
 interface GenericMessage {
@@ -47,6 +48,35 @@ interface MessageHistory {
 
 // Define a maximum token budget for conversation history
 const MAX_CONVERSATION_TOKENS = 100000; // 100K tokens for conversation history
+
+function isExpertPageAnalysisRequest(prompt: string, role: string): boolean {
+  if (!EXPERT_ROLE_IDS.includes(role as typeof EXPERT_ROLE_IDS[number])) return false;
+  return /(当前网页|当前页面|这个网页|这个页面|网页内容|页面内容|analy[sz]e the (current )?web ?page|current (web )?page|this page|page content)/i.test(prompt);
+}
+
+async function readPageForExpert(tabId: number, page: any): Promise<string | null> {
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => ({
+        title: document.title || '',
+        text: document.body?.innerText || '',
+      }),
+    });
+    const result = results[0]?.result;
+    if (result?.text?.trim()) return `Title: ${result.title}\n\n${result.text.slice(0, 24000)}`;
+  } catch (error) {
+    logWithTimestamp(`Expert page pre-read via scripting failed: ${error instanceof Error ? error.message : String(error)}`, 'warn');
+  }
+
+  try {
+    const text = await page.locator('body').innerText();
+    return text?.trim() ? text.slice(0, 24000) : null;
+  } catch (error) {
+    logWithTimestamp(`Expert page pre-read via Playwright failed: ${error instanceof Error ? error.message : String(error)}`, 'warn');
+    return null;
+  }
+}
 
 // Message histories for conversation context (one per window)
 const windowMessageHistories = new Map<number, MessageHistory>();
@@ -462,7 +492,14 @@ export function cancelExecution(tabId?: number): void {
  * @param role The role of the agent
  * @param selectedTabIds Optional array of tab IDs for multitab analysis
  */
-export async function executePrompt(prompt: string, tabId?: number, isReflectionPrompt: boolean = false, role:string = 'operator', selectedTabIds?: number[]): Promise<void> {
+export async function executePrompt(
+  prompt: string,
+  tabId?: number,
+  isReflectionPrompt: boolean = false,
+  role:string = 'operator',
+  selectedTabIds?: number[],
+  contextMode?: 'current-tab' | 'standalone',
+): Promise<void> {
   try {
     // Get provider configuration from ConfigManager
     const configManager = ConfigManager.getInstance();
@@ -588,7 +625,7 @@ export async function executePrompt(prompt: string, tabId?: number, isReflection
     let currentDomain = 'current-site';
 
     // Add current page context to history if we have a page
-    if (updatedTabState.page) {
+    if (updatedTabState.page && contextMode !== 'standalone') {
       try {
         const currentUrl = await updatedTabState.page.url();
         const currentTitle = await updatedTabState.page.title();
@@ -620,8 +657,26 @@ export async function executePrompt(prompt: string, tabId?: number, isReflection
       }
     }
     
-    // Handle multitab analysis if selectedTabIds is provided and not empty
+    // Handle explicit page analysis for Experts before the LLM/tool loop.
+    // This keeps normal Expert chat page-independent while making requests
+    // such as "分析网页数据" deterministic in extension contexts.
     let enhancedPrompt = prompt;
+    const shouldReadPageForExpert = contextMode === 'current-tab' ||
+      (contextMode === undefined && isExpertPageAnalysisRequest(prompt, role));
+    if (shouldReadPageForExpert && EXPERT_ROLE_IDS.includes(role as typeof EXPERT_ROLE_IDS[number])) {
+      const pageText = await readPageForExpert(targetTabId, updatedTabState.page);
+      if (pageText) {
+        enhancedPrompt = `${prompt}\n\n[User explicitly requested current-page analysis. Use only this captured page content; do not call a browser read tool.]\n\n${pageText}`;
+        sendUIMessage('updateOutput', {
+          type: 'system',
+          content: 'Captured the current page for expert analysis.'
+        }, targetTabId);
+      } else {
+        enhancedPrompt = `${prompt}\n\n[The current page could not be read. Explain what page content is needed instead of calling a browser read tool.]`;
+      }
+    }
+
+    // Handle multitab analysis if selectedTabIds is provided and not empty
     const isMultiTabAnalysis = selectedTabIds && Array.isArray(selectedTabIds) && selectedTabIds.length > 0;
 
     if (isMultiTabAnalysis) {
@@ -664,7 +719,7 @@ export async function executePrompt(prompt: string, tabId?: number, isReflection
                 try {
                   pageContent = await tabState.page.evaluate(() => {
                     const title = document.title || '';
-                    const url = window.location.href || '';
+                    const url = globalThis.location?.href || '';
 
                     // Get main content areas with better selectors
                     const contentSelectors = [
@@ -679,7 +734,7 @@ export async function executePrompt(prompt: string, tabId?: number, isReflection
                       const elements = document.querySelectorAll(selector);
                       elements.forEach(el => {
                         // Skip hidden elements
-                        const style = window.getComputedStyle(el);
+                        const style = globalThis.getComputedStyle(el);
                         if (style.display === 'none' || style.visibility === 'hidden') {
                           return;
                         }
@@ -713,7 +768,7 @@ export async function executePrompt(prompt: string, tabId?: number, isReflection
                   const basicInfo = await tabState.page.evaluate(() => {
                     return {
                       title: document.title || '',
-                      url: window.location.href || '',
+                      url: globalThis.location?.href || '',
                       content: document.body?.innerText?.slice(0, 5000) || 'No readable content found'
                     };
                   });
@@ -867,7 +922,7 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
         if (isReflectionPrompt) {
           // Get the domain from the current page
           try {
-            updatedTabState.page.evaluate(() => window.location.href)
+            updatedTabState.page.evaluate(() => globalThis.location?.href || '')
               .then((url: string) => {
                 const domain = new URL(url).hostname;
                 

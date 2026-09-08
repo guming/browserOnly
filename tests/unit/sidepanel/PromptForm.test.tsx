@@ -141,7 +141,7 @@ describe('PromptForm operator roles', () => {
     await waitFor(() => {
       expect(screen.queryByRole('combobox', { name: 'Assistant role' })).not.toBeInTheDocument();
     });
-    expect(screen.getByRole('heading', { name: 'Ask The Books' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Build the Life You Want.*Change book/ })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Operator/ }));
     await waitFor(() => {
@@ -166,15 +166,15 @@ describe('PromptForm Ask The Books mode', () => {
     expect(screen.queryByRole('button', { name: /Data Analyze/ })).not.toBeInTheDocument();
   });
 
-  it('renders the selected book guide as static numbered content', () => {
+  it('keeps the selected book guide collapsed until requested', () => {
     renderPromptForm();
     openAskMode();
 
-    expect(screen.getByText('Ready to begin? Share:')).toBeInTheDocument();
+    expect(screen.queryByText(/Your current situation or specific challenges/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'What to include?' }));
+    expect(screen.getByText(/Ready to begin\? Share:/)).toBeInTheDocument();
     expect(screen.getByText(/Your current situation or specific challenges/)).toBeInTheDocument();
-    expect(screen.getByText(/Your most important goal/)).toBeInTheDocument();
-    expect(screen.queryByText('Suggested starting points')).not.toBeInTheDocument();
-    expect(screen.queryByText('What is the central idea?')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Hide help' })).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('updates the guide after selecting another book', async () => {
@@ -185,9 +185,10 @@ describe('PromptForm Ask The Books mode', () => {
     const search = screen.getByRole('searchbox', { name: 'Search by title or author' });
     fireEvent.change(search, { target: { value: 'Deep Work' } });
     fireEvent.click(screen.getByRole('button', { name: /Deep Work.*Cal Newport/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'What to include?' }));
 
-    expect(await screen.findByText('Ready to master focus? Share:')).toBeInTheDocument();
-    expect(screen.getByText('What type of work or study requires your deepest focus?')).toBeInTheDocument();
+    expect(await screen.findByText(/Ready to master focus\? Share:/)).toBeInTheDocument();
+    expect(screen.getByText(/What type of work or study requires your deepest focus\?/)).toBeInTheDocument();
   });
 
   it('submits with the selected book role', async () => {
@@ -201,6 +202,7 @@ describe('PromptForm Ask The Books mode', () => {
       'I want to improve my work habits',
       'books-happinessBook',
       undefined,
+      'standalone',
     );
   });
 
@@ -224,9 +226,10 @@ describe('PromptForm Ask The Books mode', () => {
     expect(screen.getByRole('button', { name: 'Books' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Experts' }));
 
-    expect(screen.getByRole('heading', { name: 'Experts' })).toBeInTheDocument();
     expect(screen.getByText('Charlie Munger')).toBeInTheDocument();
-    expect(screen.getByText('To get a useful answer, share:')).toBeInTheDocument();
+    expect(screen.queryByText(/The decision, problem, or belief/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'What to include?' }));
+    expect(screen.getByText(/To get a useful answer, share:/)).toBeInTheDocument();
     expect(screen.getByText(/The decision, problem, or belief/)).toBeInTheDocument();
     expect(screen.getByText(/constraints, alternatives, and outcome/)).toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: 'Assistant role' })).not.toBeInTheDocument();
@@ -239,7 +242,29 @@ describe('PromptForm Ask The Books mode', () => {
 
     submitPrompt('Should I change direction?');
 
-    expect(onSubmit).toHaveBeenCalledWith('Should I change direction?', 'munger', undefined);
+    expect(onSubmit).toHaveBeenCalledWith('Should I change direction?', 'munger', undefined, 'current-tab');
+  });
+
+  it('lets expert conversations ignore the current tab', () => {
+    const { onSubmit } = renderPromptForm();
+    openAskMode();
+    fireEvent.click(screen.getByRole('button', { name: 'Experts' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Standalone' }));
+
+    submitPrompt('Talk through this idea with me');
+
+    expect(onSubmit).toHaveBeenCalledWith('Talk through this idea with me', 'munger', undefined, 'standalone');
+  });
+
+  it('keeps book conversations standalone', () => {
+    const { onSubmit } = renderPromptForm();
+    openAskMode();
+
+    expect(screen.getByText('Standalone')).toHaveAttribute('title', 'Book conversations do not use browser tab content');
+    expect(screen.queryByRole('group', { name: 'Expert context' })).not.toBeInTheDocument();
+    submitPrompt('Apply this book to my situation');
+
+    expect(onSubmit).toHaveBeenCalledWith('Apply this book to my situation', 'books-happinessBook', undefined, 'standalone');
   });
 
   it.each([
@@ -255,10 +280,11 @@ describe('PromptForm Ask The Books mode', () => {
     fireEvent.click(screen.getByRole('button', { name: new RegExp(name) }));
 
     expect(screen.getByText(name)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'What to include?' }));
     expect(screen.getByText(new RegExp(guideText))).toBeInTheDocument();
     submitPrompt('Please examine this situation');
 
-    expect(onSubmit).toHaveBeenCalledWith('Please examine this situation', expectedRole, undefined);
+    expect(onSubmit).toHaveBeenCalledWith('Please examine this situation', expectedRole, undefined, 'current-tab');
   });
 
   it('keeps draft text when changing experts', () => {
