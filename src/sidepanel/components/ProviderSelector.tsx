@@ -130,19 +130,31 @@ export function ProviderSelector({ isProcessing, compact = false }: ProviderSele
 
   if (compact) {
     return (
-      <select
-        aria-label="Model"
-        className="h-7 max-w-[150px] min-w-0 rounded-md border border-stone-300 bg-white px-2 text-xs font-medium text-stone-700 outline-none hover:border-stone-500 focus:border-[#315a78] focus:ring-2 focus:ring-[#315a78]/10"
-        value={`${currentProvider}|${currentModel}`}
-        onChange={handleChange}
-        disabled={isProcessing}
-      >
-        {options.map(option => option.models.map(model => (
-          <option key={`${option.provider}|${model.id}`} value={`${option.provider}|${model.id}`}>
-            {model.name}
-          </option>
-        )))}
-      </select>
+      <div className="flex min-w-0 items-center gap-1.5">
+        <button
+          type="button"
+          aria-label="Open Settings"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-stone-300 bg-white text-stone-600 transition-colors duration-150 hover:border-stone-500 hover:text-stone-900 disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={() => chrome.runtime.openOptionsPage()}
+          title="Open Settings"
+          disabled={isProcessing}
+        >
+          <FontAwesomeIcon icon={faCog} className="text-xs" />
+        </button>
+        <select
+          aria-label="Model"
+          className="h-7 max-w-[150px] min-w-0 rounded-md border border-stone-300 bg-white px-2 text-xs font-medium text-stone-700 outline-none hover:border-stone-500 focus:border-[#315a78] focus:ring-2 focus:ring-[#315a78]/10"
+          value={`${currentProvider}|${currentModel}`}
+          onChange={handleChange}
+          disabled={isProcessing}
+        >
+          {options.map(option => option.models.map(model => (
+            <option key={`${option.provider}|${model.id}`} value={`${option.provider}|${model.id}`}>
+              {model.name}
+            </option>
+          )))}
+        </select>
+      </div>
     );
   }
   
