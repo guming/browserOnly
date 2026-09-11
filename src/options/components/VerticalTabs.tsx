@@ -11,8 +11,6 @@ interface VerticalTabsProps {
   // Provider selection
   provider: string;
   setProvider: (provider: string) => void;
-  translationProvider: string;
-  setTranslationProvider: (provider: string) => void;
   
   // Anthropic settings
   anthropicApiKey: string;
@@ -77,9 +75,6 @@ interface VerticalTabsProps {
   handleRemoveModel: (id: string) => void;
   handleEditModel: (idx: number, field: string, value: any) => void;
   
-  // Pricing data
-  getModelPricingData: () => any[];
-
   // Notion settings
   notionEnabled: boolean;
   setNotionEnabled: (enabled: boolean) => void;
@@ -123,8 +118,6 @@ export function VerticalTabs(props: VerticalTabsProps) {
           <ProvidersTab
             provider={props.provider}
             setProvider={props.setProvider}
-            translationProvider={props.translationProvider}
-            setTranslationProvider={props.setTranslationProvider}
             anthropicApiKey={props.anthropicApiKey}
             setAnthropicApiKey={props.setAnthropicApiKey}
             anthropicBaseUrl={props.anthropicBaseUrl}
@@ -172,7 +165,6 @@ export function VerticalTabs(props: VerticalTabsProps) {
             handleAddModel={props.handleAddModel}
             handleRemoveModel={props.handleRemoveModel}
             handleEditModel={props.handleEditModel}
-            getModelPricingData={props.getModelPricingData}
           />
         );
       case 'features':

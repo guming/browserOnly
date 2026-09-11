@@ -4,14 +4,11 @@ import { OllamaModel } from '../OllamaModelList';
 import { ProviderSelector } from '../ProviderSelector';
 import { ProviderSettings } from '../ProviderSettings';
 import { SaveButton } from '../SaveButton';
-import { ModelPricingTable } from '../ModelPricingTable';
 
 interface ProvidersTabProps {
   // Provider selection
   provider: string;
   setProvider: (provider: string) => void;
-  translationProvider: string;
-  setTranslationProvider: (provider: string) => void;
   
   // Anthropic settings
   anthropicApiKey: string;
@@ -76,16 +73,12 @@ interface ProvidersTabProps {
   handleRemoveModel: (id: string) => void;
   handleEditModel: (idx: number, field: string, value: any) => void;
   
-  // Pricing data
-  getModelPricingData: () => any[];
 }
 
 export function ProvidersTab({
   // Provider selection
   provider,
   setProvider,
-  translationProvider,
-  setTranslationProvider,
   
   // Anthropic settings
   anthropicApiKey,
@@ -148,10 +141,7 @@ export function ProvidersTab({
   // Model operations
   handleAddModel,
   handleRemoveModel,
-  handleEditModel,
-  
-  // Pricing data
-  getModelPricingData
+  handleEditModel
 }: ProvidersTabProps) {
   return (
     <div className="space-y-6">
@@ -159,36 +149,13 @@ export function ProvidersTab({
         <div className="card-body">
           <h2 className="card-title text-xl">LLM Provider Configuration</h2>
           <p className="mb-4">
-            Configure your preferred LLM provider and API settings.
+            Choose the default provider for LLM tasks, then configure its connection settings.
             Your API keys are stored securely in your browser's storage.
           </p>
           
           {/* Provider Selector */}
           <ProviderSelector provider={provider} setProvider={setProvider} />
 
-          <div className="mt-5 border-t border-stone-200 pt-5">
-            <label htmlFor="translation-provider" className="mb-2 block text-sm font-semibold text-stone-800">
-              Translation Provider
-            </label>
-            <p className="mb-3 text-xs text-stone-500">
-              Choose which configured LLM provider should be used for translation tasks.
-            </p>
-            <select
-              id="translation-provider"
-              className="select select-bordered w-full max-w-md"
-              value={translationProvider}
-              onChange={event => setTranslationProvider(event.target.value)}
-            >
-              <option value="primary">Use primary provider ({provider})</option>
-              <option value="anthropic">Anthropic</option>
-              <option value="openai">OpenAI</option>
-              <option value="deepseek">DeepSeek</option>
-              <option value="gemini">Google Gemini</option>
-              <option value="ollama">Ollama</option>
-              <option value="openai-compatible">OpenAI Compatible</option>
-            </select>
-          </div>
-          
           {/* Provider-specific Settings */}
           <ProviderSettings
             provider={provider}
@@ -256,9 +223,6 @@ export function ProvidersTab({
           />
         </div>
       </div>
-      
-      {/* Model Pricing Table */}
-      <ModelPricingTable getModelPricingData={getModelPricingData} />
     </div>
   );
 }

@@ -1,14 +1,9 @@
 import { useState, useEffect } from 'react';
 import { 
-  anthropicModels, 
-  openaiModels, 
-  geminiModels, 
-  ollamaModels,
   anthropicDefaultModelId,
   openaiDefaultModelId,
   geminiDefaultModelId,
   ollamaDefaultModelId,
-  deepseekModels,
   deepseekDefaultModelId
 } from '../models/models';
 
@@ -19,42 +14,8 @@ import { OllamaModel } from './components/OllamaModelList';
 import { DEFAULT_OLLAMA_BASE_URL } from '../models/providers/ollama';
 
 export function Options() {
-  // Function to process and sort model pricing data
-  const getModelPricingData = () => {
-    const allModels = [
-      ...Object.entries(anthropicModels).map(([id, model]) => ({ 
-        id, provider: 'Anthropic', ...model 
-      })),
-      ...Object.entries(openaiModels).map(([id, model]) => ({ 
-        id, provider: 'OpenAI', ...model 
-      })),
-      ...Object.entries(deepseekModels).map(([id, model]) => ({ 
-        id, provider: 'DeepSeek', ...model 
-      })),
-      ...Object.entries(geminiModels).map(([id, model]) => ({ 
-        id, provider: 'Google', ...model 
-      })),
-      // Just one entry for Ollama with $0 cost
-      {
-        id: 'ollama',
-        provider: 'Ollama',
-        name: 'Ollama',
-        inputPrice: 0.0,
-        outputPrice: 0.0,
-        maxTokens: 4096,
-        contextWindow: 32768,
-        supportsImages: false,
-        supportsPromptCache: false,
-      }
-    ];
-    
-    // Sort by output price (cheapest first)
-    return allModels.sort((a, b) => a.outputPrice - b.outputPrice);
-  };
-  
   // Provider selection
-  const [provider, setProvider] = useState('DeepSeek');
-  const [translationProvider, setTranslationProvider] = useState('primary');
+  const [provider, setProvider] = useState('deepseek');
   
   // Anthropic settings
   const [anthropicApiKey, setAnthropicApiKey] = useState('');
@@ -117,7 +78,6 @@ export function Options() {
   useEffect(() => {
     chrome.storage.sync.get({
       provider: 'deepseek',
-      translationProvider: 'primary',
       anthropicApiKey: '',
       anthropicModelId: anthropicDefaultModelId,
       anthropicBaseUrl: '',
@@ -150,7 +110,6 @@ export function Options() {
     }, (result) => {
       
       setProvider(result.provider);
-      setTranslationProvider(result.translationProvider || 'primary');
       setAnthropicApiKey(result.anthropicApiKey);
       setAnthropicModelId(result.anthropicModelId);
       setAnthropicBaseUrl(result.anthropicBaseUrl);
@@ -190,7 +149,6 @@ export function Options() {
     // Save settings to Chrome storage
     chrome.storage.sync.set({
       provider,
-      translationProvider,
       anthropicApiKey,
       anthropicModelId,
       anthropicBaseUrl,
@@ -291,8 +249,6 @@ export function Options() {
     <VerticalTabs
       // Provider selection
       provider={provider}
-      translationProvider={translationProvider}
-      setTranslationProvider={setTranslationProvider}
       setProvider={setProvider}
       // Anthropic settings
       anthropicApiKey={anthropicApiKey}
@@ -349,8 +305,6 @@ export function Options() {
       handleAddModel={handleAddModel}
       handleRemoveModel={handleRemoveModel}
       handleEditModel={handleEditModel}
-      // Pricing data
-      getModelPricingData={getModelPricingData}
       // Notion settings
       notionEnabled={notionEnabled}
       setNotionEnabled={setNotionEnabled}
