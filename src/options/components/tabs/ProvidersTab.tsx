@@ -10,6 +10,8 @@ interface ProvidersTabProps {
   // Provider selection
   provider: string;
   setProvider: (provider: string) => void;
+  translationProvider: string;
+  setTranslationProvider: (provider: string) => void;
   
   // Anthropic settings
   anthropicApiKey: string;
@@ -82,6 +84,8 @@ export function ProvidersTab({
   // Provider selection
   provider,
   setProvider,
+  translationProvider,
+  setTranslationProvider,
   
   // Anthropic settings
   anthropicApiKey,
@@ -161,6 +165,29 @@ export function ProvidersTab({
           
           {/* Provider Selector */}
           <ProviderSelector provider={provider} setProvider={setProvider} />
+
+          <div className="mt-5 border-t border-stone-200 pt-5">
+            <label htmlFor="translation-provider" className="mb-2 block text-sm font-semibold text-stone-800">
+              Translation Provider
+            </label>
+            <p className="mb-3 text-xs text-stone-500">
+              Choose which configured LLM provider should be used for translation tasks.
+            </p>
+            <select
+              id="translation-provider"
+              className="select select-bordered w-full max-w-md"
+              value={translationProvider}
+              onChange={event => setTranslationProvider(event.target.value)}
+            >
+              <option value="primary">Use primary provider ({provider})</option>
+              <option value="anthropic">Anthropic</option>
+              <option value="openai">OpenAI</option>
+              <option value="deepseek">DeepSeek</option>
+              <option value="gemini">Google Gemini</option>
+              <option value="ollama">Ollama</option>
+              <option value="openai-compatible">OpenAI Compatible</option>
+            </select>
+          </div>
           
           {/* Provider-specific Settings */}
           <ProviderSettings

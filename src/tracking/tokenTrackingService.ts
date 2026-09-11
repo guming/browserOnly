@@ -130,9 +130,7 @@ export class TokenTrackingService {
         }
         break;
       case 'ollama':
-        if (this.currentModelId && this.currentModelId in ollamaModels) {
-          model = ollamaModels[this.currentModelId as keyof typeof ollamaModels];
-        }
+        model = ollamaModels.ollama;
         break;
     }
 

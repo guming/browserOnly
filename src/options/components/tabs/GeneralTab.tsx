@@ -1,108 +1,32 @@
 import React from 'react';
 import { AboutSection } from '../AboutSection';
 
-export function GeneralTab() {
+function ArrowIcon() { return <span className="arrow-icon" aria-hidden="true">→</span>; }
+
+export function GeneralTab({ onOpenConfiguration }: { onOpenConfiguration?: () => void }) {
   return (
-    <div className="space-y-6">
+    <div className="general-page">
       <AboutSection />
-
-      {/* Getting Started Guide */}
-      <div className="card bg-base-100 shadow-md">
-        <div className="card-body">
-          <h2 className="card-title text-xl">🚀 Getting Started</h2>
-          <p className="mb-4">
-            Follow these simple steps to start using BrowserOnly:
-          </p>
-          
-          {/* Step-by-step instructions */}
-          <div className="steps steps-vertical lg:steps-horizontal w-full">
-            <div className="step step-primary">
-              <div className="step-content text-left">
-                <h3 className="font-semibold text-lg mb-2">1. Get an API Key</h3>
-                <p className="text-sm mb-2">
-                  Obtain an API key from one of these LLM providers:
-                </p>
-                <ul className="text-sm list-disc list-inside space-y-1 ml-4">
-                  <li><strong>Anthropic</strong> - Recommended for best performance</li>
-                  <li><strong>OpenAI</strong> - Popular and reliable</li>
-                  <li><strong>DeepSeek</strong> - Cost-effective with strong reasoning capabilities</li>
-                  <li><strong>Google Gemini</strong> - Good value for money</li>
-                  <li><strong>Ollama</strong> - Free local models</li>
-                </ul>
-              </div>
-            </div>
-            
-            <div className="step step-primary">
-              <div className="step-content text-left">
-                <h3 className="font-semibold text-lg mb-2">2. Configure BrowserOnly</h3>
-                <p className="text-sm mb-2">
-                  Go to the <strong>LLM Configuration</strong> tab and:
-                </p>
-                <ul className="text-sm list-disc list-inside space-y-1 ml-4">
-                  <li>Select your preferred provider</li>
-                  <li>Enter your API key</li>
-                  <li>Click <strong>Save Settings</strong></li>
-                </ul>
-              </div>
-            </div>
-            
-            <div className="step step-primary">
-              <div className="step-content text-left">
-                <h3 className="font-semibold text-lg mb-2">3. Run Your First Task</h3>
-                <p className="text-sm mb-2">
-                  Try this example to get started:
-                </p>
-                <ul className="text-sm list-disc list-inside space-y-1 ml-4">
-                  <li>Open a new tab and go to <code className="bg-base-200 px-1 rounded">google.com</code></li>
-                  <li>Click the BrowserOnly icon or press <kbd className="kbd kbd-xs">Alt</kbd>+<kbd className="kbd kbd-xs">Shift</kbd>+<kbd className="kbd kbd-xs">B</kbd></li>
-                  <li>Type: <em>"Search for the weather in Paris"</em></li>
-                  <li>Press Enter and watch BrowserOnly work! �</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-          
-          {/* Important Tips */}
-          <div className="alert alert-info mt-6">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="stroke-current shrink-0 w-6 h-6">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-            <div>
-              <h3 className="font-bold">💡 Pro Tips</h3>
-              <ul className="text-sm mt-2 space-y-1">
-                <li>• <strong>Keep BrowserOnly attached:</strong> Leave it connected to a tab throughout your session for best performance</li>
-                <li>• <strong>Reattach if needed:</strong> If you close the attached tab, use the <strong>reattach</strong> button to reconnect</li>
-                <li>• <strong>One per window:</strong> You can run one BrowserOnly instance per Chrome window</li>
-                <li>• <strong>Tab limitations:</strong> BrowserOnly can't attach to new tabs or chrome:// pages</li>
-              </ul>
-            </div>
-          </div>
-          
-          {/* Support Section */}
-          <div className="divider">Need Help?</div>
-          
-          <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
-            <a 
-              href="https://discord.gg/P3fu9Rhb" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="btn btn-primary btn-wide"
-            >
-              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
-              </svg>
-              Join Discord Community
-            </a>
-            
-            <div className="text-center">
-              <p className="text-sm text-base-content/70">
-                Get help, share tips, and connect with other BrowserOnly users
-              </p>
-            </div>
-          </div>
+      <section className="guide-section" aria-labelledby="start-title">
+        <div className="section-kicker">Quick start</div>
+        <div className="guide-heading-row">
+          <div><h2 id="start-title">Get your first task running</h2><p>Three steps are all you need to connect a model and start browsing.</p></div>
+          <button className="text-link" type="button" onClick={onOpenConfiguration}>Open configuration <ArrowIcon /></button>
         </div>
-      </div>
-
+        <div className="steps-grid">
+          <article className="step-item"><span className="step-number">01</span><h3>Choose a provider</h3><p>Pick Anthropic, OpenAI, DeepSeek, Gemini, or a local Ollama model.</p></article>
+          <article className="step-item"><span className="step-number">02</span><h3>Add your credentials</h3><p>Enter an API key in LLM Configuration, then save your settings.</p></article>
+          <article className="step-item"><span className="step-number">03</span><h3>Describe the task</h3><p>Open the side panel and try: “Search for the weather in Paris.”</p></article>
+        </div>
+      </section>
+      <section className="notes-section" aria-labelledby="notes-title">
+        <div><div className="section-kicker">Good to know</div><h2 id="notes-title">A few operating notes</h2></div>
+        <ul className="notes-list"><li>Keep BrowserOnly attached to the active tab while a task is running.</li><li>One BrowserOnly instance can run in each Chrome window.</li><li>Chrome system pages and newly opened tabs cannot be attached.</li></ul>
+      </section>
+      <footer className="help-footer">
+        <div><span className="section-kicker">Need a hand?</span><h2>Join the BrowserOnly community</h2><p>Share workflows, report issues, and get help from other users.</p></div>
+        <a className="outline-button" href="https://discord.gg/P3fu9Rhb" target="_blank" rel="noopener noreferrer">Open Discord <ArrowIcon /></a>
+      </footer>
     </div>
   );
 }

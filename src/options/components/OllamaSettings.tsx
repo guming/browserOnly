@@ -1,5 +1,6 @@
 import React from 'react';
 import { OllamaModelList, OllamaModel } from './OllamaModelList';
+import { DEFAULT_OLLAMA_BASE_URL } from '../../models/providers/ollama';
 
 interface OllamaSettingsProps {
   ollamaApiKey: string;
@@ -32,6 +33,39 @@ export function OllamaSettings({
   handleRemoveOllamaModel,
   handleEditOllamaModel
 }: OllamaSettingsProps) {
+  const [isDiscovering, setIsDiscovering] = React.useState(false);
+  const [connectionStatus, setConnectionStatus] = React.useState('');
+
+  const discoverModels = async () => {
+    setIsDiscovering(true);
+    setConnectionStatus('');
+    try {
+      const response = await fetch(`${(ollamaBaseUrl || DEFAULT_OLLAMA_BASE_URL).replace(/\/$/, '')}/api/tags`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json() as { models?: Array<{ name: string }> };
+      const discovered = (data.models || []).map(model => ({
+        id: model.name,
+        name: model.name,
+        contextWindow: 32768,
+      }));
+      const merged = [...ollamaCustomModels];
+      discovered.forEach(model => {
+        if (!merged.some(existing => existing.id === model.id)) merged.push(model);
+      });
+      setOllamaCustomModels(merged);
+      if (!ollamaModelId && merged[0]) setOllamaModelId(merged[0].id);
+      await chrome.storage.sync.set({ ollamaCustomModels: merged });
+      if (!ollamaModelId && merged[0]) await chrome.storage.sync.set({ ollamaModelId: merged[0].id });
+      await chrome.runtime.sendMessage({ action: 'providerConfigChanged' }).catch(() => undefined);
+      if (discovered.length === 0) setConnectionStatus('Connected, but no local models were found.');
+      else setConnectionStatus(`Connected. Found ${discovered.length} local model${discovered.length === 1 ? '' : 's'}.`);
+    } catch (error) {
+      setConnectionStatus(`Unable to connect to Ollama. Check that it is running and allows this extension origin.`);
+    } finally {
+      setIsDiscovering(false);
+    }
+  };
+
   return (
     <div className="border rounded-lg p-4 mb-4">
       <h3 className="font-bold mb-2">Ollama Settings</h3>
@@ -67,13 +101,20 @@ export function OllamaSettings({
             // Save the base URL immediately to trigger the provider selector update
             chrome.storage.sync.set({ ollamaBaseUrl: newValue });
           }}
-          placeholder="Ollama server URL (default: http://localhost:11434)"
+          placeholder={DEFAULT_OLLAMA_BASE_URL}
           className="input input-bordered w-full"
         />
         <span className="label-text-alt">
-          If running Ollama locally, you need to enable CORS by setting <code>OLLAMA_ORIGINS=*</code> environment variable. 
-          <a href="https://objectgraph.com/blog/ollama-cors/" target="_blank" className="link link-primary ml-1">Learn more</a>
+          Local default: <code>{DEFAULT_OLLAMA_BASE_URL}</code>. Ollama must allow this extension origin through <code>OLLAMA_ORIGINS</code>.
         </span>
+      </div>
+
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <button type="button" className="btn btn-outline btn-sm" onClick={discoverModels} disabled={isDiscovering}>
+          {isDiscovering ? <span className="loading loading-spinner loading-xs" /> : null}
+          {isDiscovering ? 'Checking Ollama...' : 'Detect Local Models'}
+        </button>
+        {connectionStatus && <span className="text-xs text-stone-500">{connectionStatus}</span>}
       </div>
       
       {ollamaCustomModels.length === 0 && (

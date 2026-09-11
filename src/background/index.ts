@@ -40,6 +40,7 @@ function setupEventListeners(): void {
         key === 'openaiBaseUrl' ||
         key === 'geminiBaseUrl' ||
         key === 'ollamaBaseUrl'
+        || key === 'translationProvider'
       );
 
       if (providerConfigChanged) {

@@ -1,12 +1,19 @@
 import { Anthropic } from "@anthropic-ai/sdk";
 import { Message, Ollama } from "ollama/browser";
-import { OllamaModel } from '../../options/components/OllamaModelList';
 import { ollamaModels } from '../models';
 import { convertToOllamaMessages } from "./ollama-format";
 import { LLMProvider, ProviderOptions, ModelInfo, ApiStream } from './types';
 
+export const DEFAULT_OLLAMA_BASE_URL = 'http://localhost:11434';
+
+export interface OllamaModelConfig {
+  id: string;
+  name: string;
+  contextWindow: number;
+}
+
 export interface OllamaProviderOptions extends ProviderOptions {
-  ollamaCustomModels?: OllamaModel[];
+  ollamaCustomModels?: OllamaModelConfig[];
 }
 
 export class OllamaProvider implements LLMProvider {
@@ -34,19 +41,14 @@ export class OllamaProvider implements LLMProvider {
 				host: this.options.baseUrl
 			});
 		} else {
-			// Use a default URL for the client, but it won't be used unless a base URL is configured
 			this.client = new Ollama({
-				host: "http://localhost:11434"
+				host: DEFAULT_OLLAMA_BASE_URL
 			});
 		}
 	}
 
 	async *createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[], _tools?: any[]): ApiStream {
 		// Check if a base URL is configured
-		if (!this.options.baseUrl) {
-			throw new Error("Ollama base URL not configured. Please set the Ollama server URL in the extension options.");
-		}
-
 		// Check if any models are configured
 		if (!this.options.ollamaCustomModels || this.options.ollamaCustomModels.length === 0) {
 			throw new Error("No Ollama models configured. Please add at least one model in the extension options.");

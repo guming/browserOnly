@@ -1,10 +1,7 @@
 import React from 'react';
+import type { OllamaModelConfig } from '../../models/providers/ollama';
 
-export interface OllamaModel {
-  id: string;
-  name: string;
-  contextWindow: number;
-}
+export type OllamaModel = OllamaModelConfig;
 
 interface OllamaModelListProps {
   models: OllamaModel[];

@@ -11,6 +11,8 @@ interface VerticalTabsProps {
   // Provider selection
   provider: string;
   setProvider: (provider: string) => void;
+  translationProvider: string;
+  setTranslationProvider: (provider: string) => void;
   
   // Anthropic settings
   anthropicApiKey: string;
@@ -105,22 +107,24 @@ export function VerticalTabs(props: VerticalTabsProps) {
   const [activeTab, setActiveTab] = useState('general');
 
   const tabs = [
-    { id: 'general', label: 'General', icon: '🏠' },
-    { id: 'providers', label: 'LLM Configuration', icon: '🤖' },
-    { id: 'features', label: 'Features', icon: '⚙️' },
-    { id: 'connection', label: 'Connection', icon: '🔗' },
-    { id: 'memory', label: 'Memory', icon: '🧠' },
+    { id: 'general', label: 'General', icon: '01' },
+    { id: 'providers', label: 'LLM Configuration', icon: '02' },
+    { id: 'features', label: 'Features', icon: '03' },
+    { id: 'connection', label: 'Connection', icon: '04' },
+    { id: 'memory', label: 'Memory', icon: '05' },
   ];
 
   const renderTabContent = () => {
     switch (activeTab) {
       case 'general':
-        return <GeneralTab />;
+        return <GeneralTab onOpenConfiguration={() => setActiveTab('providers')} />;
       case 'providers':
         return (
           <ProvidersTab
             provider={props.provider}
             setProvider={props.setProvider}
+            translationProvider={props.translationProvider}
+            setTranslationProvider={props.setTranslationProvider}
             anthropicApiKey={props.anthropicApiKey}
             setAnthropicApiKey={props.setAnthropicApiKey}
             anthropicBaseUrl={props.anthropicBaseUrl}
@@ -199,39 +203,39 @@ export function VerticalTabs(props: VerticalTabsProps) {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
+    <div className="options-page flex min-h-screen bg-[#eef1f3] text-stone-900">
   {/* 完全移除动态背景和装饰元素 */}
   
   {/* Left Sidebar - 纯色设计 */}
-  <div className="w-64 bg-white border-r border-gray-200">
+  <div className="options-sidebar w-64 shrink-0 border-r border-stone-200 bg-[#f4f6f7]">
     <div className="p-6">
       {/* 简化的Header */}
-      <div className="flex items-center gap-3 mb-8">
-        <div className="w-12 h-12 bg-blue-600 flex items-center justify-center">
-          <span className="text-2xl">🤖</span>
+      <div className="mb-12 flex items-center gap-3">
+        <div className="brand-mark flex h-10 w-10 items-center justify-center rounded-lg bg-[#315a78] text-white">
+          <span aria-hidden="true">B</span>
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">BrowserOnly</h1>
-          <div className="text-sm text-blue-600">Configuration</div>
+          <h1 className="text-lg font-semibold tracking-tight text-stone-900">BrowserOnly</h1>
+          <div className="text-xs text-stone-500">Extension settings</div>
         </div>
       </div>
       
       {/* 简化的垂直导航 */}
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            className={`w-full flex items-center gap-4 px-4 py-3 font-medium ${
+            className={`settings-nav-item flex w-full items-center gap-3 rounded-md px-3 py-3 text-left text-sm font-medium transition-colors ${
               activeTab === tab.id
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-50 text-gray-700 hover:bg-gray-100 hover:text-gray-900 border border-gray-200'
+                ? 'bg-[#315a78] text-white shadow-sm'
+                : 'text-stone-600 hover:bg-stone-100 hover:text-stone-900'
             }`}
             onClick={() => setActiveTab(tab.id)}
           >
-            <span className="text-xl">
+            <span className="nav-index">
               {tab.icon}
             </span>
-            <span className="font-semibold">{tab.label}</span>
+            <span>{tab.label}</span>
           </button>
         ))}
       </div>
@@ -239,9 +243,9 @@ export function VerticalTabs(props: VerticalTabsProps) {
   </div>
 
   {/* Right Content Area - 简化卡片设计 */}
-  <div className="flex-1 p-6 overflow-auto">
-    <div className="bg-white border border-gray-200 h-full overflow-auto">
-      <div className="p-8">
+  <div className="options-content min-w-0 flex-1 overflow-auto p-4 sm:p-8">
+    <div className="h-full overflow-auto rounded-xl border border-stone-200 bg-white">
+      <div className="mx-auto max-w-5xl p-6 sm:p-12">
         {renderTabContent()}
       </div>
     </div>

@@ -1,18 +1,21 @@
 import { AnthropicProvider } from '../models/providers/anthropic';
 import { DeepSeekProvider } from '../models/providers/deepseek';
 import { GeminiProvider } from '../models/providers/gemini';
-import { OllamaProvider, OllamaProviderOptions } from '../models/providers/ollama';
+import { DEFAULT_OLLAMA_BASE_URL, OllamaProvider, OllamaProviderOptions, OllamaModelConfig } from '../models/providers/ollama';
 import { OpenAIProvider } from '../models/providers/openai';
 import { OpenAICompatibleProvider } from '../models/providers/openai-compatible';
 
 export interface ProviderConfig {
   provider: 'anthropic' | 'openai' | 'gemini' | 'ollama' | 'openai-compatible' | 'deepseek';
+  /** Provider used by translation features. 'primary' follows the main provider. */
+  translationProvider?: 'primary' | 'anthropic' | 'openai' | 'gemini' | 'ollama' | 'openai-compatible' | 'deepseek';
   apiKey: string;
   apiModelId?: string;
   baseUrl?: string;
   thinkingBudgetTokens?: number;
   // openai-compatible only
   openaiCompatibleModels?: Array<{ id: string; name: string; isReasoningModel?: boolean }>;
+  ollamaCustomModels?: OllamaModelConfig[];
   connectionEndpoint?: string;
   connectionKey?: string;
 }
@@ -37,6 +40,7 @@ export class ConfigManager {
   async getProviderConfig(): Promise<ProviderConfig> {
     const result = await chrome.storage.sync.get({
       provider: 'anthropic',
+      translationProvider: 'primary',
       anthropicApiKey: '',
       anthropicModelId: 'claude-3-7-sonnet-20250219',
       anthropicBaseUrl: '',
@@ -48,7 +52,8 @@ export class ConfigManager {
       geminiBaseUrl: '',
       ollamaApiKey: '',
       ollamaModelId: '',
-      ollamaBaseUrl: '',
+      ollamaBaseUrl: DEFAULT_OLLAMA_BASE_URL,
+      ollamaCustomModels: [],
       deepseekApiKey: '',
       deepseekModelId: 'deepseek-chat',
       deepseekBaseUrl: '',
@@ -59,12 +64,15 @@ export class ConfigManager {
       openaiCompatibleBaseUrl: '',
       openaiCompatibleModels: [],
     });
+
+    const translationProvider = result.translationProvider || 'primary';
     
     // Return provider-specific configuration
     switch (result.provider) {
       case 'anthropic':
         return {
           provider: 'anthropic',
+          translationProvider,
           apiKey: result.anthropicApiKey,
           apiModelId: result.anthropicModelId,
           baseUrl: result.anthropicBaseUrl,
@@ -73,6 +81,7 @@ export class ConfigManager {
       case 'openai':
         return {
           provider: 'openai',
+          translationProvider,
           apiKey: result.openaiApiKey,
           apiModelId: result.openaiModelId,
           baseUrl: result.openaiBaseUrl,
@@ -80,6 +89,7 @@ export class ConfigManager {
       case 'gemini':
         return {
           provider: 'gemini',
+          translationProvider,
           apiKey: result.geminiApiKey,
           apiModelId: result.geminiModelId,
           baseUrl: result.geminiBaseUrl,
@@ -87,13 +97,16 @@ export class ConfigManager {
       case 'ollama':
         return {
           provider: 'ollama',
+          translationProvider,
           apiKey: result.ollamaApiKey,
           apiModelId: result.ollamaModelId,
-          baseUrl: result.ollamaBaseUrl,
+          baseUrl: result.ollamaBaseUrl || DEFAULT_OLLAMA_BASE_URL,
+          ollamaCustomModels: result.ollamaCustomModels || [],
         };
       case 'deepseek':
         return {
           provider: 'deepseek',
+          translationProvider,
           apiKey: result.deepseekApiKey,
           apiModelId: result.deepseekModelId,
           baseUrl: result.deepseekBaseUrl,
@@ -101,6 +114,7 @@ export class ConfigManager {
       case 'openai-compatible':
         return {
           provider: 'openai-compatible',
+          translationProvider,
           apiKey: result.openaiCompatibleApiKey,
           apiModelId: result.openaiCompatibleModelId,
           baseUrl: result.openaiCompatibleBaseUrl,
@@ -137,9 +151,10 @@ export class ConfigManager {
     if (result.deepseekApiKey) providers.push('deepseek');
     
     // For Ollama, check if the base URL is configured AND at least one model exists
-    const ollamaBaseUrl = await this.getOllamaBaseUrl();
+    const ollamaBaseUrl = (await this.getOllamaBaseUrl()) || DEFAULT_OLLAMA_BASE_URL;
     const ollamaResult = await chrome.storage.sync.get({ ollamaCustomModels: [] });
-    if (ollamaBaseUrl && ollamaResult.ollamaCustomModels.length > 0) {
+    const ollamaModels = ollamaResult.ollamaCustomModels || [];
+    if (ollamaBaseUrl && ollamaModels.length > 0) {
       providers.push('ollama');
     }
     
@@ -180,7 +195,7 @@ export class ConfigManager {
    */
   async getOllamaBaseUrl(): Promise<string> {
     const result = await chrome.storage.sync.get({
-      ollamaBaseUrl: '',
+      ollamaBaseUrl: DEFAULT_OLLAMA_BASE_URL,
     });
     return result.ollamaBaseUrl;
   }

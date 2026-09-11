@@ -1,6 +1,174 @@
 @import "tailwindcss";
 @plugin "daisyui";
 
+/* Options uses the same quiet, compact visual language as the side panel. */
+.options-page {
+  --bo-page: #f7f8f9;
+  --bo-surface: #ffffff;
+  --bo-muted-surface: #f1f3f4;
+  --bo-border: #d9dee3;
+  --bo-border-strong: #c3cbd2;
+  --bo-text: #292f33;
+  --bo-text-muted: #6b747c;
+  --bo-primary: #315a78;
+  --bo-primary-hover: #274a64;
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.options-page h1, .options-page h2, .options-page h3 { text-wrap: balance; }
+.options-page p, .options-page li { text-wrap: pretty; }
+.options-page .settings-nav-item { color: #69737b; }
+.options-page .settings-nav-item:hover { background: #e8edef; color: #29353d; }
+.options-page .settings-nav-item.bg-\[\#315a78\] { background: #315a78; color: white; box-shadow: 0 1px 2px rgb(25 49 66 / 0.14); }
+.options-page .nav-index { width: 1.6rem; color: currentColor; font-size: 0.68rem; font-variant-numeric: tabular-nums; opacity: 0.72; }
+.options-page .brand-mark { box-shadow: 0 5px 12px rgb(49 90 120 / 0.17); }
+.options-page .general-page { color: var(--bo-text); }
+.options-page .section-kicker { color: #74808a; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+.options-page .about-section, .options-page .guide-section, .options-page .notes-section { border-bottom: 1px solid #e2e6e8; padding-bottom: 2.5rem; }
+.options-page .about-section h2, .options-page .guide-section h2, .options-page .notes-section h2, .options-page .help-footer h2 { margin-top: 0.45rem; font-size: 1.55rem; font-weight: 650; letter-spacing: -0.018em; }
+.options-page .about-heading-row, .options-page .guide-heading-row, .options-page .help-footer { display: flex; align-items: flex-start; justify-content: space-between; gap: 2rem; }
+.options-page .about-lede { margin-top: 0.45rem; color: #74808a; font-size: 1rem; }
+.options-page .version-chip { margin-top: 0.35rem; border: 1px solid #d8dee2; border-radius: 999px; padding: 0.35rem 0.65rem; color: #6f7a82; font-size: 0.7rem; font-weight: 700; }
+.options-page .about-copy { max-width: 42rem; margin-top: 2rem; color: #59656e; font-size: 1.03rem; line-height: 1.75; }
+.options-page .about-meta { display: grid; grid-template-columns: minmax(0, 1.8fr) repeat(2, minmax(100px, 0.7fr)); gap: 1.5rem; margin-top: 2rem; padding-top: 1.2rem; border-top: 1px solid #edf0f1; }
+.options-page .meta-label { display: block; margin-bottom: 0.55rem; color: #8a949b; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.options-page .meta-value, .options-page .provider-list { color: #39464f; font-size: 0.86rem; font-weight: 600; }
+.options-page .provider-list { display: flex; flex-wrap: wrap; gap: 0.35rem 0.8rem; }
+.options-page .provider-list span:not(:last-child)::after { content: "·"; margin-left: 0.8rem; color: #b4bdc2; }
+.options-page .guide-section { padding-top: 2.5rem; }
+.options-page .guide-heading-row p, .options-page .help-footer p { margin-top: 0.55rem; color: #7a858d; font-size: 0.9rem; }
+.options-page .text-link, .options-page .outline-button { color: #315a78; font-size: 0.82rem; font-weight: 700; white-space: nowrap; }
+.options-page .text-link { border: 0; background: transparent; cursor: pointer; font: inherit; }
+.options-page .text-link:hover, .options-page .outline-button:hover { color: #1f4058; }
+.options-page .arrow-icon { display: inline-block; margin-left: 0.35rem; transition: transform 180ms ease-out; }
+.options-page .text-link:hover .arrow-icon, .options-page .outline-button:hover .arrow-icon { transform: translateX(3px); }
+.options-page .steps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-top: 2.4rem; }
+.options-page .step-item { min-height: 10.5rem; padding-right: 1.3rem; border-right: 1px solid #e2e6e8; }
+.options-page .step-item:last-child { border-right: 0; }
+.options-page .step-number { color: #315a78; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; }
+.options-page .step-item h3 { margin-top: 1.4rem; font-size: 0.98rem; font-weight: 700; }
+.options-page .step-item p { margin-top: 0.55rem; color: #7a858d; font-size: 0.84rem; line-height: 1.65; }
+.options-page .notes-section { display: grid; grid-template-columns: 0.8fr 1.2fr; gap: 2rem; padding-top: 2.5rem; }
+.options-page .notes-list { margin-top: 0.45rem; color: #59656e; font-size: 0.88rem; line-height: 1.8; list-style: none; }
+.options-page .notes-list li { position: relative; padding-left: 1.2rem; }
+.options-page .notes-list li::before { content: ""; position: absolute; left: 0; top: 0.72em; width: 5px; height: 5px; border-radius: 50%; background: #6b98b5; }
+.options-page .help-footer { align-items: center; padding-top: 2.5rem; }
+.options-page .help-footer h2 { font-size: 1.15rem; }
+.options-page .help-footer p { margin-top: 0.35rem; }
+.options-page .outline-button { border: 1px solid #cbd6dc; border-radius: 0.45rem; padding: 0.65rem 0.85rem; }
+
+.options-page h1,
+.options-page h2,
+.options-page h3 {
+  color: var(--bo-text);
+}
+
+.options-page p,
+.options-page li,
+.options-page .text-gray-600,
+.options-page .text-gray-700,
+.options-page .text-base-content\/70 {
+  color: var(--bo-text-muted);
+}
+
+/* Neutralize legacy decorative treatment inside settings without changing sidepanel. */
+.options-page [class*="bg-gradient-to-"] {
+  background-image: none !important;
+  background-color: var(--bo-muted-surface) !important;
+}
+
+.options-page [class*="backdrop-blur"],
+.options-page [class*="shadow-lg"],
+.options-page [class*="shadow-xl"] {
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+.options-page [class*="rounded-3xl"],
+.options-page [class*="rounded-2xl"] {
+  border-radius: 0.75rem !important;
+}
+
+.options-page .card,
+.options-page [class~="bg-white/80"] {
+  border-color: var(--bo-border) !important;
+  background-color: var(--bo-surface) !important;
+  box-shadow: none !important;
+}
+
+.options-page .input,
+.options-page .select,
+.options-page textarea {
+  border-color: var(--bo-border-strong);
+  border-radius: 0.375rem;
+  background-color: var(--bo-surface);
+  color: var(--bo-text);
+}
+
+.options-page .input:focus,
+.options-page .select:focus,
+.options-page textarea:focus {
+  border-color: var(--bo-primary);
+  outline: 2px solid rgb(49 90 120 / 0.18);
+  outline-offset: 0;
+}
+
+.options-page .btn-primary,
+.options-page .toggle-primary:checked {
+  border-color: var(--bo-primary);
+  background-color: var(--bo-primary);
+}
+
+.options-page .btn-primary:hover {
+  border-color: var(--bo-primary-hover);
+  background-color: var(--bo-primary-hover);
+}
+
+.options-page .alert-info {
+  border-color: #c7d7e1;
+  background-color: #edf3f7;
+  color: #315a78;
+}
+
+@media (max-width: 720px) {
+  .options-page {
+    flex-direction: column;
+  }
+
+  .options-page > div:first-child {
+    width: 100%;
+    border-right: 0;
+    border-bottom: 1px solid var(--bo-border);
+  }
+
+  .options-page > div:first-child > div {
+    padding: 1rem;
+  }
+
+  .options-page > div:first-child .mb-8 {
+    margin-bottom: 1rem;
+  }
+
+  .options-page > div:first-child .space-y-1\.5 {
+    display: flex;
+    gap: 0.375rem;
+    overflow-x: auto;
+  }
+
+  .options-page > div:first-child button {
+    width: auto;
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .options-page .about-meta, .options-page .steps-grid, .options-page .notes-section { grid-template-columns: 1fr; }
+  .options-page .step-item { min-height: auto; padding: 0 0 1.25rem; border-right: 0; border-bottom: 1px solid #e2e6e8; }
+  .options-page .step-item:last-child { border-bottom: 0; }
+  .options-page .guide-heading-row, .options-page .about-heading-row, .options-page .help-footer { flex-direction: column; gap: 1rem; }
+  .options-page .options-content { padding: 0.75rem; }
+}
+
 /* Custom animations for modal */
 @keyframes fadeIn {
   from {

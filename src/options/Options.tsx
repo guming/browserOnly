@@ -16,6 +16,7 @@ import {
 import { VerticalTabs } from './components/VerticalTabs';
 import { Model } from './components/ModelList';
 import { OllamaModel } from './components/OllamaModelList';
+import { DEFAULT_OLLAMA_BASE_URL } from '../models/providers/ollama';
 
 export function Options() {
   // Function to process and sort model pricing data
@@ -53,6 +54,7 @@ export function Options() {
   
   // Provider selection
   const [provider, setProvider] = useState('DeepSeek');
+  const [translationProvider, setTranslationProvider] = useState('primary');
   
   // Anthropic settings
   const [anthropicApiKey, setAnthropicApiKey] = useState('');
@@ -115,6 +117,7 @@ export function Options() {
   useEffect(() => {
     chrome.storage.sync.get({
       provider: 'deepseek',
+      translationProvider: 'primary',
       anthropicApiKey: '',
       anthropicModelId: anthropicDefaultModelId,
       anthropicBaseUrl: '',
@@ -129,7 +132,7 @@ export function Options() {
       geminiBaseUrl: '',
       ollamaApiKey: '',
       ollamaModelId: ollamaDefaultModelId,
-      ollamaBaseUrl: '',
+      ollamaBaseUrl: DEFAULT_OLLAMA_BASE_URL,
       ollamaCustomModels: [],
       thinkingBudgetTokens: 0,
       openaiCompatibleApiKey: '',
@@ -147,6 +150,7 @@ export function Options() {
     }, (result) => {
       
       setProvider(result.provider);
+      setTranslationProvider(result.translationProvider || 'primary');
       setAnthropicApiKey(result.anthropicApiKey);
       setAnthropicModelId(result.anthropicModelId);
       setAnthropicBaseUrl(result.anthropicBaseUrl);
@@ -161,7 +165,7 @@ export function Options() {
       setGeminiBaseUrl(result.geminiBaseUrl);
       setOllamaApiKey(result.ollamaApiKey);
       setOllamaModelId(result.ollamaModelId);
-      setOllamaBaseUrl(result.ollamaBaseUrl || '');
+      setOllamaBaseUrl(result.ollamaBaseUrl || DEFAULT_OLLAMA_BASE_URL);
       setOllamaCustomModels(result.ollamaCustomModels || []);
       setThinkingBudgetTokens(result.thinkingBudgetTokens);
       setOpenaiCompatibleApiKey(result.openaiCompatibleApiKey || '');
@@ -186,6 +190,7 @@ export function Options() {
     // Save settings to Chrome storage
     chrome.storage.sync.set({
       provider,
+      translationProvider,
       anthropicApiKey,
       anthropicModelId,
       anthropicBaseUrl,
@@ -286,6 +291,8 @@ export function Options() {
     <VerticalTabs
       // Provider selection
       provider={provider}
+      translationProvider={translationProvider}
+      setTranslationProvider={setTranslationProvider}
       setProvider={setProvider}
       // Anthropic settings
       anthropicApiKey={anthropicApiKey}
