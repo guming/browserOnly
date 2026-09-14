@@ -15,7 +15,7 @@ Please be respectful and considerate of others when contributing to this project
 1. Fork the repository
    ```bash
    # Clone your fork
-   git clone https://github.com/yourusername/BrowserOnly.git
+   git clone https://github.com/gumingcn/BrowserOnly.git
    cd BrowserOnly
    
    # Install dependencies
@@ -112,4 +112,4 @@ The Models Module provides a flexible interface for multiple LLM providers:
 
 ## License
 
-By contributing to this project, you agree that your contributions will be licensed under the project's [Apache 2.0 License](https://github.com/parsaghaffari/BrowserOnly/blob/main/LICENSE).
+By contributing to this project, you agree that your contributions will be licensed under the project's [Apache 2.0 License](https://github.com/gumingcn/BrowserOnly/blob/main/LICENSE).

@@ -10,7 +10,7 @@ This guide will help you get started with BrowserOnly and show you how to use it
 
 1. Clone the repository
    ```bash
-   git clone https://github.com/parsaghaffari/BrowserOnly.git
+   git clone https://github.com/gumingcn/BrowserOnly.git
    cd BrowserOnly
    ```
 
@@ -70,6 +70,30 @@ BrowserOnly supports multiple LLM providers. You'll need to set up at least one 
    - Context window size (default: 32768)
 
 ## Using BrowserOnly
+
+### Operator mode
+
+Choose **Operator** when BrowserOnly needs to act in the browser. It can inspect pages, navigate, click, type, scroll, handle dialogs, manage tabs, and run multi-step workflows. Review approval requests before purchases, posts, messages, or submissions.
+
+Example:
+
+```text
+Open these three sources, compare their main claims, and ask before submitting anything.
+```
+
+### Ask mode
+
+Choose **Ask** when you want an explanation, summary, comparison, or critique. **Books** starts a standalone book conversation. **Experts** provides structured analysis; choose **Current tab** when the question depends on the active page, or **Standalone** when it does not.
+
+Ask mode is conversation-first and should not be treated as an instruction to operate a page.
+
+### Translating a webpage
+
+BrowserOnly can translate a full page or selected text. Translation modes are **Bilingual**, **Translation only**, and **Original**. Settings also include target language, scope, style, engine, title translation, and optional smart context.
+
+### Reading a PDF
+
+When PDF interception is enabled, detected PDF URLs open in the built-in viewer. It extracts structured text, filters common headers and footers, copies plain text or Markdown, summarizes pages or documents, and supports questions grounded in the extracted content.
 
 ### Opening the Side Panel
 

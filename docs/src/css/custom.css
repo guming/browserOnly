@@ -26,3 +26,22 @@
 html[data-theme='dark'] .docusaurus-highlight-code-line {
   background-color: rgba(0, 0, 0, 0.3);
 }
+
+/* Use semantic icons for the Docusaurus color-mode control. */
+.navbar .toggleButton svg {
+  display: none;
+}
+
+.navbar .toggleButton::before {
+  display: block;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+html[data-theme='light'] .navbar .toggleButton::before {
+  content: '☀';
+}
+
+html[data-theme='dark'] .navbar .toggleButton::before {
+  content: '☾';
+}

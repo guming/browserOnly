@@ -5,13 +5,13 @@ title: Privacy Policy
 
 # Privacy Policy
 
-*Last Updated: May 20, 2025*
+*Last updated: September 14, 2026*
 
 ## Introduction
 
 BrowserOnly is committed to protecting your privacy. This Privacy Policy explains how information is accessed, used, and stored by the BrowserOnly extension when you use it.
 
-BrowserOnly is a privacy-first open source Chrome extension that lets you control your browser using natural language. It combines the power of an LLM for instruction parsing & planning, and Playwright for robust browser automation to accomplish tasks.
+BrowserOnly is an open-source Chrome extension with Operator mode for browser actions and Ask mode for content understanding. It does not operate a BrowserOnly cloud backend for normal extension task execution.
 
 ## Information Accessed by the Extension
 
@@ -33,6 +33,7 @@ BrowserOnly is a privacy-first open source Chrome extension that lets you contro
 - **Tool Usage Data**: BrowserOnly locally tracks which tools are used during your sessions to improve functionality and provide better assistance in the future.
 
 - **Token Usage**: When using LLM providers, BrowserOnly locally tracks token usage to display cost information to you.
+- **Translation and PDF data**: Translation cache entries, extracted PDF content, embeddings, and screenshots may be stored in local extension data when those features are used.
 
 ## How Information is Used
 
@@ -50,12 +51,13 @@ BrowserOnly uses the accessed information for the following purposes:
 
 ### Local Storage
 
-BrowserOnly only stores data locally in your browser:
+BrowserOnly stores extension data locally in your browser or local extension runtime:
 
 - API keys for LLM providers
 - Configuration settings
 - Task memories
 - Token usage data
+- Translation cache, extracted content, memories, workflows, embeddings, and screenshots when those features are used
 
 This data is stored using Chrome's storage API and IndexedDB, and is not transmitted to any BrowserOnly servers.
 
@@ -90,7 +92,8 @@ BrowserOnly integrates with the following third-party services:
 - **OpenAI**: If configured, BrowserOnly sends data to OpenAI to process your instructions.
 - **Google Gemini**: If configured, BrowserOnly sends data to Google to process your instructions.
 - **Ollama**: If configured, BrowserOnly sends data to your locally running Ollama instance to process your instructions.
-- **OpenAI Compatible**: If configured, BrowserOnly sends data to third-party OpenAI compatible provider you've configured to process your instructions.
+- **OpenAI Compatible**: If configured, BrowserOnly sends data to the third-party endpoint you configure.
+- **DeepSeek**: If configured, BrowserOnly sends data to DeepSeek to process your instructions.
 
 Each of these services has its own privacy policy that governs how they handle your data. We encourage you to review their privacy policies:
 
@@ -123,7 +126,7 @@ This Privacy Policy may be updated from time to time. Any changes will be posted
 
 ## Contact Us
 
-If you have questions about this Privacy Policy, please open an issue on the [GitHub repository](https://github.com/parsaghaffari/BrowserOnly).
+If you have questions about this Privacy Policy, please open an issue on the [BrowserOnly GitHub repository](https://github.com/gumingcn/BrowserOnly/issues).
 
 ## Your Consent
 

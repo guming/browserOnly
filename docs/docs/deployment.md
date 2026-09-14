@@ -26,9 +26,9 @@ The `docusaurus.config.js` file has already been configured for GitHub Pages dep
 ```javascript
 module.exports = {
   // ...
-  url: 'https://parsaghaffari.github.io',
+  url: 'https://gumingcn.github.io',
   baseUrl: '/BrowserOnly/',
-  organizationName: 'parsaghaffari', // GitHub username
+  organizationName: 'gumingcn', // GitHub username
   projectName: 'BrowserOnly', // GitHub repository name
   // ...
 };

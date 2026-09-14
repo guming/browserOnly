@@ -1,40 +1,10 @@
-import React from 'react';
-import clsx from 'clsx';
+import React, {useState} from 'react';
 import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
-import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import styles from './index.module.css';
-import HomepageFeatures from '../components/HomepageFeatures';
 
-function HomepageHeader() {
-  const {siteConfig} = useDocusaurusContext();
-  return (
-    <header className={clsx('hero hero--primary', styles.heroBanner)}>
-      <div className="container">
-        <h1 className="hero__title">{siteConfig.title}</h1>
-        <p className="hero__subtitle">{siteConfig.tagline}</p>
-        <div className={styles.buttons}>
-          <Link
-            className="button button--secondary button--lg"
-            to="/docs/intro">
-            Get Started 🤖️
-          </Link>
-        </div>
-      </div>
-    </header>
-  );
-}
-
-export default function Home() {
-  const {siteConfig} = useDocusaurusContext();
-  return (
-    <Layout
-      title={`${siteConfig.title}`}
-      description="BrowserOnly - Control your browser with natural language. A privacy-first Chrome extension for browser automation.">
-      <HomepageHeader />
-      <main>
-        <HomepageFeatures />
-      </main>
-    </Layout>
-  );
-}
+const chromeStoreUrl='https://chromewebstore.google.com/detail/browseronly/jcjbmbhodajekbfomcahopafaklkegmb';
+const modes={operator:{label:'OPERATOR / EXECUTING',prompt:'Summarize the key points and open the second source.',lines:['Read the current page','Extract article content','Organize key points','Prepare a new tab']},ask:{label:'ASK / READY',prompt:'What are the three most important ideas here?',lines:['Browser agents are becoming action tools','User control is part of trusted AI','Multi-tab context enables complex work']}};
+function BrowserDemo(){const [mode,setMode]=useState('operator');const current=modes[mode];return <div className={styles.browser}><div className={styles.browserTop}><i/><i/><i/><span>research — browserOnly</span></div><div className={styles.browserBody}><div className={styles.page}><small>example.com / research</small><h3>AI browsers are<br/>changing the web.</h3><div className={styles.fakeLines}><i/><i/><i/></div></div><aside className={styles.agent}><div className={styles.modeTabs}>{Object.keys(modes).map(item=><button key={item} className={mode===item?styles.activeTab:''} onClick={()=>setMode(item)}>{item==='operator'?'Operator':'Ask'}</button>)}</div><div className={mode==='operator'?styles.greenLabel:styles.blueLabel}>● {current.label}</div><div className={styles.prompt}>{current.prompt}</div><div className={styles.logs}>{current.lines.map((line,index)=><div className={styles.log} key={line}><b>{mode==='operator'?(index===3?'→':'✓'):'·'}</b>{line}</div>)}</div></aside></div></div>}
+const Feature=({label,title,children})=><article className={styles.feature}><strong>{label}</strong><h3>{title}</h3><p>{children}</p></article>;
+export default function Home(){return <Layout title="BrowserOnly" description="Control your browser with natural language."><main><section className={styles.hero}><div className="container"><div className={styles.heroGrid}><div><div className={styles.eyebrow}>YOUR BROWSER. YOUR RULES.</div><h1>Let your browser<br/><span>do the work.</span></h1><p className={styles.lead}>Use Operator when you need action. Use Ask when you need understanding. BrowserOnly reads the web while keeping you in control.</p><div className={styles.actions}><a className={styles.primary} href={chromeStoreUrl} target="_blank" rel="noreferrer">Get BrowserOnly ↗</a><Link className={styles.textLink} to="#modes">Explore the two modes ↓</Link></div></div><BrowserDemo/></div></div></section><section className={styles.section} id="modes"><div className="container"><div className={styles.sectionHead}><div><div className={styles.kicker}>01 / TWO WAYS TO WORK</div><h2>Let AI act,<br/>and explain.</h2></div><p>Two modes share browser context while handling different kinds of work.</p></div><div className={styles.modeGrid}><article className={styles.modePanel}><strong>OPERATOR MODE / ACTION</strong><h3>Understand the page, then take action.</h3><p>Navigate, click, type, switch tabs, and complete multi-step tasks from one natural-language request.</p><code>“Open these sources and compare their main claims.”</code></article><article className={`${styles.modePanel} ${styles.ask}`}><strong>ASK MODE / UNDERSTAND</strong><h3>Understand the content, then answer.</h3><p>Ask about the current tab, start a Books conversation, or use an Expert for structured analysis.</p><code>“What is the strongest argument, and what could change it?”</code></article></div></div></section><section className={styles.section}><div className="container"><div className={styles.sectionHead}><div><div className={styles.kicker}>02 / CAPABILITIES</div><h2>From web pages<br/>to documents.</h2></div><p>Translate pages, read PDFs, and organize information without leaving your browser.</p></div><div className={styles.featureGrid}><Feature label="01 / LOCAL FIRST" title="Your data stays in your browser">There is no BrowserOnly cloud backend for normal tasks. You control sessions, tabs, and local memories.</Feature><Feature label="02 / PAGE TRANSLATION" title="Translate in place">Translate full pages or selected text with bilingual, translation-only, and original modes.</Feature><Feature label="03 / PDF VIEWER" title="Read PDFs and ask questions">Extract structured text, copy Markdown, summarize pages, and chat with your documents.</Feature><Feature label="04 / HUMAN IN LOOP" title="You approve sensitive actions">Review purchases, posts, messages, and submissions before anything important is sent.</Feature></div></div></section><section className={styles.section} id="how"><div className="container"><div className={styles.kicker}>03 / HOW IT WORKS</div><h2>Start in four steps.</h2><div className={styles.steps}>{['Install the extension|Get BrowserOnly from the Chrome Web Store or GitHub.','Connect a model|Configure a provider and model in the options page.','Describe the task|Tell BrowserOnly what you want in plain language.','Review and finish|Watch the steps and approve sensitive actions.'].map((step,i)=>{const [title,desc]=step.split('|');return <div key={title}><b>0{i+1}</b><h3>{title}</h3><p>{desc}</p></div>})}</div></div></section><section className={styles.closing}><div className="container"><h2>Next time you open your browser,<br/><span>start with a sentence.</span></h2><a className={styles.primary} href={chromeStoreUrl} target="_blank" rel="noreferrer">Get it from Chrome Web Store ↗</a></div></section></main></Layout>}

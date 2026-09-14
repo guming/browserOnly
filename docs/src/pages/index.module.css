@@ -1,23 +1,17 @@
-/**
- * CSS files with the .module.css suffix will be treated as CSS modules
- * and scoped locally.
- */
+.hero,.section,.closing{background:#080a0d;color:#e8eef5}.hero{padding:92px 0 76px}.heroGrid{display:grid;grid-template-columns:1fr 1.08fr;gap:72px;align-items:center}.eyebrow,.kicker{color:#b7f36b;font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.12em}.hero h1{font:800 clamp(42px,6vw,76px)/.98 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:-.075em;margin:22px 0 26px}.hero h1 span{color:#62b4ff}.lead,.sectionHead>p,.feature p,.modePanel p,.readingGrid p,.steps p{color:#84909d;line-height:1.8;font-size:14px;max-width:54ch}.actions{display:flex;gap:22px;align-items:center;margin-top:32px;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}.primary{display:inline-block;background:#b7f36b;color:#081008!important;border-radius:6px;padding:14px 17px;font-weight:800}.textLink{color:#62b4ff}.browser{background:#0d1117;border:1px solid rgba(206,229,255,.12);border-radius:12px;box-shadow:0 18px 60px rgba(0,0,0,.3);transform:rotate(1.2deg)}.browserTop{height:42px;display:flex;align-items:center;gap:7px;padding:0 14px;border-bottom:1px solid rgba(206,229,255,.12);color:#84909d;font:10px ui-monospace}.browserTop i{width:7px;height:7px;border-radius:50%;background:#ff6b6b}.browserTop i:nth-child(2){background:#ffb86b}.browserTop i:nth-child(3){background:#b7f36b}.browserTop span{margin-left:16px;background:#111820;padding:7px 12px;border-radius:5px 5px 0 0;color:#bcc9d6}.browserBody{display:grid;grid-template-columns:1fr 190px;min-height:310px}.page{padding:28px;background:#111820}.page small{color:#62b4ff}.page h3{font:24px/1.1 ui-monospace;letter-spacing:-.06em;margin:36px 0 12px}.fakeLines{display:grid;gap:9px}.fakeLines i{display:block;height:7px;background:#28323d;border-radius:2px}.fakeLines i:nth-child(2){width:76%}.fakeLines i:nth-child(3){width:61%}.agent{padding:16px;border-left:1px solid rgba(206,229,255,.12);font:10px ui-monospace}.modeTabs{display:flex;gap:1px;margin-bottom:18px;background:rgba(206,229,255,.12)}.modeTabs button{border:0;background:#111820;color:#84909d;padding:10px;font:11px ui-monospace;cursor:pointer}.modeTabs button.activeTab{color:#071008;background:#b7f36b}.greenLabel{color:#b7f36b;margin-bottom:14px}.blueLabel{color:#62b4ff;margin-bottom:14px}.prompt{color:#d9e5ef;line-height:1.7;border:1px solid rgba(98,180,255,.35);background:rgba(98,180,255,.07);padding:10px;border-radius:5px}.logs{margin-top:20px;display:grid;gap:12px;color:#84909d}.log{display:flex;gap:8px}.log b{color:#b7f36b;font-weight:400}.section{padding:76px 0;border-top:1px solid rgba(206,229,255,.12)}.sectionHead{display:flex;justify-content:space-between;align-items:end;gap:20px;margin-bottom:34px}.section h2,.closing h2{font:34px/1.05 ui-monospace;letter-spacing:-.07em;margin:10px 0 0}.sectionHead>p{margin:0}.kicker{color:#62b4ff}.modeGrid{display:grid;grid-template-columns:1.1fr .9fr;gap:1px;background:rgba(206,229,255,.12);border:1px solid rgba(206,229,255,.12)}.modePanel{background:#0d1117;padding:28px;min-height:250px;border-top:2px solid #b7f36b}.modePanel.ask{border-color:#62b4ff}.modePanel strong{color:#b7f36b;font-size:11px}.modePanel.ask strong{color:#62b4ff}.modePanel h3{font-size:21px;margin:40px 0 12px}.modePanel p{font-size:12px}.modePanel code{display:block;color:#dce8f2;border:1px solid rgba(206,229,255,.12);padding:12px;margin-top:20px;font-size:11px;line-height:1.7;white-space:pre-wrap}.featureGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(206,229,255,.12);border:1px solid rgba(206,229,255,.12)}.feature{background:#0d1117;padding:22px;min-height:190px}.feature strong{display:block;color:#b7f36b;font-size:12px;margin-bottom:44px}.feature h3,.readingGrid h3{font-size:16px;margin:0 0 10px}.feature p{font-size:12px}.readingGrid{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:48px}.readingGrid article{border-top:1px solid rgba(206,229,255,.12);padding-top:18px}.orangeLabel{color:#ffb86b;font-size:11px}.readingGrid p{font-size:12px}.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:28px;margin-top:38px}.steps>div{border-top:2px solid #62b4ff;padding-top:15px}.steps b{color:#62b4ff;font-size:11px}.steps h3{font-size:16px;margin:36px 0 10px}.steps p{font-size:12px}.closing{padding:54px 0 90px;border-top:1px solid rgba(206,229,255,.12)}.closing .container{display:flex;justify-content:space-between;align-items:center;gap:30px}.closing h2 span{color:#b7f36b}@media(max-width:800px){.hero{padding-top:62px}.heroGrid{grid-template-columns:1fr;gap:45px}.browser{transform:none}.browserBody{grid-template-columns:1fr}.agent{border-left:0;border-top:1px solid rgba(206,229,255,.12)}.modeGrid,.featureGrid,.steps,.readingGrid{grid-template-columns:1fr 1fr}.sectionHead{display:block}.sectionHead>p{margin-top:20px}.closing .container{display:block}.closing .primary{margin-top:25px}}@media(max-width:480px){.hero h1{font-size:43px}.modeGrid,.featureGrid,.steps,.readingGrid{grid-template-columns:1fr}.actions{align-items:flex-start;flex-direction:column;gap:16px}.page{padding:20px}.page h3{margin-top:28px}}
 
-.heroBanner {
-  padding: 4rem 0;
-  text-align: center;
-  position: relative;
-  overflow: hidden;
-}
-
-@media screen and (max-width: 966px) {
-  .heroBanner {
-    padding: 2rem;
-  }
-}
-
-.buttons {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+:global(html[data-theme='light']) .hero,:global(html[data-theme='light']) .section,:global(html[data-theme='light']) .closing{background:#f7f8f5;color:#17202a}
+:global(html[data-theme='light']) .hero h1,:global(html[data-theme='light']) .section h2,:global(html[data-theme='light']) .closing h2{color:#17202a}
+:global(html[data-theme='light']) .lead,:global(html[data-theme='light']) .sectionHead>p,:global(html[data-theme='light']) .feature p,:global(html[data-theme='light']) .modePanel p,:global(html[data-theme='light']) .readingGrid p,:global(html[data-theme='light']) .steps p{color:#5d6974}
+:global(html[data-theme='light']) .modeGrid,:global(html[data-theme='light']) .featureGrid{background:#d9e0e4;border-color:#d9e0e4}
+:global(html[data-theme='light']) .modePanel,:global(html[data-theme='light']) .feature{background:#ffffff}
+:global(html[data-theme='light']) .modePanel code{color:#263746;border-color:#d9e0e4}
+:global(html[data-theme='light']) .section,:global(html[data-theme='light']) .closing{border-color:#d9e0e4}
+:global(html[data-theme='light']) .browser{background:#ffffff;border-color:#d9e0e4;box-shadow:0 18px 60px rgba(24,44,60,.14)}
+:global(html[data-theme='light']) .browserTop{border-color:#d9e0e4;color:#687784}
+:global(html[data-theme='light']) .browserTop span,:global(html[data-theme='light']) .page{background:#eef2f3;color:#17202a}
+:global(html[data-theme='light']) .agent{border-color:#d9e0e4}
+:global(html[data-theme='light']) .modeTabs{background:#d9e0e4}
+:global(html[data-theme='light']) .modeTabs button{background:#f7f8f5;color:#687784}
+:global(html[data-theme='light']) .prompt{color:#263746;background:#edf6fb}
+:global(html[data-theme='light']) .fakeLines i{background:#c6d1d7}

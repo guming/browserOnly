@@ -4,18 +4,26 @@ sidebar_position: 1
 
 # Introduction to BrowserOnly
 
-Welcome to the BrowserOnly documentation! This guide will help you understand what BrowserOnly is, how to install it, and how to use it effectively.
+Welcome to the BrowserOnly documentation. BrowserOnly is an open-source Chrome extension for understanding and operating the web with natural language.
 
 ## What is BrowserOnly?
 
-BrowserOnly is a privacy-first open source Chrome extension that lets you control your browser using natural language. It combines the power of an LLM for instruction parsing and Playwright for robust browser automation.
+BrowserOnly runs as an extension in your browser. It uses the LLM provider you configure, keeps browser sessions and local feature data in browser storage, and can use Playwright-based tools to carry out requested actions.
+
+## Two ways to work
+
+**Operator mode** is for action: inspect pages, navigate, click, type, scroll, manage tabs, and complete multi-step tasks. BrowserOnly can request approval before sensitive actions.
+
+**Ask mode** is for understanding: ask about the current tab, use Books for a standalone conversation, or choose an Expert for structured analysis. Ask mode does not automatically inspect the active tab unless the selected context calls for it.
 
 Since BrowserOnly runs entirely within your browser (with the exception of the LLM), it can interact with logged-in websites, like your social media accounts or email, without compromising security or requiring backend infrastructure. This makes it more convenient for personal use than other "browser use" type products out there.
 
 ## Key Features
 
 - **Natural Language Control**: Control your browser with simple, natural language commands
-- **Multiple LLM Support**: Works with major LLM providers such as **Anthropic**, **OpenAI**, and **Gemini**, with more coming soon
+- **Multiple LLM Support**: Configure Anthropic, OpenAI, Gemini, DeepSeek, Ollama, or an OpenAI-compatible provider
+- **Page Translation**: Translate full pages or selected text in bilingual, translation-only, or original mode
+- **PDF Viewer**: Extract structured text, copy Markdown, summarize pages, and ask questions about PDFs
 - **Token Tracking**: Tracks **token use** and **price** so you know how much you're spending on each task
 - **Browser Tools**: Has access to a wide range of browser tools for interacting and understanding browser state
 - **Playwright Integration**: Uses **Playwright** in the background which is a robust browser automation tool
@@ -34,7 +42,7 @@ Since BrowserOnly runs entirely within your browser (with the exception of the L
 
 1. Clone the repository
    ```bash
-   git clone https://github.com/parsaghaffari/BrowserOnly.git
+   git clone https://github.com/gumingcn/BrowserOnly.git
    cd BrowserOnly
    ```
 
