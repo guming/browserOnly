@@ -25,6 +25,7 @@ export default defineConfig({
         'sidepanel': path.resolve(__dirname, 'src/sidepanel/index.tsx'),
         'options': path.resolve(__dirname, 'src/options/index.tsx'),
         'pdfInterceptor': path.resolve(__dirname, 'src/content/pdfInterceptor.ts'),
+        'pageTranslation': path.resolve(__dirname, 'src/content/pageTranslation.ts'),
       },
       output: {
         entryFileNames: '[name].js',

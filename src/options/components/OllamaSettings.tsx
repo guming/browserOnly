@@ -1,6 +1,9 @@
 import React from 'react';
-import { OllamaModelList, OllamaModel } from './OllamaModelList';
 import { DEFAULT_OLLAMA_BASE_URL } from '../../models/providers/ollama';
+import { getOllamaConnectionError, getOllamaExtensionOrigin } from '../../models/providers/ollama-connection';
+import { OllamaModelList, OllamaModel } from './OllamaModelList';
+
+export { getOllamaConnectionError, getOllamaExtensionOrigin } from '../../models/providers/ollama-connection';
 
 interface OllamaSettingsProps {
   ollamaApiKey: string;
@@ -18,6 +21,11 @@ interface OllamaSettingsProps {
   handleEditOllamaModel: (idx: number, field: string, value: any) => void;
 }
 
+type ConnectionStatus = {
+  kind: 'success' | 'warning' | 'error';
+  message: string;
+};
+
 export function OllamaSettings({
   ollamaApiKey,
   setOllamaApiKey,
@@ -34,14 +42,21 @@ export function OllamaSettings({
   handleEditOllamaModel
 }: OllamaSettingsProps) {
   const [isDiscovering, setIsDiscovering] = React.useState(false);
-  const [connectionStatus, setConnectionStatus] = React.useState('');
+  const [connectionStatus, setConnectionStatus] = React.useState<ConnectionStatus | null>(null);
+  const extensionOrigin = getOllamaExtensionOrigin();
 
   const discoverModels = async () => {
     setIsDiscovering(true);
-    setConnectionStatus('');
+    setConnectionStatus(null);
     try {
       const response = await fetch(`${(ollamaBaseUrl || DEFAULT_OLLAMA_BASE_URL).replace(/\/$/, '')}/api/tags`);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) {
+        setConnectionStatus({
+          kind: 'error',
+          message: getOllamaConnectionError(response.status, extensionOrigin),
+        });
+        return;
+      }
       const data = await response.json() as { models?: Array<{ name: string }> };
       const discovered = (data.models || []).map(model => ({
         id: model.name,
@@ -57,10 +72,19 @@ export function OllamaSettings({
       await chrome.storage.sync.set({ ollamaCustomModels: merged });
       if (!ollamaModelId && merged[0]) await chrome.storage.sync.set({ ollamaModelId: merged[0].id });
       await chrome.runtime.sendMessage({ action: 'providerConfigChanged' }).catch(() => undefined);
-      if (discovered.length === 0) setConnectionStatus('Connected, but no local models were found.');
-      else setConnectionStatus(`Connected. Found ${discovered.length} local model${discovered.length === 1 ? '' : 's'}.`);
-    } catch (error) {
-      setConnectionStatus(`Unable to connect to Ollama. Check that it is running and allows this extension origin.`);
+      if (discovered.length === 0) {
+        setConnectionStatus({ kind: 'warning', message: 'Connected, but no local models were found.' });
+      } else {
+        setConnectionStatus({
+          kind: 'success',
+          message: `Connected. Found ${discovered.length} local model${discovered.length === 1 ? '' : 's'}.`,
+        });
+      }
+    } catch {
+      setConnectionStatus({
+        kind: 'error',
+        message: getOllamaConnectionError(null, extensionOrigin),
+      });
     } finally {
       setIsDiscovering(false);
     }
@@ -105,7 +129,7 @@ export function OllamaSettings({
           className="input input-bordered w-full"
         />
         <span className="label-text-alt">
-          Local default: <code>{DEFAULT_OLLAMA_BASE_URL}</code>. Ollama must allow this extension origin through <code>OLLAMA_ORIGINS</code>.
+          Local default: <code>{DEFAULT_OLLAMA_BASE_URL}</code>. Extension origin: <code>{extensionOrigin}</code>
         </span>
       </div>
 
@@ -114,7 +138,24 @@ export function OllamaSettings({
           {isDiscovering ? <span className="loading loading-spinner loading-xs" /> : null}
           {isDiscovering ? 'Checking Ollama...' : 'Detect Local Models'}
         </button>
-        {connectionStatus && <span className="text-xs text-stone-500">{connectionStatus}</span>}
+        {connectionStatus && (
+          <span
+            role="status"
+            className={`text-xs ${connectionStatus.kind === 'error' ? 'text-error' : connectionStatus.kind === 'warning' ? 'text-warning' : 'text-success'}`}
+          >
+            {connectionStatus.message}
+          </span>
+        )}
+      </div>
+
+      <div className="alert alert-info mb-4 text-sm">
+        <div>
+          <span>
+            Ollama must allow this extension origin. For a terminal-launched server, use{' '}
+            <code>OLLAMA_ORIGINS={extensionOrigin} ollama serve</code>. If the Ollama desktop app is already running,
+            configure the same environment variable and fully restart the app.
+          </span>
+        </div>
       </div>
       
       {ollamaCustomModels.length === 0 && (

@@ -14,6 +14,11 @@ import { SimpleChatAgent } from '../agent/SimpleChatAgent';
 import { WorkflowStore } from '../workflows/WorkflowStore';
 import { WorkflowService } from '../workflows/WorkflowService';
 import { WorkflowRunner } from '../workflows/WorkflowRunner';
+import { translateBatch } from '../translation/translationService';
+import { TranslationQueue } from '../translation/translationQueue';
+import { createPageTranslationStartMessage, deliverTranslationBatchResult, sendToTranslationContentScript } from '../translation/translationContentScript';
+const translationQueue = new TranslationQueue((request, signal) => translateBatch(request, signal));
+const activeTranslationSessions = new Map<number, string>();
 
 const workflowRunners = new Map<string, { runner: WorkflowRunner; executionTabId?: number; ownerTabId: number; context?: { tabId?: number; windowId?: number; ownerTabId?: number; cancelReason?: string } }>();
 const workflowRunByExecutionTab = new Map<number, WorkflowRunner>();
@@ -163,6 +168,32 @@ export function handleMessage(
           });
         return true; // Keep the message channel open for async response
 
+      case 'translatePage':
+        handlePageTranslation(message, sendResponse);
+        return true;
+      case 'stopPageTranslation':
+        if (typeof message.tabId === 'number') {
+          const pageSessionId = message.pageSessionId || activeTranslationSessions.get(message.tabId);
+          if (pageSessionId) translationQueue.cancel(pageSessionId);
+          activeTranslationSessions.delete(message.tabId);
+          Promise.resolve(chrome.tabs.sendMessage(message.tabId, { action: 'stopPageTranslation', pageSessionId, requestId: message.requestId })).catch(() => {});
+        }
+        sendResponse({ success: true });
+        return true;
+      case 'setTranslationMode':
+        if (typeof message.tabId === 'number') Promise.resolve(chrome.tabs.sendMessage(message.tabId, message)).catch(() => {});
+        sendResponse({ success: true });
+        return true;
+      case 'translationBatch':
+        handleTranslationBatch(message, sender, sendResponse);
+        return true;
+      case 'translateSelection':
+        handleSelectionTranslation(message, sender);
+        return true;
+      case 'translationCapability':
+        sendResponse({ success: true, chromeTranslator: typeof (globalThis as any).Translator !== 'undefined', ollama: true, configuredProvider: true });
+        return true;
+
       default:
         // This should never happen due to the type guard, but TypeScript requires it
         logWithTimestamp(`Unhandled message action: ${(message as any).action}`, 'warn');
@@ -233,8 +264,62 @@ function isBackgroundMessage(message: any): message is BackgroundMessage {
       message.action === 'checkPdfUrl' ||
       message.action === 'fetchPdfAsBlob' ||
       message.action === 'pdfAiChat'
+      || message.action === 'translatePage'
+      || message.action === 'stopPageTranslation'
+      || message.action === 'setTranslationMode'
+      || message.action === 'translateSelection'
+      || message.action === 'translationBatch'
+      || message.action === 'translationBatchResult'
+      || message.action === 'translationStatus'
+      || message.action === 'translationCapability'
     )
   );
+}
+
+async function handlePageTranslation(message: any, sendResponse: (response?: any)=>void) {
+  const tabId=message.tabId; if(typeof tabId!=='number') { sendResponse({success:false,error:'tabId required'}); return; }
+  const pageSessionId=message.pageSessionId || `${tabId}-${Date.now()}`;
+  const previousSessionId = activeTranslationSessions.get(tabId);
+  if (previousSessionId && previousSessionId !== pageSessionId) translationQueue.cancel(previousSessionId);
+  console.info('[translation][background] translatePage received', { tabId, pageSessionId, mode: message.mode });
+  try {
+    const settings = await ConfigManager.getInstance().getTranslationSettings();
+    console.info('[translation][background] settings loaded', { targetLanguage: message.targetLanguage || settings.targetLanguage, translateTitle: message.translateTitle ?? settings.translateTitle });
+    await sendToTranslationContentScript(tabId, createPageTranslationStartMessage(message, settings, pageSessionId));
+    activeTranslationSessions.set(tabId, pageSessionId);
+    console.info('[translation][background] start sent to content script', { tabId, pageSessionId });
+    sendResponse({success:true,pageSessionId});
+  } catch (error) {
+    sendResponse({success:false,error:String(error)});
+  }
+}
+async function handleTranslationBatch(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {
+  const tabId=message.tabId ?? sender.tab?.id; if(typeof tabId!=='number') return;
+  console.info('[translation][background] batch received', { tabId, pageSessionId: message.pageSessionId, requestId: message.requestId, units: message.units?.length, targetLanguage: message.targetLanguage });
+  try {
+    const results=await translationQueue.enqueue({...message, tabId});
+    console.info('[translation][background] batch completed', { tabId, pageSessionId: message.pageSessionId, requestId: message.requestId, results: results.length });
+    await deliverTranslationBatchResult(tabId, message, results);
+    console.info('[translation][background] batch delivered', { tabId, pageSessionId: message.pageSessionId, requestId: message.requestId, results: results.length });
+    sendResponse({success:true,pageSessionId:message.pageSessionId,requestId:message.requestId,results});
+  }
+  catch(error) {
+    console.error('[translation][background] batch failed', { tabId, pageSessionId:message.pageSessionId, requestId:message.requestId, error: String(error) });
+    sendResponse({success:false,pageSessionId:message.pageSessionId,requestId:message.requestId,error:String(error)});
+  }
+}
+export async function translateSelectionForTab(tabId: number, message: any): Promise<void> {
+  try {
+    const result=await translateBatch({...message,tabId,pageSessionId:message.pageSessionId || `selection-${tabId}`,units:[{sourceId:message.sourceId||'selection',text:message.text,kind:'selection'}]});
+    await sendToTranslationContentScript(tabId,{action:'translationSelectionResult',requestId:message.requestId,translatedText:result[0]?.translatedText||''});
+  } catch(error) {
+    await sendToTranslationContentScript(tabId,{action:'translationSelectionResult',requestId:message.requestId,error:String(error)}).catch(()=>{});
+  }
+}
+async function handleSelectionTranslation(message: any, sender: chrome.runtime.MessageSender) {
+  const tabId=message.tabId ?? sender.tab?.id; if(typeof tabId!=='number') return;
+  const settings = await ConfigManager.getInstance().getTranslationSettings();
+  await translateSelectionForTab(tabId, {...message,targetLanguage:message.targetLanguage || settings.targetLanguage});
 }
 
 async function handleRunWorkflow(

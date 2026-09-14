@@ -4,6 +4,8 @@ import type { WorkflowExecutionMode } from '../workflows/types';
 
 // Provider types
 export type ProviderType = 'anthropic' | 'openai' | 'gemini' | 'ollama' | 'openai-compatible' | 'deepseek';
+export type TranslationAction = 'translatePage' | 'stopPageTranslation' | 'setTranslationMode' | 'translateSelection' | 'translationBatch' | 'translationBatchResult' | 'translationStatus' | 'translationCapability';
+export interface TranslationMessage { action: TranslationAction; tabId?: number; windowId?: number; pageSessionId?: string; requestId?: string; [key: string]: any; }
 
 // Agent status types
 export enum AgentStatus {
@@ -297,7 +299,8 @@ export type BackgroundMessage =
   | TogglePdfInterceptionMessage
   | CheckPdfUrlMessage
   | FetchPdfAsBlobMessage
-  | PdfAiChatMessage;
+  | PdfAiChatMessage
+  | TranslationMessage;
 
 // New message types for enhanced tab management
 export interface TabStatusChangedMessage {

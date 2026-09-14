@@ -58,6 +58,39 @@
 .options-page .help-footer p { margin-top: 0.35rem; }
 .options-page .outline-button { border: 1px solid #cbd6dc; border-radius: 0.45rem; padding: 0.65rem 0.85rem; }
 
+/* Features follows the same restrained, editorial settings vocabulary. */
+.options-page .features-page { color: var(--bo-text); }
+.options-page .features-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 2rem; padding-bottom: 2.25rem; border-bottom: 1px solid #e2e6e8; }
+.options-page .features-header h1 { margin-top: 0.45rem; font-size: 1.55rem; font-weight: 650; letter-spacing: -0.018em; }
+.options-page .features-header p { margin-top: 0.45rem; color: #74808a; font-size: 0.92rem; }
+.options-page .feature-count { min-width: 5rem; padding-top: 0.15rem; text-align: right; font-variant-numeric: tabular-nums; }
+.options-page .feature-count span { display: block; color: #315a78; font-size: 1.65rem; font-weight: 650; line-height: 1; }
+.options-page .feature-count small { display: block; margin-top: 0.4rem; color: #8a949b; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.options-page .feature-list { border-bottom: 1px solid #e2e6e8; }
+.options-page .feature-row { display: grid; grid-template-columns: 2.3rem minmax(0, 1fr) auto; gap: 1.25rem; align-items: start; padding: 2rem 0; border-bottom: 1px solid #edf0f1; }
+.options-page .feature-row:last-child { border-bottom: 0; }
+.options-page .feature-index { padding-top: 0.18rem; color: #8b969e; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; }
+.options-page .feature-copy { max-width: 42rem; }
+.options-page .feature-title-row { display: flex; align-items: center; gap: 0.7rem; }
+.options-page .feature-title-row h2 { font-size: 1rem; font-weight: 700; }
+.options-page .feature-copy > p { margin-top: 0.55rem; color: #6f7b84; font-size: 0.84rem; line-height: 1.65; }
+.options-page .feature-state { border: 1px solid #d8dee2; border-radius: 999px; padding: 0.16rem 0.45rem; color: #7a858d; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.options-page .feature-state.is-on { border-color: #bfd3c7; background: #eff6f2; color: #397154; }
+.options-page .feature-toggle { display: flex; min-width: 3rem; min-height: 2.75rem; align-items: center; justify-content: flex-end; cursor: pointer; }
+.options-page .translator-control { display: grid; grid-template-columns: 9rem minmax(15rem, 23rem); gap: 0.6rem 1rem; align-items: center; margin-top: 1.5rem; padding-top: 1.35rem; border-top: 1px solid #edf0f1; }
+.options-page .translator-control > label { color: #39464f; font-size: 0.78rem; font-weight: 700; }
+.options-page .translator-control .select { width: 100%; }
+.options-page .field-note, .options-page .field-error { grid-column: 2; margin: 0; font-size: 0.75rem; line-height: 1.55; }
+.options-page .field-note { color: #7a858d; }
+.options-page .field-error { color: #a33f3f; }
+.options-page .features-savebar { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; padding-top: 1.5rem; }
+.options-page .features-savebar > p { color: #8a949b; font-size: 0.76rem; }
+.options-page .save-actions { display: flex; align-items: center; gap: 1rem; }
+.options-page .save-message { display: inline-flex; align-items: center; gap: 0.35rem; color: #397154; font-size: 0.78rem; font-weight: 700; }
+.options-page .save-message svg { width: 1rem; height: 1rem; }
+.options-page .save-error { color: #a33f3f; }
+.options-page .features-savebar .btn { min-height: 2.55rem; height: 2.55rem; border-radius: 0.4rem; padding-inline: 1rem; font-size: 0.78rem; transition-property: transform, background-color, border-color; transition-duration: 150ms; }
+
 .options-page h1,
 .options-page h2,
 .options-page h3 {
@@ -166,7 +199,19 @@
   .options-page .step-item { min-height: auto; padding: 0 0 1.25rem; border-right: 0; border-bottom: 1px solid #e2e6e8; }
   .options-page .step-item:last-child { border-bottom: 0; }
   .options-page .guide-heading-row, .options-page .about-heading-row, .options-page .help-footer { flex-direction: column; gap: 1rem; }
+  .options-page .features-header, .options-page .features-savebar { align-items: flex-start; }
+  .options-page .feature-row { grid-template-columns: 1.8rem minmax(0, 1fr); gap: 0.8rem; }
+  .options-page .feature-toggle { grid-column: 2; justify-content: flex-start; }
+  .options-page .translator-control { grid-template-columns: 1fr; }
+  .options-page .field-note, .options-page .field-error { grid-column: 1; }
   .options-page .options-content { padding: 0.75rem; }
+}
+
+@media (max-width: 480px) {
+  .options-page .features-header, .options-page .features-savebar { flex-direction: column; }
+  .options-page .feature-count { text-align: left; }
+  .options-page .save-actions { width: 100%; flex-wrap: wrap; justify-content: space-between; }
+  .options-page .features-savebar .btn { width: 100%; }
 }
 
 /* Custom animations for modal */

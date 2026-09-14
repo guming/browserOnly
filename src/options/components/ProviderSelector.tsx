@@ -12,7 +12,7 @@ export function ProviderSelector({ provider, setProvider }: ProviderSelectorProp
         Default Provider
       </label>
       <p className="mb-3 text-xs leading-5 text-stone-500">
-        Used for translation and all other LLM tasks. Select a provider to configure it below.
+        Used for general LLM tasks. Translation can follow this provider or use another configured provider.
       </p>
       <select
         id="default-provider"

@@ -24,6 +24,15 @@ export interface NotionConfig {
   enabled: boolean;
   bearerToken: string;
 }
+export interface TranslationSettings {
+  targetLanguage: string;
+  translationMode: 'bilingual' | 'translation-only' | 'original';
+  translationScope: 'main' | 'all';
+  translationStyle: 'natural' | 'faithful' | 'explain';
+  translationEngine: 'auto' | 'configured-provider' | 'ollama' | 'chrome';
+  aiSmartContext: boolean;
+  translateTitle: boolean;
+}
 
 export class ConfigManager {
   private static instance: ConfigManager;
@@ -37,7 +46,7 @@ export class ConfigManager {
     return ConfigManager.instance;
   }
   
-  async getProviderConfig(): Promise<ProviderConfig> {
+  async getProviderConfig(providerOverride?: ProviderConfig['provider']): Promise<ProviderConfig> {
     const result = await chrome.storage.sync.get({
       provider: 'anthropic',
       translationProvider: 'primary',
@@ -68,7 +77,8 @@ export class ConfigManager {
     const translationProvider = result.translationProvider || 'primary';
     
     // Return provider-specific configuration
-    switch (result.provider) {
+    const provider = providerOverride || result.provider;
+    switch (provider) {
       case 'anthropic':
         return {
           provider: 'anthropic',
@@ -121,7 +131,7 @@ export class ConfigManager {
           openaiCompatibleModels: result.openaiCompatibleModels || [],
         };
       default:
-        throw new Error(`Provider ${result.provider} not supported`);
+        throw new Error(`Provider ${provider} not supported`);
     }
   }
   
@@ -129,6 +139,13 @@ export class ConfigManager {
     // Save provider-specific configuration
     await chrome.storage.sync.set(config);
   }
+
+  async getTranslationSettings(): Promise<TranslationSettings> {
+    const result = await chrome.storage.sync.get({ targetLanguage: '', translationMode: 'bilingual', translationScope: 'main', translationStyle: 'natural', translationEngine: 'auto', aiSmartContext: false, translateTitle: true });
+    return { targetLanguage: result.targetLanguage || (typeof navigator !== 'undefined' && navigator.language ? navigator.language : 'zh-CN'), translationMode: result.translationMode, translationScope: result.translationScope, translationStyle: result.translationStyle, translationEngine: result.translationEngine, aiSmartContext: !!result.aiSmartContext, translateTitle: result.translateTitle !== false };
+  }
+
+  async saveTranslationSettings(settings: Partial<TranslationSettings>): Promise<void> { await chrome.storage.sync.set(settings); }
   
   /**
    * Get all providers that have API keys configured

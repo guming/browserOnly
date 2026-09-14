@@ -39,6 +39,11 @@
       "js": ["pdfInterceptor.js"],
       "run_at": "document_start"
     }
+    ,{
+      "matches": ["<all_urls>"],
+      "js": ["pageTranslation.js"],
+      "run_at": "document_idle"
+    }
   ],
   "commands": {
     "_execute_action": {

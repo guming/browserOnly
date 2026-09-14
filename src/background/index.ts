@@ -1,7 +1,8 @@
 import { MemoryService } from '../tracking/memoryService';
-import { setupMessageListeners } from './messageHandler';
+import { setupMessageListeners, translateSelectionForTab } from './messageHandler';
 import { cleanupOnUnload, setupTabListeners } from './tabManager';
 import { logWithTimestamp } from './utils';
+import { ConfigManager } from './configManager';
 
 /**
  * Initialize the extension
@@ -165,6 +166,7 @@ function setupEventListeners(): void {
       title: "Send selection to BrowserOnly",
       contexts: ["selection"]
     });
+    chrome.contextMenus.create({ id: 'translateSelection', title: '翻译选中文本', contexts: ['selection'] });
   });
 
   chrome.contextMenus.onClicked.addListener(async (info, tab) => {
@@ -180,6 +182,17 @@ function setupEventListeners(): void {
       if(tab?.id){
         chrome.sidePanel.open({ tabId: tab.id });
       }
+    }
+    if (info.menuItemId === 'translateSelection' && tab?.id && info.selectionText) {
+      const settings = await ConfigManager.getInstance().getTranslationSettings();
+      await translateSelectionForTab(tab.id, {
+        action: 'translateSelection',
+        text: info.selectionText,
+        requestId: `${Date.now()}`,
+        targetLanguage: settings.targetLanguage,
+        engine: 'auto',
+        style: 'natural',
+      });
     }
   });
 

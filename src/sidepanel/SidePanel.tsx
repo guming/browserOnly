@@ -409,6 +409,23 @@ export function SidePanel() {
   const toggleOutputExpansion = () => {
     setIsOutputExpanded(!isOutputExpanded);
   };
+  const startPageTranslation = async () => {
+    const targetTabId = currentSelectedTabId ?? tabId;
+    if (typeof targetTabId !== 'number') return;
+    console.info('[translation][sidepanel] start requested', { targetTabId, currentSelectedTabId, tabId });
+    const response = await chrome.runtime.sendMessage({ action: 'translatePage', tabId: targetTabId, windowId, mode: 'bilingual', translateTitle: true });
+    console.info('[translation][sidepanel] start response', response);
+    if (response?.success) {
+      addSystemMessage('页面翻译已开启，页面内容将自动翻译；选中文本也可快速翻译。');
+    } else {
+      addSystemMessage(`页面翻译启动失败：${response?.error || '无法连接到当前页面'}`);
+    }
+  };
+  const stopPageTranslation = () => {
+    const targetTabId = currentSelectedTabId ?? tabId;
+    if (typeof targetTabId !== 'number') return;
+    chrome.runtime.sendMessage({ action: 'stopPageTranslation', tabId: targetTabId, windowId });
+  };
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#fafbfc] text-slate-900">
@@ -449,6 +466,8 @@ export function SidePanel() {
               </div>
               
               <div className="flex items-center gap-2">
+                <button onClick={startPageTranslation} className="btn btn-sm border border-slate-300 bg-white text-slate-700" title="Translate page">翻译页面</button>
+                <button onClick={stopPageTranslation} className="btn btn-sm border border-slate-300 bg-white text-slate-700" title="Restore original page">恢复原文</button>
                 {/* 优化按钮动画 - 使用transform3d */}
                 <div className="tooltip tooltip-bottom" data-tip="Reflect and learn from this session">
                   <button 

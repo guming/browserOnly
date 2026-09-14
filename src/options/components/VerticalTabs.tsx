@@ -3,7 +3,7 @@ import { GeneralTab } from './tabs/GeneralTab';
 import { ProvidersTab } from './tabs/ProvidersTab';
 import { MemoryTab } from './tabs/MemoryTab';
 import { ConnectionTab } from './tabs/ConnectionTab';
-import { FeaturesTab } from './tabs/FeaturesTab';
+import { ConfiguredProvider, FeaturesTab, TranslationProvider } from './tabs/FeaturesTab';
 import { Model } from './ModelList';
 import { OllamaModel } from './OllamaModelList';
 
@@ -96,6 +96,11 @@ interface VerticalTabsProps {
   // PDF Viewer settings
   pdfInterceptorEnabled: boolean;
   setPdfInterceptorEnabled: (enabled: boolean) => void;
+  translationProvider: TranslationProvider;
+  setTranslationProvider: (provider: TranslationProvider) => void;
+  targetLanguage: string;
+  setTargetLanguage: (language: string) => void;
+  configuredProviders: ConfiguredProvider[];
 }
 
 export function VerticalTabs(props: VerticalTabsProps) {
@@ -171,6 +176,12 @@ export function VerticalTabs(props: VerticalTabsProps) {
         return <FeaturesTab
           pdfInterceptorEnabled={props.pdfInterceptorEnabled}
           setPdfInterceptorEnabled={props.setPdfInterceptorEnabled}
+          translationProvider={props.translationProvider}
+          setTranslationProvider={props.setTranslationProvider}
+          targetLanguage={props.targetLanguage}
+          setTargetLanguage={props.setTargetLanguage}
+          primaryProvider={props.provider}
+          configuredProviders={props.configuredProviders}
         />;
       case 'connection':
         return <ConnectionTab

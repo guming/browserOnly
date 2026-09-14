@@ -1,6 +1,7 @@
 import { Anthropic } from "@anthropic-ai/sdk";
 import { Message, Ollama } from "ollama/browser";
 import { ollamaModels } from '../models';
+import { getOllamaConnectionError, getOllamaExtensionOrigin, getOllamaStatusCode } from "./ollama-connection";
 import { convertToOllamaMessages } from "./ollama-format";
 import { LLMProvider, ProviderOptions, ModelInfo, ApiStream } from './types';
 
@@ -103,19 +104,22 @@ export class OllamaProvider implements LLMProvider {
         console.error("Error processing Ollama stream:", streamError);
         throw new Error(`Ollama stream processing error: ${streamError.message || "Unknown error"}`);
       }
-    } catch (error: any) {
+	    } catch (error: any) {
       // Check if it's a timeout error
       if (error.message && error.message.includes("timed out")) {
         throw new Error("Ollama request timed out after 120 seconds");
       }
 
       // Enhance error reporting
-      const statusCode = error.status || error.statusCode;
-      const errorMessage = error.message || "Unknown error";
+	      const statusCode = getOllamaStatusCode(error);
+	      const errorMessage = error.message || "Unknown error";
 
-      console.error(`Ollama API error (${statusCode || "unknown"}): ${errorMessage}`);
-      throw error;
-    }
+	      console.error(`Ollama API error (${statusCode || "unknown"}): ${errorMessage}`);
+	      if (statusCode === 403) {
+	        throw new Error(getOllamaConnectionError(403, getOllamaExtensionOrigin()));
+	      }
+	      throw error;
+	    }
   }
 
   /**

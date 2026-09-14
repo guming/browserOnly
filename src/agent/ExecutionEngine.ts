@@ -103,6 +103,18 @@ export class ExecutionEngine {
   }
 
   /**
+   * Some OpenAI-compatible gateways expose their internal DSML closing token
+   * as text instead of returning a normal </tool> tag. Normalize that known
+   * transport artifact before attempting to detect or parse a tool call.
+   */
+  private normalizeToolCallMarkup(value: string): string {
+    return value.replace(
+      /<\/[|｜]{2}\s*DSML\s*[|｜]{2}\s*parameter\s*>/gi,
+      '</tool>'
+    );
+  }
+
+  /**
    * Execute a browser reading tool with a narrow extension-context fallback.
    * Some Chromium extension pages do not expose `window` inside page.evaluate.
    * In that case a plain DOM text read still provides useful input to the
@@ -336,6 +348,10 @@ export class ExecutionEngine {
         accumulatedText += textChunk;
         streamBuffer += textChunk;
 
+        // Normalize the whole buffer because the malformed closing token may
+        // be split across multiple streaming chunks.
+        streamBuffer = this.normalizeToolCallMarkup(streamBuffer);
+
         // Only look for complete tool calls with all three required tags
         const completeToolCallRegex = /(```(?:xml|bash)\s*)?<tool>(.*?)<\/tool>\s*<input>([\s\S]*?)<\/input>\s*<requires_approval>(.*?)<\/requires_approval>(\s*```)?/;
         
@@ -389,6 +405,7 @@ export class ExecutionEngine {
 
     // Decode any escaped HTML entities in the accumulated text
     accumulatedText = this.decodeHtmlEntities(accumulatedText);
+    accumulatedText = this.normalizeToolCallMarkup(accumulatedText);
     console.log("Decoded HTML entities in accumulated text");
 
     adaptedCallbacks.onLlmOutput(accumulatedText);

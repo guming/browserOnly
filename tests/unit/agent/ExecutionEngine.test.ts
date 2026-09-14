@@ -132,6 +132,21 @@ describe('ExecutionEngine', () => {
       expect(mockCallbacks.onComplete).toHaveBeenCalled();
     });
 
+    it('should execute tool calls containing a leaked DSML closing token', async () => {
+      const mockStream = (async function* () {
+        yield { type: 'text', text: '<tool>browser_screenshot</｜｜DS' };
+        yield { type: 'text', text: 'ML｜｜ parameter>\n<input>{}</input>\n<requires_approval>false</requires_approval>\n</invoke>' };
+      })();
+      mockProvider.createMessage.mockReturnValue(mockStream);
+
+      await executionEngine.executePrompt('Take a screenshot', mockCallbacks, [], false, 'operator');
+
+      expect(mockToolFunctions[0]).toHaveBeenCalledWith('{}', undefined);
+      expect(mockCallbacks.onToolOutput).toHaveBeenCalledWith('🕹️ tool: browser_screenshot | args: {}');
+      expect(mockCallbacks.onLlmOutput).toHaveBeenCalledWith(expect.stringContaining('</tool>'));
+      expect(mockCallbacks.onComplete).toHaveBeenCalled();
+    });
+
     it('should handle tool calls requiring approval', async () => {
       // Mock provider to return response with tool call requiring approval
       const mockStream = (async function* () {

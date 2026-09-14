@@ -49,6 +49,7 @@ const mockChrome = {
     create: jest.fn().mockResolvedValue({ id: 1, url: 'about:blank' }),
     update: jest.fn().mockResolvedValue({ id: 1 }),
     get: jest.fn().mockResolvedValue({ id: 1, windowId: 1, url: 'about:blank' }),
+    sendMessage: jest.fn().mockResolvedValue({}),
     onCreated: {
       addListener: jest.fn(),
     },
@@ -58,6 +59,11 @@ const mockChrome = {
     onUpdated: {
       addListener: jest.fn(),
     },
+  },
+  scripting: {
+    executeScript: jest.fn().mockResolvedValue([]),
+    insertCSS: jest.fn().mockResolvedValue(undefined),
+    removeCSS: jest.fn().mockResolvedValue(undefined),
   },
   action: {
     onClicked: {

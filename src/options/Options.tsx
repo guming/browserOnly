@@ -12,6 +12,9 @@ import { VerticalTabs } from './components/VerticalTabs';
 import { Model } from './components/ModelList';
 import { OllamaModel } from './components/OllamaModelList';
 import { DEFAULT_OLLAMA_BASE_URL } from '../models/providers/ollama';
+import { ConfiguredProvider, TranslationProvider } from './components/tabs/FeaturesTab';
+
+const defaultTargetLanguage = () => (typeof navigator !== 'undefined' && navigator.language ? navigator.language : 'zh-CN');
 
 export function Options() {
   // Provider selection
@@ -73,6 +76,8 @@ export function Options() {
 
   // PDF Viewer settings
   const [pdfInterceptorEnabled, setPdfInterceptorEnabled] = useState(true);
+  const [translationProvider, setTranslationProvider] = useState<TranslationProvider>('primary');
+  const [targetLanguage, setTargetLanguage] = useState(defaultTargetLanguage);
 
   // Load saved settings when component mounts
   useEffect(() => {
@@ -107,6 +112,8 @@ export function Options() {
       duckdbConnectionString: '',
       duckdbDatabasePath: ':memory:',
       'pdf-interceptor-enabled': false,
+      translationProvider: 'primary',
+      targetLanguage: '',
     }, (result) => {
       
       setProvider(result.provider);
@@ -139,6 +146,8 @@ export function Options() {
       setDuckdbConnectionString(result.duckdbConnectionString || '');
       setDuckdbDatabasePath(result.duckdbDatabasePath || ':memory:');
       setPdfInterceptorEnabled(result['pdf-interceptor-enabled'] !== false);
+      setTranslationProvider(result.translationProvider || 'primary');
+      setTargetLanguage(result.targetLanguage || defaultTargetLanguage());
     });
   }, []);
 
@@ -178,6 +187,8 @@ export function Options() {
       duckdbConnectionString,
       duckdbDatabasePath,
       'pdf-interceptor-enabled': pdfInterceptorEnabled,
+      translationProvider,
+      targetLanguage,
     }, () => {
       
       setIsSaving(false);
@@ -244,6 +255,18 @@ export function Options() {
   const handleEditModel = (idx: number, field: string, value: any) => {
     setOpenaiCompatibleModels(models => models.map((m, i) => i === idx ? { ...m, [field]: value } : m));
   };
+
+  const configuredProviders: ConfiguredProvider[] = [
+    anthropicApiKey.trim() && { id: 'anthropic' as const, name: 'Anthropic' },
+    openaiApiKey.trim() && { id: 'openai' as const, name: 'OpenAI' },
+    deepseekApiKey.trim() && { id: 'deepseek' as const, name: 'DeepSeek' },
+    geminiApiKey.trim() && { id: 'gemini' as const, name: 'Google Gemini' },
+    ollamaBaseUrl.trim() && ollamaCustomModels.length > 0 && { id: 'ollama' as const, name: 'Ollama' },
+    openaiCompatibleApiKey.trim() && openaiCompatibleModels.length > 0 && {
+      id: 'openai-compatible' as const,
+      name: 'OpenAI Compatible',
+    },
+  ].filter((item): item is ConfiguredProvider => Boolean(item));
 
   return (
     <VerticalTabs
@@ -324,6 +347,11 @@ export function Options() {
       // PDF Viewer settings
       pdfInterceptorEnabled={pdfInterceptorEnabled}
       setPdfInterceptorEnabled={setPdfInterceptorEnabled}
+      translationProvider={translationProvider}
+      setTranslationProvider={setTranslationProvider}
+      targetLanguage={targetLanguage}
+      setTargetLanguage={setTargetLanguage}
+      configuredProviders={configuredProviders}
     />
   );
 }

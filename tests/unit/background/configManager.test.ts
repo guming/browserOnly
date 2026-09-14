@@ -36,6 +36,7 @@ jest.mock('../../../src/models/providers/gemini', () => ({
 }));
 
 jest.mock('../../../src/models/providers/ollama', () => ({
+  DEFAULT_OLLAMA_BASE_URL: '',
   OllamaProvider: {
     getAvailableModels: jest.fn().mockReturnValue([
       { id: 'llama2', name: 'Llama 2' },
@@ -48,6 +49,14 @@ jest.mock('../../../src/models/providers/openai-compatible', () => ({
   OpenAICompatibleProvider: {
     getAvailableModels: jest.fn().mockReturnValue([
       { id: 'custom-model', name: 'Custom Model' },
+    ]),
+  },
+}));
+
+jest.mock('../../../src/models/providers/deepseek', () => ({
+  DeepSeekProvider: {
+    getAvailableModels: jest.fn().mockReturnValue([
+      { id: 'deepseek-chat', name: 'DeepSeek Chat' },
     ]),
   },
 }));
@@ -86,6 +95,28 @@ describe('ConfigManager', () => {
   });
 
   describe('getProviderConfig', () => {
+    it('loads credentials for an explicitly selected translation provider', async () => {
+      mockChromeStorage.sync.get.mockResolvedValue({
+        provider: 'anthropic',
+        translationProvider: 'openai',
+        anthropicApiKey: 'anthropic-key',
+        anthropicModelId: 'claude-model',
+        openaiApiKey: 'openai-key',
+        openaiModelId: 'gpt-4o-mini',
+        openaiBaseUrl: 'https://api.openai.com/v1',
+      });
+
+      const config = await configManager.getProviderConfig('openai');
+
+      expect(config).toEqual({
+        provider: 'openai',
+        translationProvider: 'openai',
+        apiKey: 'openai-key',
+        apiModelId: 'gpt-4o-mini',
+        baseUrl: 'https://api.openai.com/v1',
+      });
+    });
+
     it('should return stored provider configuration', async () => {
       mockChromeStorage.sync.get.mockResolvedValue({
         provider: 'anthropic',
@@ -99,6 +130,7 @@ describe('ConfigManager', () => {
 
       expect(config).toEqual({
         provider: 'anthropic',
+        translationProvider: 'primary',
         apiKey: 'test-key',
         apiModelId: 'claude-3-5-sonnet-20241022',
         baseUrl: '',
@@ -107,6 +139,7 @@ describe('ConfigManager', () => {
 
       expect(mockChromeStorage.sync.get).toHaveBeenCalledWith({
         provider: 'anthropic',
+        translationProvider: 'primary',
         anthropicApiKey: '',
         anthropicModelId: 'claude-3-7-sonnet-20250219',
         anthropicBaseUrl: '',
@@ -119,6 +152,10 @@ describe('ConfigManager', () => {
         ollamaApiKey: '',
         ollamaModelId: '',
         ollamaBaseUrl: '',
+        ollamaCustomModels: [],
+        deepseekApiKey: '',
+        deepseekModelId: 'deepseek-chat',
+        deepseekBaseUrl: '',
         thinkingBudgetTokens: 0,
         openaiCompatibleApiKey: '',
         openaiCompatibleModelId: '',
@@ -140,6 +177,7 @@ describe('ConfigManager', () => {
 
       expect(config).toEqual({
         provider: 'anthropic',
+        translationProvider: 'primary',
         apiKey: '',
         apiModelId: 'claude-3-7-sonnet-20250219',
         baseUrl: '',
@@ -159,6 +197,7 @@ describe('ConfigManager', () => {
 
       expect(config).toEqual({
         provider: 'openai',
+        translationProvider: 'primary',
         apiKey: 'openai-key',
         apiModelId: 'gpt-4o',
         baseUrl: '',
@@ -177,6 +216,7 @@ describe('ConfigManager', () => {
 
       expect(config).toEqual({
         provider: 'gemini',
+        translationProvider: 'primary',
         apiKey: 'gemini-key',
         apiModelId: 'gemini-2.5-flash-preview-05-20',
         baseUrl: '',
@@ -195,9 +235,11 @@ describe('ConfigManager', () => {
 
       expect(config).toEqual({
         provider: 'ollama',
+        translationProvider: 'primary',
         apiKey: 'dummy-key',
         apiModelId: 'llama2',
         baseUrl: 'http://localhost:11434',
+        ollamaCustomModels: [],
       });
     });
 
@@ -214,6 +256,7 @@ describe('ConfigManager', () => {
 
       expect(config).toEqual({
         provider: 'openai-compatible',
+        translationProvider: 'primary',
         apiKey: 'custom-key',
         apiModelId: 'custom-model',
         baseUrl: 'https://api.custom.com/v1',

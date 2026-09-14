@@ -22,6 +22,7 @@ export class DeepSeekProvider implements LLMProvider {
     async *createMessage(systemPrompt: string, messages: any[], tools?: any[]): ApiStream {
         const model = this.getModel();
         const modelId = model.id;
+        console.info('[provider][deepseek] request starting', { modelId, messages: messages.length });
         // Process messages to filter out system instructions
         const filteredMessages = messages.filter(message => 
         !(message.role === "user" && 
@@ -276,7 +277,7 @@ export class DeepSeekProvider implements LLMProvider {
               }
             }
           } catch (error) {
-            console.error("Error in DeepSeek stream:", error);
+            console.error('[provider][deepseek] stream failed', { error: String(error) });
             yield {
               type: "text",
               text: "Error: Failed to stream response from DeepSeek API. Please try again.",

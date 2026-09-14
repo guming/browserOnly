@@ -10,7 +10,11 @@ export async function createProvider(
   provider: 'anthropic' | 'openai' | 'gemini' | 'ollama' | 'openai-compatible' | 'deepseek',
   options: ProviderOptions | OpenAICompatibleProviderOptions
 ): Promise<LLMProvider> {
-  console.log("options",options)
+  console.info('[provider] creating provider', {
+    provider,
+    model: options.apiModelId,
+    hasApiKey: Boolean(options.apiKey),
+  });
   switch (provider) {
     case 'anthropic':
       return new AnthropicProvider(options);
