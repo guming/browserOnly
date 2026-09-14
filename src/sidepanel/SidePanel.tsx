@@ -466,8 +466,8 @@ export function SidePanel() {
               </div>
               
               <div className="flex items-center gap-2">
-                <button onClick={startPageTranslation} className="btn btn-sm border border-slate-300 bg-white text-slate-700" title="Translate page">翻译页面</button>
-                <button onClick={stopPageTranslation} className="btn btn-sm border border-slate-300 bg-white text-slate-700" title="Restore original page">恢复原文</button>
+                <button onClick={startPageTranslation} className="btn btn-sm border border-slate-300 bg-white text-slate-700" title="Translate page">Translate page</button>
+                <button onClick={stopPageTranslation} className="btn btn-sm border border-slate-300 bg-white text-slate-700" title="Restore original page">Restore original</button>
                 {/* 优化按钮动画 - 使用transform3d */}
                 <div className="tooltip tooltip-bottom" data-tip="Reflect and learn from this session">
                   <button 
