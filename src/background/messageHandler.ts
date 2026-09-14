@@ -78,11 +78,15 @@ export function handleMessage(
         return true; // Keep the message channel open for async response
         
       case 'switchToTab':
-        handleSwitchToTab(message, sendResponse);
+        handleSwitchToTab(message, sendResponse).catch(error => {
+          sendResponse({ success: false, error: String(error) });
+        });
         return true;
 
       case 'refreshTab':
-        handleRefreshTab(message, sendResponse);
+        handleRefreshTab(message, sendResponse).catch(error => {
+          sendResponse({ success: false, error: String(error) });
+        });
         return true;
         
       case 'getTokenUsage':
@@ -145,7 +149,8 @@ export function handleMessage(
       case 'download-markdown':
           console.log('download message is', message.filename)
           handleDownloadMarkdown(message);
-          return true;
+          sendResponse({ success: true });
+          return false;
 
       case 'togglePdfInterception':
         handleTogglePdfInterception(message, sendResponse);
@@ -188,7 +193,7 @@ export function handleMessage(
         handleTranslationBatch(message, sender, sendResponse);
         return true;
       case 'translateSelection':
-        handleSelectionTranslation(message, sender);
+        handleSelectionTranslation(message, sender, sendResponse);
         return true;
       case 'translationCapability':
         sendResponse({ success: true, chromeTranslator: typeof (globalThis as any).Translator !== 'undefined', ollama: true, configuredProvider: true });
@@ -316,10 +321,23 @@ export async function translateSelectionForTab(tabId: number, message: any): Pro
     await sendToTranslationContentScript(tabId,{action:'translationSelectionResult',requestId:message.requestId,error:String(error)}).catch(()=>{});
   }
 }
-async function handleSelectionTranslation(message: any, sender: chrome.runtime.MessageSender) {
-  const tabId=message.tabId ?? sender.tab?.id; if(typeof tabId!=='number') return;
-  const settings = await ConfigManager.getInstance().getTranslationSettings();
-  await translateSelectionForTab(tabId, {...message,targetLanguage:message.targetLanguage || settings.targetLanguage});
+async function handleSelectionTranslation(
+  message: any,
+  sender: chrome.runtime.MessageSender,
+  sendResponse: (response?: any) => void
+) {
+  const tabId=message.tabId ?? sender.tab?.id;
+  if(typeof tabId!=='number') {
+    sendResponse({ success: false, error: 'tabId required' });
+    return;
+  }
+  try {
+    const settings = await ConfigManager.getInstance().getTranslationSettings();
+    await translateSelectionForTab(tabId, {...message,targetLanguage:message.targetLanguage || settings.targetLanguage});
+    sendResponse({ success: true });
+  } catch (error) {
+    sendResponse({ success: false, error: String(error) });
+  }
 }
 
 async function handleRunWorkflow(
