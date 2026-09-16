@@ -279,7 +279,7 @@ export const browserQuery: ToolFactory = (page: Page) =>
             selector,
             (nodes: Element[]) => nodes.slice(0, 10).map((n) => n.outerHTML)
           )) as string[];
-          if (!matches.length) return `No nodes matched ${selector}`;
+          if (!matches.length) return `Error: No nodes matched selector: ${selector}`;
           return truncate(matches.join("\n\n"));
         });
       } catch (err) {

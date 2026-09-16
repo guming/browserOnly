@@ -210,6 +210,15 @@ describe('Observation Tools', () => {
       expect(mockPage.$$eval).toHaveBeenCalledWith('button', expect.any(Function));
     });
 
+    it('should report an empty query as a tool failure', async () => {
+      const tool = browserQuery(mockPage);
+      mockPage.$$eval.mockResolvedValue([]);
+
+      const result = await tool.func('.stale-selector');
+
+      expect(result).toBe('Error: No nodes matched selector: .stale-selector');
+    });
+
     it('should limit results to 10 elements', async () => {
       const tool = browserQuery(mockPage);
       const manyElements = Array.from({ length: 15 }, (_, i) => `<div>Element ${i}</div>`);
@@ -236,7 +245,7 @@ describe('Observation Tools', () => {
 
       const result = await tool.func('.nonexistent');
 
-      expect(result).toBe('No nodes matched .nonexistent');
+      expect(result).toBe('Error: No nodes matched selector: .nonexistent');
     });
 
     it('should handle query errors', async () => {

@@ -111,7 +111,33 @@ export class ExecutionEngine {
     return value.replace(
       /<\/[|｜]{2}\s*DSML\s*[|｜]{2}\s*parameter\s*>/gi,
       '</tool>'
-    );
+    )
+      // Some reasoning models emit the XML protocol as Markdown-escaped text.
+      // Normalize only protocol punctuation; selector escaping inside <input>
+      // must otherwise remain untouched.
+      .replace(/\\([<>_])/g, '$1');
+  }
+
+  private hasMalformedToolIntent(value: string): boolean {
+    const normalized = this.normalizeToolCallMarkup(value);
+    return /<\/?(?:tool|input|requires_approval)\b/i.test(normalized)
+      || /(?:browser|lookup|save|delete|clear)\\?_\w+/i.test(value)
+        && /requires\\?_approval/i.test(value);
+  }
+
+  private hasUnfinishedActionNarration(value: string): boolean {
+    const text = value.trim();
+    if (/^\s*[-*]\s*\[\s\]\s+/m.test(text)) return true;
+
+    // Models sometimes narrate the next browser action, then end the stream
+    // before emitting the corresponding tool call. Keep this deliberately
+    // narrow so ordinary final prose such as "let me know" still completes.
+    return /\b(?:now|next|then)\s*,?\s*(?:let me|i(?:'ll| will)|we(?:'ll| will))\s+(?!know\b)(?:click|type|enter|search|open|navigate|select|choose|submit|press|inspect|find|check|verify|scroll|add|fill)\b/i.test(text)
+      || /\blet me\s+(?!know\b)(?:click|type|enter|search|open|navigate|select|choose|submit|press|inspect|find|check|verify|scroll|add|fill)\b/i.test(text);
+  }
+
+  private isToolFailure(result: string): boolean {
+    return /^(?:error\b|Action cancelled|No (?:nodes|elements) (?:matched|found)|Unable to\b)/i.test(result.trim());
   }
 
   /**
@@ -564,7 +590,23 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
           }
 
           if (!toolMatch) {
-            // no tool tag ⇒ task complete
+            // A malformed/escaped tool call is not a final answer. Ask the
+            // model to repair its protocol and keep the execution loop alive.
+            if (this.hasMalformedToolIntent(accumulatedText) || this.hasUnfinishedActionNarration(accumulatedText)) {
+              const malformedToolCall = this.hasMalformedToolIntent(accumulatedText);
+              messages.push(
+                { role: "assistant", content: accumulatedText },
+                {
+                  role: "user",
+                  content: malformedToolCall
+                    ? `Error: A tool call was intended but its XML is malformed or Markdown-escaped. Continue the original task and emit exactly one valid tool call using this format:\n\n<tool>tool_name</tool>\n<input>arguments here</input>\n<requires_approval>true or false</requires_approval>\n\nDo not escape the angle brackets or underscores. Do not stop until the original task is verified complete.`
+                    : `You described a next browser action but did not emit its tool call. Continue the original task now by emitting exactly one valid tool call. Do not provide another progress-only message, and do not stop until the original task is verified complete.`
+                }
+              );
+              messages = trimHistory(messages);
+              continue;
+            }
+            // no tool intent ⇒ task complete
             done = true;
             break;
           }
@@ -702,7 +744,10 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
             }
           } catch (error) {
             // If not valid JSON, add as plain text
-            messages.push({ role: "user", content: `Tool result: ${result}` });
+            const repairInstruction = this.isToolFailure(result)
+              ? `\nThe tool did not accomplish the step. Re-observe the current page, adapt any stale memory or selector, and continue the original task. Do not finish until success is verified.`
+              : '';
+            messages.push({ role: "user", content: `Tool result: ${result}${repairInstruction}` });
           }
 
           messages = trimHistory(messages);

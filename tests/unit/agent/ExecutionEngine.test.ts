@@ -147,6 +147,67 @@ describe('ExecutionEngine', () => {
       expect(mockCallbacks.onComplete).toHaveBeenCalled();
     });
 
+    it('should retry malformed Markdown-escaped tool intent instead of completing', async () => {
+      mockProvider.createMessage
+        .mockImplementationOnce(() => (async function* () {
+          yield { type: 'text', text: 'Continuing.\\<tool>browser\\_screenshot\\</input>\n\\<input>{}\\</input>\n\\<requires\\_approval>false\\</requires\\_approval>' };
+        })())
+        .mockImplementationOnce(() => (async function* () {
+          yield { type: 'text', text: '<tool>browser_screenshot</tool>\n<input>{}</input>\n<requires_approval>false</requires_approval>' };
+        })())
+        .mockImplementationOnce(() => (async function* () {
+          yield { type: 'text', text: 'The screenshot was captured and the task is complete.' };
+        })());
+
+      await executionEngine.executePrompt('Take a screenshot', mockCallbacks, [], false, 'operator');
+
+      expect(mockProvider.createMessage).toHaveBeenCalledTimes(3);
+      expect(mockToolFunctions[0]).toHaveBeenCalledWith('{}', undefined);
+      expect(mockCallbacks.onComplete).toHaveBeenCalledTimes(1);
+    });
+
+    it('should continue when the model emits action narration without its tool call', async () => {
+      mockProvider.createMessage
+        .mockImplementationOnce(() => (async function* () {
+          yield { type: 'text', text: '- [x] Click the search box\nNow let me type the search term.' };
+        })())
+        .mockImplementationOnce(() => (async function* () {
+          yield { type: 'text', text: '<tool>browser_screenshot</tool>\n<input>{}</input>\n<requires_approval>false</requires_approval>' };
+        })())
+        .mockImplementationOnce(() => (async function* () {
+          yield { type: 'text', text: 'The requested browser task is verified complete.' };
+        })());
+
+      await executionEngine.executePrompt('Continue the browser task', mockCallbacks, [], false, 'operator');
+
+      expect(mockProvider.createMessage).toHaveBeenCalledTimes(3);
+      expect(mockToolFunctions[0]).toHaveBeenCalledWith('{}', undefined);
+      expect(mockCallbacks.onComplete).toHaveBeenCalledTimes(1);
+    });
+
+    it('should tell the model to repair a failed stale selector', async () => {
+      mockToolFunctions[0].mockResolvedValueOnce('Error: No nodes matched selector: .old');
+      mockProvider.createMessage
+        .mockImplementationOnce(() => (async function* () {
+          yield { type: 'text', text: '<tool>browser_screenshot</tool>\n<input>.old</input>\n<requires_approval>false</requires_approval>' };
+        })())
+        .mockImplementationOnce((systemPrompt: string, messages: any[]) => {
+          expect(messages).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+              role: 'user',
+              content: expect.stringContaining('Re-observe the current page, adapt any stale memory or selector'),
+            }),
+          ]));
+          return (async function* () {
+            yield { type: 'text', text: 'Unable to continue without another observation.' };
+          })();
+        });
+
+      await executionEngine.executePrompt('Take a screenshot', mockCallbacks, [], false, 'operator');
+
+      expect(mockProvider.createMessage).toHaveBeenCalledTimes(2);
+    });
+
     it('should handle tool calls requiring approval', async () => {
       // Mock provider to return response with tool call requiring approval
       const mockStream = (async function* () {
