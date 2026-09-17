@@ -1,23 +1,21 @@
 # BrowserOnly 🤖️
-*Your in-browser AI assistant. Control the web with natural language.*
+*An AI assistant that works inside your browser.*
 
 [![Join our Discord](https://img.shields.io/badge/Discord-Join%20Chat-7289da?logo=discord&logoColor=white&style=for-the-badge)](https://discord.gg/g42ww3wn)
 
 https://github.com/user-attachments/assets/209c7042-6d54-4fce-92a7-ddf8519156c6
 
-BrowserOnly is a privacy-first open source Chrome extension that lets you control your browser using natural language. It combines the power of an LLM for instruction parsing & planning, and Playwright for robust browser automation to accomplish tasks.
+BrowserOnly is an open source Chrome extension for controlling the web with natural language. Tell it what you want to do, and it uses an LLM to plan the task and Playwright to carry it out in your current browser.
 
-Since BrowserOnly runs entirely within your browser (with the exception of the LLM), it can safely interact with logged-in websites, like your social media accounts or email, without compromising security or requiring backend infrastructure. This makes it more convenient for personal use than other "browser use" type products out there.
+BrowserOnly runs in your browser, with no BrowserOnly backend in the middle. Your existing tabs, sessions, and logged-in websites stay on your machine. You choose the LLM provider, and BrowserOnly sends requests only to that provider.
 
-## 🎲 Features
+## Why BrowserOnly?
 
-- Supports major LLM providers such as **Anthropic**, **OpenAI**, **Gemini**, and **Ollama** with more coming soon
-- Tracks **token use** and **price** so you know how much you're spending on each task
-- Has access to a wide range of **🕹️ browser tools** (listed below) for interacting and understanding browser state
-- Uses **Playwright** in the background which is a robust browser automation tool
-- The **memory** feature captures useful tool use sequences and stores them locally to make future use more efficient
-- The agent knows when to ask for user's **approval**, e.g. for purchases or posting updates on social media
-- **Built-in PDF Viewer** with advanced text extraction and AI assistant capabilities for analyzing PDF documents
+- **Control the web with plain language.** Navigate, click, type, scroll, inspect pages, and work across tabs from one prompt.
+- **Keep control of sensitive actions.** BrowserOnly can ask for your approval before actions such as purchases or posting updates.
+- **Use your preferred model.** Connect Anthropic, OpenAI, Gemini, Ollama, or other supported providers from the options page.
+- **Keep useful routines local.** BrowserOnly can store reusable website interaction memories in your browser.
+- **Read PDFs with AI.** Extract clean text, summarize documents, and ask questions without leaving Chrome.
 
 ## 🕹️ Supported tools
 
@@ -169,15 +167,15 @@ BrowserOnly includes a built-in PDF viewer with advanced capabilities:
 To use the PDF viewer, simply open any PDF file in Chrome and click the text extraction button in the toolbar.
 </details>
 
-## ✅ Use Cases
+## What can you use it for?
 
-- **Social media butler**: Checks your social media accounts, summarizes notifications and messages, and helps you respond.
-- **News curator**: Gathers and summarizes the latest headlines from your preferred news sources and blogs, giving you a quick, personalized briefing.
-- **Personal assistant**: Helps with everyday tasks like reading and sending emails and messages, booking flights, finding products, and more.
-- **Research assistant**: Assists with deep dives into topics like companies, job listings, market trends, and academic publications by gathering and organizing information.
-- **Knowledge bookmarking & summarization**: Quickly summarizes articles, extracts key information, and saves useful insights for later reference.
-- **Chat with any website**: Ask questions, generate summaries, fill out forms, etc.
-- **PDF document assistant**: Analyze research papers, reports, and documents with intelligent text extraction and AI-powered Q&A, getting instant summaries and insights without reading the entire document.
+Use BrowserOnly whenever a task involves both understanding a webpage and taking action on it:
+
+- Research several pages and turn the results into a summary.
+- Read and summarize articles, reports, and PDF documents.
+- Fill out repetitive forms and navigate multi-step websites.
+- Review inboxes, dashboards, or notifications before deciding what to do next.
+- Automate routine website tasks while keeping final actions under your control.
 
 ## 🛫 Roadmap
 
@@ -224,8 +222,8 @@ BrowserOnly is now available on [Chrome Web Store](https://chromewebstore.google
 2. Type your instruction (e.g., *"Go to Google, search for Cicero, and click the first result"*)  
 3. Hit Enter and watch BrowserOnly go to work 🤖️
 
-**Note:** 
-1. Since BrowserOnly uses Chrome DevTools Protocol (CDP) to attach to tabs, it's best to leave it attached to a base tab that you leave open throughout your session (BrowserOnly can open new tabs if needed). If you close the attached tab, use the ![reattach button](<reattach-button.png>) button to reattach to a new tab.
+**Note:**
+1. Since BrowserOnly uses Chrome DevTools Protocol (CDP) to attach to tabs, it's best to leave it attached to a base tab that you leave open throughout your session (BrowserOnly can open new tabs if needed). If you close the attached tab, use the [reattach button](<reattach-button.png>) to reattach to a new tab.
 2. You can have one instance of BrowserOnly running per Chrome window and the instances will be working in isolation from one another.
 3. BrowserOnly can't attach to tabs without a URL (e.g. a new tab), or with URLs starting with 'chrome://' or 'chrome-extension://'.
 
@@ -242,7 +240,7 @@ BrowserOnly is built using these amazing open source projects:
 - [Cline](https://github.com/cline/cline) enabled us to vibe-code the first version of BrowserOnly and inspired me to build a "Cline for the web"
 - [playwright-crx](https://github.com/ruifigueira/playwright-crx) by [@ruifigueira](https://github.com/ruifigueira) for in-browser use of Playwright
 - [playwright-mcp](https://github.com/microsoft/playwright-mcp) for the browser tool implementations
-- [daisyUI](https://daisyui.com/) 🌼 for the ~~pollen and nectar~~ UI components :)
+- [daisyUI](https://daisyui.com/) 🌼 for the ~~pollen and nectar~~ UI components:)
 
 ## 💡 Learnings & what's worth stealing
 
