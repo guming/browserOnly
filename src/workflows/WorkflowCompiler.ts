@@ -3,10 +3,12 @@ import { buildStableLocator } from './locator';
 
 const now = () => Date.now();
 const id = (prefix: string) => `${prefix}-${crypto.randomUUID()}`;
+export const WORKFLOW_CANDIDATE_TTL_MS = 24 * 60 * 60 * 1000;
 const workflowToolName = (toolName: string) =>
   toolName === 'browser_read_main' ? 'browser_read_main_for_workflow' : toolName;
 
 export function compileTrace(trace: ToolTraceEvent[], domain: string, name = 'Recorded workflow'): { workflow: Workflow; version: WorkflowVersion } {
+  const createdAt = now();
   const steps: WorkflowStep[] = trace
     .filter(event => event.result?.ok !== false)
     .filter((event, index, events) => index === 0 || event.toolName !== events[index - 1].toolName || JSON.stringify(event.input) !== JSON.stringify(events[index - 1].input))
@@ -26,13 +28,14 @@ export function compileTrace(trace: ToolTraceEvent[], domain: string, name = 'Re
 
   const version: WorkflowVersion = {
     id: id('version'), workflowId: id('workflow'), version: 1,
-    source: 'recording', steps, finalAssertions: [], createdAt: now()
+    source: 'recording', steps, finalAssertions: [], createdAt
   };
   const workflow: Workflow = {
     id: version.workflowId, name, description: `Recorded on ${domain}`,
-    schemaVersion: 1, status: 'draft', triggerDomains: [domain], variables: [],
+    schemaVersion: 1, status: 'candidate', triggerDomains: [domain], variables: [],
     executionMode: 'new_tab',
-    activeVersionId: version.id, createdAt: now(), updatedAt: now()
+    activeVersionId: version.id, expiresAt: createdAt + WORKFLOW_CANDIDATE_TTL_MS,
+    createdAt, updatedAt: createdAt
   };
   return { workflow, version };
 }

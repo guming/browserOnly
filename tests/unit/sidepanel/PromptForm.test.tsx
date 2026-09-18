@@ -45,6 +45,28 @@ const submitPrompt = (prompt: string) => {
 };
 
 describe('PromptForm operator roles', () => {
+  it('runs /translate as a direct page action instead of an agent prompt', () => {
+    const onSubmit = jest.fn();
+    const onRunDirectAction = jest.fn(() => true);
+    render(
+      <PromptForm
+        onSubmit={onSubmit}
+        onCancel={jest.fn()}
+        isProcessing={false}
+        tabStatus="attached"
+        onRunDirectAction={onRunDirectAction}
+      />,
+    );
+
+    const textbox = screen.getByRole('textbox');
+    fireEvent.change(textbox, { target: { value: '/translate' } });
+    fireEvent.keyDown(textbox, { key: 'Enter' });
+    fireEvent.submit(textbox.closest('form')!);
+
+    expect(onRunDirectAction).toHaveBeenCalledWith('translate');
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it('shows only the five approved roles in the configured order', () => {
     renderPromptForm();
 

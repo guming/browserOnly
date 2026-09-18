@@ -4,6 +4,7 @@ import { lookupMemories } from '../agent/tools/memoryTools';
 import { getAllTools } from '../agent/tools';
 import { WorkflowRunner, WorkflowRunnerOptions } from './WorkflowRunner';
 import type { WorkflowRun, WorkflowVersion } from './types';
+import { extractionRequestSchema } from '../extraction/extractionSchema';
 
 const WORKFLOW_MAX_RETURN_CHARS = 20_000;
 
@@ -105,6 +106,32 @@ export class WorkflowService {
       tools.push({ name, description: `Workflow-safe page summary (${name}).`, func: getSummary });
     }
     tools.push({ name: 'browser_get_title', description: 'Workflow-safe page title.', func: async () => getPage().title() });
+    tools.push({
+      name: 'browser_extract_structured',
+      description: 'Extract user-confirmed fields from the current page table into standard JSON.',
+      func: async (input: string) => {
+        const request = extractionRequestSchema.parse(typeof input === 'string' ? JSON.parse(input || '{}') : input);
+        const rows = await getPage().locator('table tr').allInnerTexts();
+        const values = rows.slice(1, (request.maxRows ?? 100) + 1).map((line: string) => {
+          const cells = line.split(/\s{2,}|\t/).map(cell => cell.trim());
+          return Object.fromEntries(request.fields.map((field, index) => [field.key, cells[index] ?? null]));
+        });
+        return JSON.stringify({ fields: request.fields, rows: values, sourceUrls: [getPage().url()], warnings: values.length ? [] : ['No table rows found'], generatedAt: new Date().toISOString() });
+      },
+    });
+    tools.push({
+      name: 'browser_export_data',
+      description: 'Convert a standard structured extraction result to JSON or CSV.',
+      func: async (input: string) => {
+        const payload = JSON.parse(input || '{}');
+        if (!Array.isArray(payload.fields) || !Array.isArray(payload.rows)) throw new Error('browser_export_data requires a standard extraction result');
+        const keys = payload.fields.map((field: { key: string }) => field.key);
+        const format = payload.format ?? 'json';
+        if (format === 'json') return JSON.stringify(payload.rows, null, 2);
+        const cell = (value: unknown) => { if (value == null) return ''; const text = typeof value === 'object' ? JSON.stringify(value) : String(value); return /[,"\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text; };
+        return [keys.join(','), ...payload.rows.map((row: Record<string, unknown>) => keys.map((key: string) => cell(row[key])).join(','))].join('\r\n');
+      },
+    });
     tools.push({
       name: 'browser_get_section',
       description: 'Workflow-safe section lookup.',

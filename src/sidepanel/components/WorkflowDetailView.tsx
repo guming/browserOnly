@@ -46,7 +46,7 @@ export function WorkflowDetailView({ workflow, onBack, onSaved }: Props) {
       setSaving(false);
       return;
     }
-    const nextWorkflow: Workflow = { ...workflow, name: name.trim() || workflow.name, description, variables, startUrl: normalizedStartUrl, executionMode, activeVersionId: nextVersion.id, status: 'active', updatedAt: Date.now() };
+    const nextWorkflow: Workflow = { ...workflow, name: name.trim() || workflow.name, description, variables, startUrl: normalizedStartUrl, executionMode, activeVersionId: nextVersion.id, status: 'active', expiresAt: undefined, updatedAt: Date.now() };
     await WorkflowStore.getInstance().saveVersion(nextVersion);
     await WorkflowStore.getInstance().saveWorkflow(nextWorkflow);
     setVersion(nextVersion);

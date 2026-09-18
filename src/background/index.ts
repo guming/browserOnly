@@ -1,5 +1,6 @@
 import { MemoryService } from '../tracking/memoryService';
 import { setupMessageListeners, translateSelectionForTab } from './messageHandler';
+import { putPendingAction } from '../actions';
 import { cleanupOnUnload, setupTabListeners } from './tabManager';
 import { logWithTimestamp } from './utils';
 import { ConfigManager } from './configManager';
@@ -161,12 +162,19 @@ function setupEventListeners(): void {
   });
 
   chrome.runtime.onInstalled.addListener(() => {
+    chrome.contextMenus.create({ id: 'browserOnlyRoot', title: 'BrowserOnly', contexts: ['page', 'selection'] });
     chrome.contextMenus.create({
       id: "copyToPrompt",
       title: "Send selection to BrowserOnly",
-      contexts: ["selection"]
+      contexts: ["selection"],
+      parentId: 'browserOnlyRoot'
     });
-    chrome.contextMenus.create({ id: 'translateSelection', title: '翻译选中文本', contexts: ['selection'] });
+    chrome.contextMenus.create({ id: 'summarizeSelection', title: 'Summarize selection', contexts: ['selection'], parentId: 'browserOnlyRoot' });
+    chrome.contextMenus.create({ id: 'extractSelection', title: 'Extract from selection', contexts: ['selection'], parentId: 'browserOnlyRoot' });
+    chrome.contextMenus.create({ id: 'summarizePage', title: 'Summarize this page', contexts: ['page'], parentId: 'browserOnlyRoot' });
+    chrome.contextMenus.create({ id: 'extractPage', title: 'Extract structured data', contexts: ['page'], parentId: 'browserOnlyRoot' });
+    chrome.contextMenus.create({ id: 'translateSelection', title: 'Translate selection', contexts: ['selection'], parentId: 'browserOnlyRoot' });
+    chrome.contextMenus.create({ id: 'translatePage', title: 'Translate this page', contexts: ['page'], parentId: 'browserOnlyRoot' });
   });
 
   chrome.contextMenus.onClicked.addListener(async (info, tab) => {
@@ -193,6 +201,16 @@ function setupEventListeners(): void {
         engine: 'auto',
         style: 'natural',
       });
+    }
+    const actionMap: Record<string, string> = { summarizeSelection: 'summarize', extractSelection: 'extract', summarizePage: 'summarize', extractPage: 'extract' };
+    const actionId = actionMap[String(info.menuItemId)];
+    if (actionId && tab?.id !== undefined) {
+      putPendingAction({ actionId, source: 'context_menu', tabId: tab.id, windowId: tab.windowId, pageUrl: tab.url, pageTitle: tab.title, selectionText: info.selectionText });
+      await chrome.sidePanel.open({ tabId: tab.id });
+    }
+    if (info.menuItemId === 'translatePage' && tab?.id) {
+      const settings = await ConfigManager.getInstance().getTranslationSettings();
+      await chrome.runtime.sendMessage({ action: 'translatePage', tabId: tab.id, windowId: tab.windowId, mode: settings.translationMode, translateTitle: settings.translateTitle });
     }
   });
 

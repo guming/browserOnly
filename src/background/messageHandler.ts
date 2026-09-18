@@ -1,5 +1,6 @@
 import { handleApprovalResponse } from '../agent/approvalManager';
 import { createProvider }  from '../models/providers/factory';
+import { consumePendingAction, putPendingAction } from '../actions';
 import { TokenTrackingService } from '../tracking/tokenTrackingService';
 import { executePrompt } from './agentController';
 import { cancelExecution } from './agentController';
@@ -17,6 +18,7 @@ import { WorkflowRunner } from '../workflows/WorkflowRunner';
 import { translateBatch } from '../translation/translationService';
 import { TranslationQueue } from '../translation/translationQueue';
 import { createPageTranslationStartMessage, deliverTranslationBatchResult, sendToTranslationContentScript } from '../translation/translationContentScript';
+import { dispatchTranslationBatch } from '../translation/translationBatchDispatcher';
 const translationQueue = new TranslationQueue((request, signal) => translateBatch(request, signal));
 const activeTranslationSessions = new Map<number, string>();
 
@@ -51,6 +53,13 @@ export function handleMessage(
       case 'runWorkflow':
         handleRunWorkflow(message, sendResponse).catch(error => sendResponse({ success: false, error: String(error) }));
         return true;
+      case 'invokeAction':
+        putPendingAction(message.invocation);
+        sendResponse({ success: true });
+        return false;
+      case 'getPendingAction':
+        sendResponse({ success: true, invocation: consumePendingAction(message.windowId, message.tabId) });
+        return false;
 
       case 'cancelExecution':
         handleCancelExecution(message, sendResponse);
@@ -190,8 +199,17 @@ export function handleMessage(
         sendResponse({ success: true });
         return true;
       case 'translationBatch':
-        handleTranslationBatch(message, sender, sendResponse);
-        return true;
+        return dispatchTranslationBatch(message, sender, sendResponse, {
+          enqueue: request => translationQueue.enqueue(request),
+          deliverResults: async (tabId, request, results) => {
+            console.info('[translation][background] batch completed', { tabId, pageSessionId: request.pageSessionId, requestId: request.requestId, results: results.length });
+            await deliverTranslationBatchResult(tabId, request, results);
+          },
+          deliverError: async (tabId, request, error) => {
+            console.error('[translation][background] batch failed', { tabId, pageSessionId: request.pageSessionId, requestId: request.requestId, error: String(error) });
+            await sendToTranslationContentScript(tabId, { action: 'translationStatus', pageSessionId: request.pageSessionId, requestId: request.requestId, error: String(error) }).catch(() => {});
+          },
+        });
       case 'translateSelection':
         handleSelectionTranslation(message, sender, sendResponse);
         return true;
@@ -242,6 +260,8 @@ function isBackgroundMessage(message: any): message is BackgroundMessage {
     (
       message.action === 'executePrompt' ||
       message.action === 'runWorkflow' ||
+      message.action === 'invokeAction' ||
+      message.action === 'getPendingAction' ||
       message.action === 'cancelExecution' ||
       message.action === 'cancelWorkflow' ||
       message.action === 'clearHistory' ||
@@ -296,21 +316,6 @@ async function handlePageTranslation(message: any, sendResponse: (response?: any
     sendResponse({success:true,pageSessionId});
   } catch (error) {
     sendResponse({success:false,error:String(error)});
-  }
-}
-async function handleTranslationBatch(message: any, sender: chrome.runtime.MessageSender, sendResponse: (response?: any) => void) {
-  const tabId=message.tabId ?? sender.tab?.id; if(typeof tabId!=='number') return;
-  console.info('[translation][background] batch received', { tabId, pageSessionId: message.pageSessionId, requestId: message.requestId, units: message.units?.length, targetLanguage: message.targetLanguage });
-  try {
-    const results=await translationQueue.enqueue({...message, tabId});
-    console.info('[translation][background] batch completed', { tabId, pageSessionId: message.pageSessionId, requestId: message.requestId, results: results.length });
-    await deliverTranslationBatchResult(tabId, message, results);
-    console.info('[translation][background] batch delivered', { tabId, pageSessionId: message.pageSessionId, requestId: message.requestId, results: results.length });
-    sendResponse({success:true,pageSessionId:message.pageSessionId,requestId:message.requestId,results});
-  }
-  catch(error) {
-    console.error('[translation][background] batch failed', { tabId, pageSessionId:message.pageSessionId, requestId:message.requestId, error: String(error) });
-    sendResponse({success:false,pageSessionId:message.pageSessionId,requestId:message.requestId,error:String(error)});
   }
 }
 export async function translateSelectionForTab(tabId: number, message: any): Promise<void> {

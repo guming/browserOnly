@@ -45,13 +45,28 @@ export class WorkflowStore {
 
   async listWorkflows(): Promise<Workflow[]> {
     const db = await this.open();
-    return (await this.readAll<Workflow>(db, 'workflows')).map(normalizeWorkflow);
+    const workflows = (await this.readAll<Workflow>(db, 'workflows')).map(normalizeWorkflow);
+    const expired = workflows.filter(isExpiredWorkflowCandidate);
+    await Promise.all(expired.flatMap(workflow => [
+      this.delete(db, 'workflows', workflow.id),
+      this.delete(db, 'versions', workflow.activeVersionId)
+    ]));
+    return workflows.filter(workflow => !isExpiredWorkflowCandidate(workflow));
   }
 
   async getWorkflow(id: string): Promise<Workflow | undefined> {
     const db = await this.open();
     const workflow = await this.read<Workflow>(db, 'workflows', id);
-    return workflow ? normalizeWorkflow(workflow) : undefined;
+    if (!workflow) return undefined;
+    const normalized = normalizeWorkflow(workflow);
+    if (isExpiredWorkflowCandidate(normalized)) {
+      await Promise.all([
+        this.delete(db, 'workflows', normalized.id),
+        this.delete(db, 'versions', normalized.activeVersionId)
+      ]);
+      return undefined;
+    }
+    return normalized;
   }
 
   async saveWorkflow(workflow: Workflow): Promise<void> {
@@ -138,6 +153,18 @@ export class WorkflowStore {
       request.onerror = () => reject(request.error);
     });
   }
+
+  private delete(db: IDBDatabase, storeName: string, key: IDBValidKey): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const request = db.transaction(storeName, 'readwrite').objectStore(storeName).delete(key);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+}
+
+export function isExpiredWorkflowCandidate(workflow: Workflow, timestamp = Date.now()): boolean {
+  return workflow.status === 'candidate' && typeof workflow.expiresAt === 'number' && workflow.expiresAt <= timestamp;
 }
 
 /** Apply compatibility defaults without rewriting legacy IndexedDB records. */

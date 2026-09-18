@@ -1100,7 +1100,7 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
           const candidate = compileTrace(trace, domain, prompt.slice(0, 60) || 'Recorded workflow');
           void WorkflowStore.getInstance().saveVersion(candidate.version)
             .then(() => WorkflowStore.getInstance().saveWorkflow(candidate.workflow))
-            .then(() => sendUIMessage('updateOutput', { type: 'system', content: `Workflow draft created: ${candidate.workflow.name}` }, targetTabId))
+            .then(() => sendUIMessage('updateOutput', { type: 'system', content: `Automation candidate available for 24 hours: ${candidate.workflow.name}` }, targetTabId))
             .catch(error => logWithTimestamp(`Could not save workflow draft: ${String(error)}`, 'warn'));
         }
         

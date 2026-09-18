@@ -3,6 +3,7 @@ import {
   resetStateForNewTranslationSession,
   TranslationUnitState,
 } from '../translation/orderedTranslationBuffer';
+import { getSelectionOverlayPosition } from '../translation/selectionOverlayPosition';
 
 type Mode = 'bilingual' | 'translation-only' | 'original';
 
@@ -189,24 +190,24 @@ function createOverlayHost(hostId: string): HTMLDivElement {
   const host = document.createElement('div');
   host.id = hostId;
   host.dataset.browseronlySkip = 'true';
-  host.style.cssText = 'all:initial;position:fixed;z-index:2147483647;display:block;';
+  host.style.cssText = 'all:initial;position:fixed;z-index:2147483647;display:block;box-sizing:border-box;';
   document.documentElement.appendChild(host);
   return host;
 }
 
 function positionNearSelection(host: HTMLElement, anchor = selectionAnchor): void {
   const rect = host.getBoundingClientRect();
-  const anchorLeft = anchor?.left ?? VIEWPORT_GAP;
-  const anchorBottom = anchor?.bottom ?? window.innerHeight - VIEWPORT_GAP;
-  const anchorTop = anchor?.top ?? anchorBottom;
-  const maxLeft = Math.max(VIEWPORT_GAP, window.innerWidth - rect.width - VIEWPORT_GAP);
-  const left = Math.min(Math.max(VIEWPORT_GAP, anchorLeft), maxLeft);
-  const below = anchorBottom + VIEWPORT_GAP;
-  const top = below + rect.height <= window.innerHeight - VIEWPORT_GAP
-    ? below
-    : Math.max(VIEWPORT_GAP, anchorTop - rect.height - VIEWPORT_GAP);
+  const position = getSelectionOverlayPosition(anchor, rect, { width: window.innerWidth, height: window.innerHeight }, VIEWPORT_GAP);
+  const { left, top } = position;
   host.style.left = `${left}px`;
   host.style.top = `${top}px`;
+}
+
+function currentSelectionAnchor(): DOMRect | undefined {
+  const selection = window.getSelection();
+  if (!selection?.rangeCount || selection.isCollapsed) return undefined;
+  const rect = selection.getRangeAt(0).getBoundingClientRect();
+  return rect.width || rect.height ? rect : undefined;
 }
 
 function showToolbar(): void {
@@ -258,31 +259,48 @@ function hideToolbar(): void {
 }
 
 function showSelectionResult(text: string): void {
+  selectionAnchor = currentSelectionAnchor() ?? selectionAnchor;
   const host = createOverlayHost(RESULT_HOST_ID);
+  host.style.width = `min(480px, calc(100vw - ${VIEWPORT_GAP * 3}px))`;
   const shadow = host.attachShadow({ mode: 'closed' });
-  const result = document.createElement('div');
-  result.setAttribute('role', 'status');
-  result.style.cssText = [
+  const card = document.createElement('section');
+  card.setAttribute('role', 'dialog');
+  card.setAttribute('aria-label', 'Translation');
+  card.style.cssText = [
     'all:initial',
     'box-sizing:border-box',
-    'display:block',
-    'width:max-content',
-    'max-width:min(360px,calc(100vw - 16px))',
-    'padding:10px 12px',
-    'border:1px solid #cbd2d8',
-    'border-radius:8px',
-    'background:#fff',
-    'box-shadow:0 8px 24px rgba(20,29,36,.18)',
+    'display:flex',
+    'flex-direction:column',
+    'width:100%',
+    'overflow:hidden',
+    'border:1px solid rgba(37,53,66,.18)',
+    'border-radius:12px',
+    'background:#fffdfa',
+    'box-shadow:0 14px 38px rgba(20,29,36,.18),0 2px 8px rgba(20,29,36,.08)',
     'color:#20272c',
-    'font:400 14px/1.55 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Noto Sans SC",sans-serif',
-    'white-space:pre-wrap',
-    'overflow-wrap:anywhere',
-    'word-break:break-word',
+    'font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Noto Sans SC",sans-serif',
   ].join(';');
+  const header = document.createElement('header');
+  header.style.cssText = 'all:initial;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;padding:9px 10px 8px 14px;border-bottom:1px solid rgba(37,53,66,.1);font:600 12px/1.2 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#53616b;letter-spacing:.02em;';
+  const label = document.createElement('span');
+  label.textContent = 'Translation';
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.setAttribute('aria-label', 'Close translation');
+  close.textContent = '×';
+  close.style.cssText = 'all:initial;box-sizing:border-box;display:grid;place-items:center;width:26px;height:26px;border-radius:7px;color:#65737d;font:400 20px/1 ui-sans-serif;cursor:pointer;';
+  close.addEventListener('mouseenter', () => { close.style.background = '#eef1f2'; });
+  close.addEventListener('mouseleave', () => { close.style.background = 'transparent'; });
+  close.addEventListener('click', () => host.remove());
+  const result = document.createElement('div');
+  result.setAttribute('role', 'status');
+  result.style.cssText = 'all:initial;box-sizing:border-box;display:block;max-height:min(42vh,360px);overflow:auto;padding:14px 16px 16px;color:#20272c;font:400 15px/1.72 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Noto Sans SC",sans-serif;white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal;';
   result.textContent = text;
-  shadow.appendChild(result);
+  header.append(label, close);
+  card.append(header, result);
+  shadow.appendChild(card);
   positionNearSelection(host);
-  window.setTimeout(() => host.remove(), 10000);
+  window.setTimeout(() => host.remove(), 20000);
 }
 
 if (shouldInitialize) chrome.runtime.onMessage.addListener((message: any) => {

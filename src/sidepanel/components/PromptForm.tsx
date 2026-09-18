@@ -5,12 +5,18 @@ import { ExpertPicker } from './ExpertPicker';
 import { MultiTabSelector, type TabInfo } from './MultiTabSelector';
 import { availableBooks } from './askBooksData';
 import { getExpert, type ExpertId } from './expertData';
+import { ActionRegistry, type ActionDefinition } from '../../actions';
+import { SlashCommandMenu } from './actions/SlashCommandMenu';
+import { ActionChip } from './actions/ActionChip';
+import type { ActionInvocation } from '../../actions';
 
 interface PromptFormProps {
   onSubmit: (prompt: string, role: string, selectedTabIds?: number[], contextMode?: AskContextMode) => void;
   onCancel: () => void;
   isProcessing: boolean;
   tabStatus: 'attached' | 'detached' | 'unknown' | 'running' | 'idle' | 'error';
+  initialAction?: ActionInvocation;
+  onRunDirectAction?: (actionId: string) => boolean;
 }
 
 type ModeType = 'operator' | 'ask';
@@ -38,7 +44,7 @@ const notebookLMOptions = [
 const isOperatorRole = (value: string): value is OperatorRoleType =>
   operatorRoleOptions.some(option => option.value === value);
 
-export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isProcessing, tabStatus }) => {
+export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isProcessing, tabStatus, initialAction, onRunDirectAction }) => {
   const [prompt, setPrompt] = useState('');
   const [mode, setMode] = useState<ModeType>('operator');
   const [role, setRole] = useState<RoleType>('operator');
@@ -53,6 +59,11 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
   const [selectedNotebookLMOption, setSelectedNotebookLMOption] = useState<NotebookLMOption>('summary');
   const [showMultiTabSelector, setShowMultiTabSelector] = useState(false);
   const [selectedTabIds, setSelectedTabIds] = useState<number[]>([]);
+  const [selectedAction, setSelectedAction] = useState<ActionDefinition>();
+  const [actionIndex, setActionIndex] = useState(0);
+  const registry = useMemo(() => new ActionRegistry(), []);
+  const actionResults = useMemo(() => prompt.startsWith('/') ? registry.search(prompt, { hasPage: tabStatus !== 'detached', comparableTabCount: selectedTabIds.length }) : [], [prompt, registry, selectedTabIds.length, tabStatus]);
+  useEffect(() => { if (initialAction) { const action = registry.get(initialAction.actionId); if (action) setSelectedAction(action); } }, [initialAction, registry]);
 
   const selectedBook = useMemo(
     () => availableBooks.find(book => book.id === selectedBookId) ?? availableBooks[0],
@@ -77,7 +88,12 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!prompt.trim() || isDisabled) return;
+    if ((!prompt.trim() && !selectedAction) || isDisabled) return;
+    if (selectedAction?.runBehavior === 'direct' && onRunDirectAction?.(selectedAction.id)) {
+      setPrompt('');
+      setSelectedAction(undefined);
+      return;
+    }
 
     const finalRole = role === 'books'
       ? `books-${selectedBook.id}`
@@ -86,11 +102,12 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
           : role;
     const tabIds = role === 'researcher' && selectedTabIds.length > 0 ? selectedTabIds : undefined;
     if (mode === 'ask') {
-      onSubmit(prompt, finalRole, tabIds, askTarget === 'books' ? 'standalone' : askContextMode);
+      onSubmit(actionPrompt(selectedAction, prompt), finalRole, tabIds, askTarget === 'books' ? 'standalone' : askContextMode);
     } else {
-      onSubmit(prompt, finalRole, tabIds);
+      onSubmit(actionPrompt(selectedAction, prompt), finalRole, tabIds);
     }
     setPrompt('');
+    setSelectedAction(undefined);
   };
 
   const handleTabsSelected = (tabs: TabInfo[]) => {
@@ -303,6 +320,8 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
       <div className={mode === 'ask' ? 'mt-1' : 'mt-3'}>
         {tabStatus === 'detached' && <p className="mb-2 text-xs text-red-700" role="status">Tab connection lost. Refresh the tab to continue.</p>}
         <div className="relative rounded-[11px] border border-stone-300 bg-white transition-[border-color,box-shadow] duration-150 focus-within:border-[#315a78] focus-within:ring-2 focus-within:ring-[#315a78]/10">
+          {selectedAction && <ActionChip label={selectedAction.name} onRemove={() => setSelectedAction(undefined)} />}
+          <SlashCommandMenu actions={actionResults} activeIndex={actionIndex} onSelect={action => { setSelectedAction(action); setPrompt(''); setActionIndex(0); }} />
           <TextareaAutosize
             aria-label="Prompt"
             autoFocus
@@ -312,6 +331,11 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
             minRows={mode === 'ask' && isAskExpanded ? 6 : 1}
             onChange={event => setPrompt(event.target.value)}
             onKeyDown={event => {
+              if (actionResults.length) {
+                if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setActionIndex(index => (index + (event.key === 'ArrowDown' ? 1 : -1) + actionResults.length) % actionResults.length); return; }
+                if (event.key === 'Escape') { event.preventDefault(); setPrompt(''); return; }
+                if (event.key === 'Enter') { event.preventDefault(); setSelectedAction(actionResults[actionIndex] ?? actionResults[0]); setPrompt(''); return; }
+              }
               if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault();
                 handleSubmit(event);
@@ -327,7 +351,7 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
                   ? `Generate ${selectedNotebookOption?.title.toLowerCase()} for this content`
                   : role === 'researcher' && selectedTabIds.length > 0
                     ? 'Enter your research question for the selected tabs'
-                    : 'Type your message'}
+                    : 'Ask anything, or type / for quick actions'}
             value={prompt}
           />
           <div className="absolute inset-x-3 bottom-2 flex items-center justify-between text-[11px] text-stone-400">
@@ -378,3 +402,9 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
     </form>
   );
 };
+
+function actionPrompt(action: ActionDefinition | undefined, instruction: string): string {
+  if (!action) return instruction;
+  const base = action.id === 'summarize' ? 'Summarize the current page.' : action.id === 'translate' ? 'Translate the current page.' : action.id === 'extract' ? 'Extract structured data from the current page.' : action.id === 'compare' ? 'Compare the selected tabs.' : action.name;
+  return instruction.trim() ? `${base}\n\nAdditional instructions: ${instruction.trim()}` : base;
+}

@@ -1,8 +1,8 @@
-export type WorkflowStatus = 'draft' | 'active' | 'archived';
+export type WorkflowStatus = 'candidate' | 'draft' | 'active' | 'archived';
 export type WorkflowRunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled' | 'repairing';
 export type WorkflowExecutionMode = 'new_tab' | 'current_tab';
 
-export type WorkflowVariableType = 'string' | 'number' | 'date' | 'boolean' | 'secret';
+export type WorkflowVariableType = 'string' | 'number' | 'date' | 'boolean' | 'secret' | 'enum' | 'url' | 'tab' | 'tabs' | 'fields';
 
 export interface WorkflowVariable {
   key: string;
@@ -10,6 +10,10 @@ export interface WorkflowVariable {
   type: WorkflowVariableType;
   required: boolean;
   defaultValue?: unknown;
+  description?: string;
+  placeholder?: string;
+  options?: Array<{ label: string; value: string }>;
+  validation?: { min?: number; max?: number; maxLength?: number; pattern?: string };
 }
 
 export interface StableLocator {
@@ -62,6 +66,8 @@ export interface Workflow {
   activeVersionId: string;
   startUrl?: string;
   executionMode?: WorkflowExecutionMode;
+  /** Auto-generated candidates are discarded after this timestamp unless the user saves them. */
+  expiresAt?: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -70,7 +76,7 @@ export interface WorkflowVersion {
   id: string;
   workflowId: string;
   version: number;
-  source: 'recording' | 'manual_edit' | 'ai_repair';
+  source: 'recording' | 'manual_edit' | 'ai_repair' | 'template';
   sourceRunId?: string;
   steps: WorkflowStep[];
   finalAssertions: WorkflowAssertion[];

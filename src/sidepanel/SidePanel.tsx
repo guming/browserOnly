@@ -15,11 +15,14 @@ import { WorkspaceSwitcher, type WorkspaceView } from './components/WorkspaceSwi
 import { WorkflowListView } from './components/WorkflowListView';
 import { RunListView } from './components/RunListView';
 import { WorkflowStore } from '../workflows';
+import { PendingActionRouter } from './components/actions/PendingActionRouter';
+import type { ActionInvocation } from '../actions';
 
 export function SidePanel() {
   const [activeView, setActiveView] = useState<WorkspaceView>('tasks');
   const [workflowCount, setWorkflowCount] = useState(0);
   const [failedRunCount, setFailedRunCount] = useState(0);
+  const [pendingAction, setPendingAction] = useState<ActionInvocation>();
   useEffect(() => {
     const refreshCounts = async () => {
       const store = WorkflowStore.getInstance();
@@ -543,11 +546,18 @@ export function SidePanel() {
         {/* Bottom Input Section - 减少backdrop-blur */}
         <div className={`mt-3 space-y-3 flex-shrink-0 ${isOutputExpanded ? 'hidden' : ''}`}>
           <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <PendingActionRouter tabId={tabId ?? undefined} windowId={windowId ?? undefined} onAction={setPendingAction} />
             {activeView === 'tasks' && <PromptForm
               onSubmit={handleSubmit}
               onCancel={handleCancel}
               isProcessing={isProcessing}
               tabStatus={tabStatus}
+              initialAction={pendingAction}
+              onRunDirectAction={actionId => {
+                if (actionId !== 'translate') return false;
+                void startPageTranslation();
+                return true;
+              }}
             />}
           </div>
 

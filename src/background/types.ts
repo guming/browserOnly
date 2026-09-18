@@ -1,9 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { BrowserAgent } from "../agent/AgentCore";
 import type { WorkflowExecutionMode } from '../workflows/types';
+import type { ActionInvocation } from '../actions/types';
 
 // Provider types
-export type ProviderType = 'anthropic' | 'openai' | 'gemini' | 'ollama' | 'openai-compatible' | 'deepseek';
+export type ProviderType = 'anthropic' | 'openai' | 'gemini' | 'ollama' | 'openai-compatible' | 'deepseek' | 'chatgpt-web';
+export type WebSessionConnectionState = 'checking' | 'connected' | 'login_required' | 'rate_limited' | 'verification_required' | 'page_changed' | 'unavailable';
 export type TranslationAction = 'translatePage' | 'stopPageTranslation' | 'setTranslationMode' | 'translateSelection' | 'translationBatch' | 'translationBatchResult' | 'translationStatus' | 'translationCapability';
 export interface TranslationMessage { action: TranslationAction; tabId?: number; windowId?: number; pageSessionId?: string; requestId?: string; [key: string]: any; }
 
@@ -98,6 +100,8 @@ export interface RunWorkflowMessage {
   /** @deprecated Use ownerTabId/ownerWindowId. Kept for message compatibility during migration. */
   tabId?: number;
 }
+export interface InvokeActionMessage { action: 'invokeAction'; invocation: ActionInvocation; }
+export interface GetPendingActionMessage { action: 'getPendingAction'; tabId: number; windowId: number; }
 
 // UI Message types
 export interface UpdateOutputMessage {
@@ -289,6 +293,8 @@ export type BackgroundMessage =
   | ApprovalResponseMessage
   | ReflectAndLearnMessage
   | RunWorkflowMessage
+  | InvokeActionMessage
+  | GetPendingActionMessage
   | TokenUsageUpdatedMessage
   | UpdateOutputMessage
   | ProviderConfigChangedMessage
