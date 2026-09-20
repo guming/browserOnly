@@ -176,6 +176,11 @@ Use BrowserOnly whenever a task involves both understanding a webpage and taking
 - Fill out repetitive forms and navigate multi-step websites.
 - Review inboxes, dashboards, or notifications before deciding what to do next.
 - Automate routine website tasks while keeping final actions under your control.
+- Monitor page text, prices, stock indicators, and readable page content with local snapshots, diffs, and browser notifications.
+
+### Local Web Monitoring
+
+Open **Monitors** in the side panel to select an element or monitor the page's main text. BrowserOnly checks it on a best-effort schedule, records structured changes locally, and notifies you when the configured condition becomes true. Routine checks do not call an LLM, but Chrome and the computer must remain running. Login expiry and CAPTCHA challenges pause reliable monitoring rather than being bypassed.
 
 ## 🛫 Roadmap
 

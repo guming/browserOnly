@@ -1,5 +1,25 @@
 import type { StableLocator } from './types';
 
+export interface ElementLocatorMetadata {
+  role?: string; accessibleName?: string; label?: string; testId?: string;
+  id?: string; text?: string; css?: string;
+}
+
+export function buildStableLocatorFromElement(metadata: ElementLocatorMetadata): StableLocator | undefined {
+  const locator: StableLocator = { fallbackOrder: [] };
+  if (metadata.role) { locator.role = metadata.role; locator.accessibleName = metadata.accessibleName; locator.fallbackOrder.push('role'); }
+  if (metadata.label) { locator.label = metadata.label; locator.fallbackOrder.push('label'); }
+  if (metadata.testId) { locator.testId = metadata.testId; locator.fallbackOrder.push('testId'); }
+  if (metadata.text && metadata.text.length <= 120) { locator.text = metadata.text; locator.fallbackOrder.push('text'); }
+  locator.css = metadata.id ? `#${cssEscape(metadata.id)}` : metadata.css;
+  if (locator.css) locator.fallbackOrder.push('css');
+  return locator.fallbackOrder.length ? locator : undefined;
+}
+
+function cssEscape(value: string): string {
+  return typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(value) : value.replace(/[^a-zA-Z0-9_-]/g, character => `\\${character}`);
+}
+
 /** Converts common BrowserOnly selector inputs into an ordered, resilient locator. */
 export function buildStableLocator(input: unknown): StableLocator | undefined {
   if (typeof input !== 'string' || !input.trim()) return undefined;

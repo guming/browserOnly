@@ -17,11 +17,13 @@ import { RunListView } from './components/RunListView';
 import { WorkflowStore } from '../workflows';
 import { PendingActionRouter } from './components/actions/PendingActionRouter';
 import type { ActionInvocation } from '../actions';
+import { MonitorListView } from './components/monitors/MonitorListView';
 
 export function SidePanel() {
   const [activeView, setActiveView] = useState<WorkspaceView>('tasks');
   const [workflowCount, setWorkflowCount] = useState(0);
   const [failedRunCount, setFailedRunCount] = useState(0);
+  const [monitorCount, setMonitorCount] = useState(0);
   const [pendingAction, setPendingAction] = useState<ActionInvocation>();
   useEffect(() => {
     const refreshCounts = async () => {
@@ -29,6 +31,7 @@ export function SidePanel() {
       const [workflows, runs] = await Promise.all([store.listWorkflows().catch(() => []), store.listRuns().catch(() => [])]);
       setWorkflowCount(workflows.filter(workflow => workflow.status !== 'archived').length);
       setFailedRunCount(runs.filter(run => run.status === 'failed').length);
+      chrome.runtime.sendMessage({ action: 'monitorList' }).then(response => { if (response?.success) setMonitorCount(response.data.filter((item: any) => item.status !== 'paused').length); }).catch(() => undefined);
     };
     refreshCounts();
     const timer = window.setInterval(refreshCounts, 3000);
@@ -456,7 +459,7 @@ export function SidePanel() {
       </header>
     )}
 
-    {hasConfiguredProviders ? (
+    {hasConfiguredProviders || activeView === 'monitors' ? (
       <>
         {/* Main Content Area - 优化动画性能 */}
         <div className={`flex-grow flex flex-col gap-3 ${isOutputExpanded ? 'fixed inset-4 z-50 overflow-hidden rounded-xl border border-slate-200 bg-[#fafbfc] p-4' : 'min-h-0 overflow-hidden z-20'}`}>
@@ -465,7 +468,7 @@ export function SidePanel() {
           <div className={`${isOutputExpanded ? 'flex-1' : 'flex-1 min-h-0'} relative z-30 flex min-h-0 flex-col overflow-visible rounded-xl border border-stone-200 bg-white`}>
             <div className="flex items-center justify-between border-b border-slate-200 bg-[#f2f5f7] px-4 py-2">
               <div className="flex items-center gap-2 text-sm font-semibold text-stone-900">
-                <WorkspaceSwitcher value={activeView} onChange={setActiveView} workflowCount={workflowCount} failedRunCount={failedRunCount} />
+                <WorkspaceSwitcher value={activeView} onChange={setActiveView} workflowCount={workflowCount} monitorCount={monitorCount} failedRunCount={failedRunCount} />
               </div>
               
               <div className="flex items-center gap-2">
@@ -524,7 +527,7 @@ export function SidePanel() {
             >
               {activeView === 'tasks' ? (
                 <MessageDisplay messages={messages} streamingSegments={streamingSegments} isStreaming={isStreaming} />
-              ) : activeView === 'workflows' ? <WorkflowListView onRunStarted={() => { setActiveView('tasks'); setIsProcessing(true); setTabStatus('running'); addSystemMessage('▶ Automation started. Running the saved steps…'); }} /> : <RunListView />}
+              ) : activeView === 'workflows' ? <WorkflowListView onRunStarted={() => { setActiveView('tasks'); setIsProcessing(true); setTabStatus('running'); addSystemMessage('▶ Automation started. Running the saved steps…'); }} /> : activeView === 'monitors' ? <MonitorListView tabId={currentSelectedTabId ?? tabId ?? undefined} /> : <RunListView />}
             </div>
           </div>
 
@@ -579,6 +582,12 @@ export function SidePanel() {
             className="btn btn-lg rounded-lg border-0 bg-[#315a78] text-white transition-colors duration-150 hover:bg-[#274a64]"
           >
             Configure Providers
+          </button>
+          <button
+            onClick={() => setActiveView('monitors')}
+            className="mt-3 block w-full text-sm font-semibold text-[#315a78] hover:underline"
+          >
+            Open local monitors
           </button>
           
           {/* 简化加载动画 */}

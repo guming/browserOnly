@@ -4,6 +4,7 @@ import { putPendingAction } from '../actions';
 import { cleanupOnUnload, setupTabListeners } from './tabManager';
 import { logWithTimestamp } from './utils';
 import { ConfigManager } from './configManager';
+import { setupMonitoring } from '../monitoring/backgroundIntegration';
 
 /**
  * Initialize the extension
@@ -22,6 +23,8 @@ function initializeExtension(): void {
 
   // Set up command listeners
   setupCommandListeners();
+
+  setupMonitoring();
 }
 
 /**

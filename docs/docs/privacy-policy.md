@@ -5,7 +5,7 @@ title: Privacy Policy
 
 # Privacy Policy
 
-*Last updated: September 14, 2026*
+*Last updated: September 20, 2026*
 
 ## Introduction
 
@@ -34,6 +34,7 @@ BrowserOnly is an open-source Chrome extension with Operator mode for browser ac
 
 - **Token Usage**: When using LLM providers, BrowserOnly locally tracks token usage to display cost information to you.
 - **Translation and PDF data**: Translation cache entries, extracted PDF content, embeddings, and screenshots may be stored in local extension data when those features are used.
+- **Web Monitor data**: When you create a Monitor, BrowserOnly stores its URL, selected element locator, extracted values, run history, structured differences, and baseline/change screenshots in local IndexedDB. Scheduled monitoring does not send this data to an LLM provider or BrowserOnly server.
 
 ## How Information is Used
 
@@ -58,6 +59,7 @@ BrowserOnly stores extension data locally in your browser or local extension run
 - Task memories
 - Token usage data
 - Translation cache, extracted content, memories, workflows, embeddings, and screenshots when those features are used
+- Web Monitor configurations, extracted values, diffs, run history, and evidence screenshots
 
 This data is stored using Chrome's storage API and IndexedDB, and is not transmitted to any BrowserOnly servers.
 
@@ -82,6 +84,7 @@ You have full control over which LLM providers you use and can remove your API k
 
 You can clear all locally stored data by:
 - Using the "Clear All Memories" tool within BrowserOnly
+- Deleting individual Monitors, which also deletes their retained runs, snapshots, diffs, and screenshots
 - Clearing your browser's storage for the BrowserOnly extension
 
 ## Third-Party Services
@@ -115,6 +118,10 @@ BrowserOnly requires several Chrome permissions to function properly:
 - **storage**: Used to store configuration settings, task memories, token usage data, and extension state information.
 
 - **activeTab**: Used to interact with the currently active tab to perform actions like clicking elements, typing text, and extracting information.
+
+- **alarms**: Used to wake the local extension periodically and check due Web Monitors. Chrome alarms are best-effort and do not run while Chrome or the computer is stopped.
+
+- **notifications**: Used to report a matched Monitor condition or a Monitor that needs attention after repeated failures.
 
 - **host_permissions** (`<all_urls>`): Used to interact with any website you visit, enabling automation across different domains.
 

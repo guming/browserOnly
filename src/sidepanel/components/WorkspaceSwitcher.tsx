@@ -1,15 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 
-export type WorkspaceView = 'tasks' | 'workflows' | 'runs';
+export type WorkspaceView = 'tasks' | 'workflows' | 'monitors' | 'runs';
 
 interface WorkspaceSwitcherProps {
   value: WorkspaceView;
   onChange: (value: WorkspaceView) => void;
   workflowCount?: number;
   failedRunCount?: number;
+  monitorCount?: number;
 }
 
-export function WorkspaceSwitcher({ value, onChange, workflowCount = 0, failedRunCount = 0 }: WorkspaceSwitcherProps) {
+export function WorkspaceSwitcher({ value, onChange, workflowCount = 0, failedRunCount = 0, monitorCount = 0 }: WorkspaceSwitcherProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -19,10 +20,10 @@ export function WorkspaceSwitcher({ value, onChange, workflowCount = 0, failedRu
   }, []);
   return (
     <div ref={ref} className="relative inline-flex items-center rounded-lg border border-stone-200 bg-stone-100 p-0.5">
-      {(['tasks', 'workflows'] as const).map(item => (
+      {(['tasks', 'workflows', 'monitors'] as const).map(item => (
         <button key={item} type="button" onClick={() => onChange(item)} aria-current={value === item ? 'page' : undefined}
           className={`min-h-8 rounded-md px-2.5 text-xs font-semibold transition-colors ${value === item ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500 hover:text-stone-800'}`}>
-          {item === 'tasks' ? 'Tasks' : <>Automations{workflowCount ? <span className="ml-1 text-[10px] text-stone-400">{workflowCount}</span> : null}</>}
+          {item === 'tasks' ? 'Tasks' : item === 'workflows' ? <>Automations{workflowCount ? <span className="ml-1 text-[10px] text-stone-400">{workflowCount}</span> : null}</> : <>Monitors{monitorCount ? <span className="ml-1 text-[10px] text-stone-400">{monitorCount}</span> : null}</>}
         </button>
       ))}
       <button type="button" aria-label="More workspace views" aria-expanded={open} onClick={() => setOpen(current => !current)}

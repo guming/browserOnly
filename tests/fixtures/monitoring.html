@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>Monitoring Fixture</title></head>
+  <body>
+    <main>
+      <h1>Monitoring Fixture</h1>
+      <p id="tracked-text" role="status">Original text</p>
+      <button id="change-text" type="button">Change text</button>
+      <button id="remove-text" type="button">Remove target</button>
+      <p id="delayed-container"></p>
+      <p id="price">$1,299.00</p>
+      <p id="stock">Out of stock</p>
+      <button id="drop-price" type="button">Drop price</button>
+      <button id="restore-stock" type="button">Restore stock</button>
+    </main>
+    <script>
+      document.querySelector('#change-text').addEventListener('click', () => { document.querySelector('#tracked-text').textContent = 'Updated text'; });
+      document.querySelector('#remove-text').addEventListener('click', () => { document.querySelector('#tracked-text')?.remove(); });
+      window.setTimeout(() => { document.querySelector('#delayed-container').textContent = 'Ready'; }, 1000);
+      document.querySelector('#drop-price').addEventListener('click', () => { document.querySelector('#price').textContent = '$999.00'; });
+      document.querySelector('#restore-stock').addEventListener('click', () => { document.querySelector('#stock')?.remove(); });
+    </script>
+  </body>
+</html>

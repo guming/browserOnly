@@ -165,6 +165,28 @@ Go to Gmail, find all unread emails from the last week, and create a summary of 
 
 ## Tips and Tricks
 
+## Web Monitors
+
+Web Monitors periodically check a page in your local Chrome profile. They work without an AI provider and support element text, prices, stock indicators, and main page text.
+
+### Create a Monitor
+
+1. Open the page you want to monitor.
+2. Open BrowserOnly and select **Monitors**.
+3. Select **New**, choose the Monitor type, and use **Pick element** for text, price, or stock monitoring. Page Text monitors select the main readable content automatically.
+4. Choose a trigger and check interval. The default is 30 minutes and the minimum is 1 minute.
+5. Create the Monitor. BrowserOnly first runs a baseline check; a failed baseline is not saved as an active Monitor.
+
+### Manage and diagnose Monitors
+
+- **Run now** performs an immediate check.
+- **Pause** stops scheduled checks; **Resume** schedules the next check.
+- A Monitor pauses as **Needs attention** after three consecutive failures. Run it manually, fix its selected element if necessary, then resume it explicitly.
+- The history distinguishes baseline, unchanged, changed, and failed runs. A missing element is a failure, not a content-change event.
+- Deleting a Monitor also deletes its retained snapshots, diffs, and screenshots.
+
+Monitoring is local and best-effort. Chrome and the computer must remain running. Login expiry, CAPTCHA challenges, foreground-only sites, and anti-automation controls can prevent a check; BrowserOnly does not bypass them.
+
 ### Be Specific
 
 The more specific your instructions, the better BrowserOnly can help you:

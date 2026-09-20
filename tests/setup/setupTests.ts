@@ -7,6 +7,7 @@ import { ReadableStream } from 'stream/web';
 global.TextEncoder = TextEncoder;
 global.TextDecoder = TextDecoder as any;
 global.ReadableStream = ReadableStream as any;
+if (!global.crypto.randomUUID) Object.defineProperty(global.crypto, 'randomUUID', { value: () => `test-${Math.random().toString(16).slice(2)}` });
 
 // Mock Chrome APIs globally
 const mockChrome = {
@@ -35,6 +36,9 @@ const mockChrome = {
     onInstalled: {
       addListener: jest.fn(),
     },
+    onStartup: {
+      addListener: jest.fn(),
+    },
     onSuspend: {
       addListener: jest.fn(),
     },
@@ -58,7 +62,17 @@ const mockChrome = {
     },
     onUpdated: {
       addListener: jest.fn(),
+      removeListener: jest.fn(),
     },
+    remove: jest.fn().mockResolvedValue(undefined),
+  },
+  alarms: {
+    create: jest.fn().mockResolvedValue(undefined),
+    onAlarm: { addListener: jest.fn(), removeListener: jest.fn() },
+  },
+  notifications: {
+    create: jest.fn().mockResolvedValue('notification-id'),
+    onClicked: { addListener: jest.fn(), removeListener: jest.fn() },
   },
   scripting: {
     executeScript: jest.fn().mockResolvedValue([]),

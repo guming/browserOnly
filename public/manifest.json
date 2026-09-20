@@ -31,7 +31,7 @@
     "default_path": "sidepanel.html"
   },
   "options_page": "options.html",
-  "permissions": ["debugger", "tabs", "sidePanel", "storage", "activeTab", "commands", "downloads", "contextMenus", "scripting"],
+  "permissions": ["debugger", "tabs", "sidePanel", "storage", "activeTab", "commands", "downloads", "contextMenus", "scripting", "alarms", "notifications"],
   "host_permissions": ["<all_urls>"],
   "content_scripts": [
     {

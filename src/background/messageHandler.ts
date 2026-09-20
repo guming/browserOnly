@@ -19,6 +19,7 @@ import { translateBatch } from '../translation/translationService';
 import { TranslationQueue } from '../translation/translationQueue';
 import { createPageTranslationStartMessage, deliverTranslationBatchResult, sendToTranslationContentScript } from '../translation/translationContentScript';
 import { dispatchTranslationBatch } from '../translation/translationBatchDispatcher';
+import { handleMonitorMessage, isMonitorMessage } from '../monitoring/backgroundIntegration';
 const translationQueue = new TranslationQueue((request, signal) => translateBatch(request, signal));
 const activeTranslationSessions = new Map<number, string>();
 
@@ -37,6 +38,10 @@ export function handleMessage(
   sendResponse: (response?: any) => void
 ): boolean {
   try {
+    if (isMonitorMessage(message)) {
+      handleMonitorMessage(message).then(sendResponse).catch(error => sendResponse({ success: false, error: { code: 'UNKNOWN', message: String(error) } }));
+      return true;
+    }
     // Type guard to check if the message is a valid background message
     if (!isBackgroundMessage(message)) {
       logWithTimestamp(`Ignoring unknown message type: ${JSON.stringify(message)}`, 'warn');
