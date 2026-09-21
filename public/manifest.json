@@ -1,6 +1,6 @@
 {
   "name": "BrowserOnly - AI Browser Assistant",
-  "version": "0.4.7",
+  "version": "0.4.8",
   "manifest_version": 3,
   "background": {
     "service_worker": "background.js",

@@ -1,7 +1,7 @@
 {
   "name": "browserOnly",
   "description": "Control your browser with natural language",
-  "version": "0.4.7",
+  "version": "0.4.8",
   "type": "module",
   "keywords": [
     "browser-automation",
