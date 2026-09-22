@@ -302,8 +302,8 @@ See https://github.com/adobe-type-tools/cmap-resources
                 <div id="editorModeSeparator" class="verticalToolbarSeparator"></div>
 
                 <div class="toolbarHorizontalGroup hiddenMediumView">
-                  <button id="extractTextButton" class="toolbarButton" type="button" tabindex="0" title="Extract Text">
-                    <span>Extract Text</span>
+                  <button id="extractTextButton" class="toolbarButton" type="button" tabindex="0" title="Open reading assistant" aria-label="Open reading assistant" aria-expanded="false" aria-controls="textExtractionPanel">
+                    <span>Reading assistant</span>
                   </button>
 
                   <button id="printButton" class="toolbarButton" type="button" tabindex="0" data-l10n-id="pdfjs-print-button">
@@ -782,79 +782,91 @@ See https://github.com/adobe-type-tools/cmap-resources
     <div id="printContainer"></div>
 
     <!-- Text Extraction Panel -->
-    <div id="textExtractionPanel">
+    <div id="textPanelBackdrop" class="text-panel-backdrop" hidden></div>
+    <div id="textExtractionPanel" role="dialog" aria-modal="true" aria-labelledby="textPanelTitle" tabindex="-1">
       <div class="text-panel-header">
-        <div class="text-panel-title">PDF Assistant</div>
+        <div>
+          <div id="textPanelTitle" class="text-panel-title">Reading assistant</div>
+          <div class="text-panel-subtitle">Extract, copy, and understand this document</div>
+        </div>
         <button id="closeTextPanelBtn" title="Close" aria-label="Close text panel">×</button>
       </div>
 
       <!-- Tab Navigation -->
-      <div class="text-panel-tabs">
-        <button class="tab-button active" data-tab="extract">📄 Extract Text</button>
-        <button class="tab-button" data-tab="ai">🤖 AI Assistant</button>
+      <div class="text-panel-tabs" role="tablist" aria-label="Reading assistant views">
+        <button id="extractTabButton" class="tab-button active" data-tab="extract" role="tab" aria-selected="true" aria-controls="extractTab" tabindex="0">Text</button>
+        <button id="aiTabButton" class="tab-button" data-tab="ai" role="tab" aria-selected="false" aria-controls="aiTab" tabindex="-1">AI assistant</button>
       </div>
 
       <!-- Extract Text Tab -->
-      <div id="extractTab" class="tab-content active">
+      <div id="extractTab" class="tab-content active" role="tabpanel" aria-labelledby="extractTabButton" tabindex="0">
         <div class="text-panel-actions">
-          <button id="copyTextBtn" title="Copy as plain text">
-            📋 Copy Text
-          </button>
-          <button id="copyMarkdownBtn" title="Copy as markdown">
-            📝 Copy Markdown
-          </button>
+          <button id="copyTextBtn" class="copy-primary-action" title="Copy as plain text" type="button">Copy text</button>
+          <div class="copy-menu-wrapper">
+            <button id="copyMenuToggle" class="copy-menu-toggle" title="More copy options" aria-label="More copy options" aria-expanded="false" aria-controls="copyMenu" type="button">More</button>
+            <div id="copyMenu" class="copy-menu" role="menu" hidden>
+              <button id="copyMarkdownBtn" role="menuitem" title="Copy as markdown" type="button">Copy as Markdown</button>
+            </div>
+          </div>
         </div>
 
         <div class="text-panel-content">
-          <div id="extractionLoading">
+          <div id="extractionLoading" role="status" aria-live="polite">
             <div class="spinner"></div>
-            <div>Extracting text from PDF...</div>
+            <div class="extraction-status-title">Reading document text</div>
             <div id="extractionProgress"></div>
           </div>
-          <div class="paper-container">
+          <div class="paper-container" hidden>
             <div class="paper-sheet">
               <div id="extractedContent"></div>
+              <div id="extractionEmptyState" class="extraction-empty-state" hidden>
+                <div class="empty-state-icon" aria-hidden="true">Aa</div>
+                <div class="empty-state-title">No readable text found</div>
+                <div class="empty-state-copy">This PDF may contain scanned pages or protected text.</div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       <!-- AI Assistant Tab -->
-      <div id="aiTab" class="tab-content">
+      <div id="aiTab" class="tab-content" role="tabpanel" aria-labelledby="aiTabButton" tabindex="0" hidden>
         <div class="ai-panel-actions">
-          <button id="summarizePageBtn" class="ai-action-btn">📄 Summarize This Page</button>
-          <button id="summarizeAllBtn" class="ai-action-btn">📚 Summarize All Pages</button>
-          <button id="clearChatBtn" class="ai-action-btn secondary">🗑️ Clear Chat</button>
+          <button id="summarizePageBtn" class="ai-action-btn primary" type="button">Summarize page</button>
+          <button id="summarizeAllBtn" class="ai-action-btn" type="button">Summarize document</button>
+          <button id="clearChatBtn" class="ai-action-btn secondary" type="button">Clear chat</button>
         </div>
 
         <div class="ai-chat-container">
-          <div id="aiChatMessages" class="ai-chat-messages">
+          <div id="aiChatMessages" class="ai-chat-messages" aria-live="polite" aria-busy="false">
             <div class="ai-welcome-message">
               <div class="ai-message assistant">
+                <div class="ai-message-label">Assistant</div>
                 <div class="ai-message-content">
-                  👋 Hello! I'm your PDF AI Assistant. I can help you:
+                  I can help you read and understand this document:
                   <ul>
                     <li>Summarize pages or the entire document</li>
                     <li>Answer questions about the content</li>
                     <li>Explain complex concepts</li>
                     <li>Find specific information</li>
                   </ul>
-                  Try clicking "Summarize This Page" or ask me a question!
+                  Start with a shortcut above or ask a question below.
                 </div>
               </div>
             </div>
           </div>
 
-          <div id="aiLoadingIndicator" class="ai-loading hidden">
+          <div id="aiLoadingIndicator" class="ai-loading hidden" role="status" aria-live="polite">
             <div class="ai-loading-spinner"></div>
-            <span>Thinking...</span>
+            <span>Preparing an answer</span>
           </div>
 
           <div class="ai-input-container">
+            <label for="aiChatInput" class="visuallyHidden">Ask about this PDF</label>
             <textarea id="aiChatInput" class="ai-chat-input" placeholder="Ask a question about this PDF..." rows="2"></textarea>
-            <button id="aiSendBtn" class="ai-send-btn">
+            <button id="aiSendBtn" class="ai-send-btn" type="button" aria-label="Send question">
               <span>Send</span>
-              <span class="send-icon">➤</span>
+              <span class="send-icon" aria-hidden="true">↗</span>
             </button>
           </div>
         </div>

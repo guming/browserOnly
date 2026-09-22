@@ -120,17 +120,43 @@ In summary:
         const targetTab = this.dataset.tab;
 
         // Remove active class from all tabs and contents
-        tabButtons.forEach(btn => btn.classList.remove('active'));
-        tabContents.forEach(content => content.classList.remove('active'));
+        tabButtons.forEach(btn => {
+          btn.classList.remove('active');
+          btn.setAttribute('aria-selected', 'false');
+          btn.setAttribute('tabindex', '-1');
+        });
+        tabContents.forEach(content => {
+          content.classList.remove('active');
+          content.setAttribute('hidden', 'hidden');
+        });
 
         // Add active class to clicked tab and corresponding content
         this.classList.add('active');
+        this.setAttribute('aria-selected', 'true');
+        this.setAttribute('tabindex', '0');
         const targetContent = document.getElementById(targetTab + 'Tab');
         if (targetContent) {
           targetContent.classList.add('active');
+          targetContent.removeAttribute('hidden');
         }
 
         console.log('[AI Assistant] Switched to tab:', targetTab);
+      });
+
+      button.addEventListener('keydown', function(event) {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+
+        const tabs = Array.from(tabButtons);
+        const currentIndex = tabs.indexOf(this);
+        let nextIndex = currentIndex;
+        if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+        if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % tabs.length;
+        if (event.key === 'Home') nextIndex = 0;
+        if (event.key === 'End') nextIndex = tabs.length - 1;
+
+        event.preventDefault();
+        tabs[nextIndex].focus();
+        tabs[nextIndex].click();
       });
     });
   }
@@ -314,15 +340,16 @@ In summary:
         messagesContainer.innerHTML = `
           <div class="ai-welcome-message">
             <div class="ai-message assistant">
+              <div class="ai-message-label">Assistant</div>
               <div class="ai-message-content">
-                👋 Hello! I'm your PDF AI Assistant. I can help you:
+                I can help you read and understand this document:
                 <ul>
                   <li>Summarize pages or the entire document</li>
                   <li>Answer questions about the content</li>
                   <li>Explain complex concepts</li>
                   <li>Find specific information</li>
                 </ul>
-                Try clicking "Summarize This Page" or ask me a question!
+                Start with a shortcut above or ask a question below.
               </div>
             </div>
           </div>
@@ -394,7 +421,7 @@ In summary:
     } catch (error) {
       console.error('[PDF AI Assistant] Error caught:', error);
       console.error('[PDF AI Assistant] Error stack:', error.stack);
-      addMessageToChat('assistant', '❌ Sorry, I encountered an error. Please make sure the extension is properly configured with an API key.');
+      addMessageToChat('assistant', 'We couldn\'t complete the request. Check the model configuration and try again.');
       showToast('AI request failed', true);
     } finally {
       console.log('[PDF AI Assistant] sendToAi completed, cleaning up...');
@@ -421,6 +448,10 @@ In summary:
       const messageDiv = document.createElement('div');
       messageDiv.className = `ai-message ${role}`;
 
+      const labelDiv = document.createElement('div');
+      labelDiv.className = 'ai-message-label';
+      labelDiv.textContent = role === 'user' ? 'You' : 'Assistant';
+
       const contentDiv = document.createElement('div');
       contentDiv.className = 'ai-message-content';
 
@@ -428,6 +459,7 @@ In summary:
       const formattedContent = formatMessage(content);
       contentDiv.innerHTML = formattedContent;
 
+      messageDiv.appendChild(labelDiv);
       messageDiv.appendChild(contentDiv);
       messagesContainer.appendChild(messageDiv);
 
@@ -490,6 +522,9 @@ In summary:
       } else {
         loadingIndicator.classList.add('hidden');
       }
+
+      const messagesContainer = document.getElementById('aiChatMessages');
+      messagesContainer?.setAttribute('aria-busy', show ? 'true' : 'false');
     }
   }
 

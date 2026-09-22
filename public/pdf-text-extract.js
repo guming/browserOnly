@@ -6,6 +6,8 @@
 
   let extractedText = '';
   let isTextPanelOpen = false;
+  let lastFocusedElement = null;
+  let extractionCompleted = false;
 
   // Create a global namespace for sharing data between scripts
   window.PDFTextExtractor = window.PDFTextExtractor || {};
@@ -16,11 +18,11 @@
   };
 
   window.PDFTextExtractor.hasExtractedText = function() {
-    return extractedText && extractedText.length > 0;
+    return hasReadableText(extractedText);
   };
 
   window.PDFTextExtractor.triggerExtraction = function() {
-    if (!extractedText) {
+    if (!extractionCompleted) {
       return extractAllText();
     }
     return Promise.resolve(extractedText);
@@ -54,10 +56,15 @@
     document.getElementById('copyMarkdownBtn')?.addEventListener('click', copyAsMarkdown);
     document.getElementById('closeTextPanelBtn')?.addEventListener('click', closeTextPanel);
 
+    document.getElementById('textPanelBackdrop')?.addEventListener('click', closeTextPanel);
+    document.getElementById('copyMenuToggle')?.addEventListener('click', toggleCopyMenu);
+    document.addEventListener('keydown', handleGlobalKeydown);
+    document.addEventListener('click', handleDocumentClick);
+
     // Load saved state
     const savedState = localStorage.getItem('pdfTextPanelOpen');
     if (savedState === 'true') {
-      openTextPanel();
+      openTextPanel(false);
     }
   }
 
@@ -69,17 +76,29 @@
     }
   }
 
-  function openTextPanel() {
+  function openTextPanel(shouldFocus = true) {
     const panel = document.getElementById('textExtractionPanel');
     const button = document.getElementById('extractTextButton');
+    const backdrop = document.getElementById('textPanelBackdrop');
 
     if (!panel) return;
 
+    if (!isTextPanelOpen && document.activeElement && document.activeElement !== document.body) {
+      lastFocusedElement = document.activeElement;
+    }
     panel.classList.add('open');
+    panel.removeAttribute('hidden');
     button?.classList.add('active');
+    button?.setAttribute('aria-expanded', 'true');
+    button?.setAttribute('title', 'Close reading assistant');
+    backdrop?.removeAttribute('hidden');
     document.body.classList.add('text-panel-open');
     isTextPanelOpen = true;
     localStorage.setItem('pdfTextPanelOpen', 'true');
+
+    if (shouldFocus) {
+      window.requestAnimationFrame(() => document.getElementById('closeTextPanelBtn')?.focus());
+    }
 
     // Extract text if not already done
     if (!extractedText) {
@@ -90,19 +109,91 @@
   function closeTextPanel() {
     const panel = document.getElementById('textExtractionPanel');
     const button = document.getElementById('extractTextButton');
+    const backdrop = document.getElementById('textPanelBackdrop');
+    const copyMenu = document.getElementById('copyMenu');
+    const copyMenuToggle = document.getElementById('copyMenuToggle');
 
     if (!panel) return;
 
     panel.classList.remove('open');
+    panel.setAttribute('hidden', 'hidden');
     button?.classList.remove('active');
+    button?.setAttribute('aria-expanded', 'false');
+    button?.setAttribute('title', 'Open reading assistant');
+    backdrop?.setAttribute('hidden', 'hidden');
+    copyMenu?.setAttribute('hidden', 'hidden');
+    copyMenuToggle?.setAttribute('aria-expanded', 'false');
     document.body.classList.remove('text-panel-open');
     isTextPanelOpen = false;
     localStorage.setItem('pdfTextPanelOpen', 'false');
+
+    if (lastFocusedElement instanceof HTMLElement && document.contains(lastFocusedElement)) {
+      lastFocusedElement.focus();
+    } else {
+      button?.focus();
+    }
+  }
+
+  function handleGlobalKeydown(event) {
+    if (!isTextPanelOpen) return;
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeTextPanel();
+      return;
+    }
+
+    if (event.key !== 'Tab') return;
+
+    const panel = document.getElementById('textExtractionPanel');
+    if (!panel) return;
+
+    const focusable = Array.from(panel.querySelectorAll('button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'))
+      .filter(element => !element.hasAttribute('hidden') && element.getClientRects().length > 0);
+    if (focusable.length === 0) return;
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  function toggleCopyMenu() {
+    const menu = document.getElementById('copyMenu');
+    const toggle = document.getElementById('copyMenuToggle');
+    if (!menu || !toggle) return;
+
+    const isOpen = !menu.hasAttribute('hidden');
+    if (isOpen) {
+      menu.setAttribute('hidden', 'hidden');
+      toggle.setAttribute('aria-expanded', 'false');
+    } else {
+      menu.removeAttribute('hidden');
+      toggle.setAttribute('aria-expanded', 'true');
+      document.getElementById('copyMarkdownBtn')?.focus();
+    }
+  }
+
+  function handleDocumentClick(event) {
+    const wrapper = document.querySelector('.copy-menu-wrapper');
+    const menu = document.getElementById('copyMenu');
+    const toggle = document.getElementById('copyMenuToggle');
+    if (!wrapper || !menu || !toggle || wrapper.contains(event.target)) return;
+
+    menu.setAttribute('hidden', 'hidden');
+    toggle.setAttribute('aria-expanded', 'false');
   }
 
   async function extractAllText() {
     const contentDiv = document.getElementById('extractedContent');
     const loadingDiv = document.getElementById('extractionLoading');
+    const paperContainer = document.querySelector('.paper-container');
+    const emptyState = document.getElementById('extractionEmptyState');
 
     if (!PDFViewerApplication.pdfDocument) {
       showError('No PDF document loaded');
@@ -112,6 +203,8 @@
     try {
       loadingDiv.style.display = 'flex';
       contentDiv.innerHTML = '';
+      emptyState?.setAttribute('hidden', 'hidden');
+      paperContainer?.setAttribute('hidden', 'hidden');
 
       const numPages = PDFViewerApplication.pdfDocument.numPages;
 
@@ -130,7 +223,7 @@
         });
 
         const progress = Math.round((pageNum / numPages) * 50);
-        document.getElementById('extractionProgress').textContent = `Analyzing pages ${pageNum}/${numPages} (${progress}%)`;
+        document.getElementById('extractionProgress').textContent = `Analyzing page ${pageNum} of ${numPages} (${progress}%)`;
       }
 
       // Identify repetitive elements (headers/footers)
@@ -150,11 +243,17 @@
         fullText += pageText;
 
         const progress = 50 + Math.round((i + 1) / numPages * 50);
-        document.getElementById('extractionProgress').textContent = `Extracting page ${pageNum}/${numPages} (${progress}%)`;
+        document.getElementById('extractionProgress').textContent = `Extracting page ${pageNum} of ${numPages} (${progress}%)`;
       }
 
       extractedText = fullText;
-      renderMarkdown(extractedText);
+      extractionCompleted = true;
+      if (hasReadableText(extractedText)) {
+        renderMarkdown(extractedText);
+      } else {
+        emptyState?.removeAttribute('hidden');
+      }
+      paperContainer?.removeAttribute('hidden');
       loadingDiv.style.display = 'none';
 
       return fullText;
@@ -163,8 +262,13 @@
       console.error('[Text Extract] Error:', error);
       showError('Failed to extract text: ' + error.message);
       loadingDiv.style.display = 'none';
+      extractionCompleted = false;
       throw error;
     }
+  }
+
+  function hasReadableText(text) {
+    return Boolean(text && text.replace(/## Page \d+/g, '').trim());
   }
 
   function identifyRepetitiveElements(allPagesData) {
@@ -321,12 +425,23 @@
 
   function showError(message) {
     const contentDiv = document.getElementById('extractedContent');
+    const paperContainer = document.querySelector('.paper-container');
+    const emptyState = document.getElementById('extractionEmptyState');
+    const loadingDiv = document.getElementById('extractionLoading');
+    emptyState?.setAttribute('hidden', 'hidden');
+    paperContainer?.removeAttribute('hidden');
+    if (loadingDiv) loadingDiv.style.display = 'none';
     contentDiv.innerHTML = `<div class="error-message">${escapeHtml(message)}</div>`;
   }
 
   async function copyAsText() {
-    if (!extractedText) {
+    if (!extractionCompleted) {
       await extractAllText();
+    }
+
+    if (!hasReadableText(extractedText)) {
+      showToast('No readable text found', true);
+      return;
     }
 
     try {
@@ -338,7 +453,7 @@
         .trim();
 
       await navigator.clipboard.writeText(plainText);
-      showToast('Text copied to clipboard!');
+      showToast('Text copied to clipboard');
     } catch (error) {
       console.error('[Text Extract] Copy error:', error);
       showToast('Failed to copy text', true);
@@ -346,13 +461,18 @@
   }
 
   async function copyAsMarkdown() {
-    if (!extractedText) {
+    if (!extractionCompleted) {
       await extractAllText();
+    }
+
+    if (!hasReadableText(extractedText)) {
+      showToast('No readable text found', true);
+      return;
     }
 
     try {
       await navigator.clipboard.writeText(extractedText);
-      showToast('Markdown copied to clipboard!');
+      showToast('Markdown copied to clipboard');
     } catch (error) {
       console.error('[Text Extract] Copy error:', error);
       showToast('Failed to copy markdown', true);
@@ -363,6 +483,8 @@
     const toast = document.createElement('div');
     toast.className = 'toast-notification' + (isError ? ' error' : '');
     toast.textContent = message;
+    toast.setAttribute('role', isError ? 'alert' : 'status');
+    toast.setAttribute('aria-live', isError ? 'assertive' : 'polite');
     document.body.appendChild(toast);
 
     setTimeout(() => toast.classList.add('show'), 10);
