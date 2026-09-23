@@ -623,16 +623,27 @@ export async function executePrompt(
     }
 
     let currentDomain = 'current-site';
+    let currentUrl: string | undefined;
+
+    if (updatedTabState.page) {
+      try {
+        const pageUrl = await updatedTabState.page.url();
+        if (pageUrl) {
+          currentUrl = pageUrl;
+          try { currentDomain = new URL(pageUrl).hostname; } catch { /* keep fallback */ }
+        }
+      } catch (error) {
+        logWithTimestamp(`Could not capture workflow start URL: ${error instanceof Error ? error.message : String(error)}`, 'warn');
+      }
+    }
 
     // Add current page context to history if we have a page
     if (updatedTabState.page && contextMode !== 'standalone') {
       try {
-        const currentUrl = await updatedTabState.page.url();
         const currentTitle = await updatedTabState.page.title();
-        try { currentDomain = new URL(currentUrl).hostname; } catch { /* keep fallback */ }
         
         // Add a more explicit system message about the current page
-        const pageContextMessage = `Current page: ${currentUrl} (${currentTitle}) - Consider this context when executing commands. If asked to summarize, read content, create tables, or analyze options without specific references, assume the request refers to content on this page.`;
+        const pageContextMessage = `Current page: ${currentUrl ?? 'unknown'} (${currentTitle}) - Consider this context when executing commands. If asked to summarize, read content, create tables, or analyze options without specific references, assume the request refers to content on this page.`;
         
         sendUIMessage('updateOutput', {
           type: 'system',
@@ -1097,7 +1108,7 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
         const trace = traceRecorder.finish();
         if (trace.length > 0 && !isReflectionPrompt && !isMultiTabAnalysis) {
           const domain = currentDomain;
-          const candidate = compileTrace(trace, domain, prompt.slice(0, 60) || 'Recorded workflow');
+          const candidate = compileTrace(trace, domain, prompt.slice(0, 60) || 'Recorded workflow', currentUrl);
           void WorkflowStore.getInstance().saveVersion(candidate.version)
             .then(() => WorkflowStore.getInstance().saveWorkflow(candidate.workflow))
             .then(() => sendUIMessage('updateOutput', { type: 'system', content: `Automation candidate available for 24 hours: ${candidate.workflow.name}` }, targetTabId))

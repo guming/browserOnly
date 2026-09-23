@@ -257,6 +257,20 @@ describe('Observation Tools', () => {
       expect(result).toContain('Error querying \'invalid[selector\': Element not found');
     });
 
+    it('should wait for a navigation in progress and retry the query', async () => {
+      const tool = browserQuery(mockPage);
+      mockPage.$$eval
+        .mockRejectedValueOnce(new Error('Execution context was destroyed, most likely because of a navigation'))
+        .mockResolvedValueOnce(mockElementQueries.buttons);
+      mockPage.waitForLoadState.mockResolvedValue(undefined);
+
+      const result = await tool.func('div[id="J_goodsList"]');
+
+      expect(mockPage.waitForLoadState).toHaveBeenCalledWith('domcontentloaded', { timeout: 5000 });
+      expect(mockPage.$$eval).toHaveBeenCalledTimes(2);
+      expect(result).toContain('<button class="cta-button">Get Started</button>');
+    });
+
     it('should truncate long results', async () => {
       const tool = browserQuery(mockPage);
       const largeElements = Array.from({ length: 5 }, () => generateMockHTML(100));

@@ -15,7 +15,7 @@ interface UseChromeMessagingProps {
   onFallbackStarted: (message: string) => void;
   onUpdateScreenshot: (content: any) => void;
   onProcessingComplete: () => void;
-  onRequestApproval?: (request: { requestId: string, toolName: string, toolInput: string, reason: string }) => void;
+  onRequestApproval?: (request: { requestId: string, runId?: string, toolName: string, toolInput: string, reason: string }) => void;
   setTabTitle: (title: string) => void;
   onTabStatusChanged?: (status: 'attached' | 'detached' | 'running' | 'idle' | 'error', tabId: number) => void;
   onTargetCreated?: (tabId: number, targetInfo: any) => void;
@@ -123,6 +123,7 @@ export const useChromeMessaging = ({
           if (onRequestApproval) {
             onRequestApproval({
               requestId: message.requestId,
+              runId: message.runId,
               toolName: message.toolName,
               toolInput: message.toolInput,
               reason: message.reason || 'This action requires approval.'
@@ -283,33 +284,28 @@ export const useChromeMessaging = ({
     });
   };
 
-  const approveRequest = (requestId: string) => {
-    chrome.runtime.sendMessage({
-      action: 'approvalResponse',
-      requestId,
-      approved: true,
-      tabId,
-      windowId
-    }, (_response) => {
-      if (chrome.runtime.lastError) {
-        console.error('Error sending approval response:', chrome.runtime.lastError);
-      }
+  const respondToApproval = (requestId: string, approved: boolean, runId?: string): Promise<boolean> =>
+    new Promise(resolve => {
+      chrome.runtime.sendMessage({
+        action: 'approvalResponse',
+        requestId,
+        runId,
+        approved,
+        tabId,
+        windowId
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error('Error sending approval response:', chrome.runtime.lastError);
+          resolve(false);
+          return;
+        }
+        resolve(response?.success === true);
+      });
     });
-  };
 
-  const rejectRequest = (requestId: string) => {
-    chrome.runtime.sendMessage({
-      action: 'approvalResponse',
-      requestId,
-      approved: false,
-      tabId,
-      windowId
-    }, (_response) => {
-      if (chrome.runtime.lastError) {
-        console.error('Error sending rejection response:', chrome.runtime.lastError);
-      }
-    });
-  };
+  const approveRequest = (requestId: string, runId?: string) => respondToApproval(requestId, true, runId);
+
+  const rejectRequest = (requestId: string, runId?: string) => respondToApproval(requestId, false, runId);
 
   return {
     executePrompt,

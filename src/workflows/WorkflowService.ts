@@ -5,6 +5,7 @@ import { getAllTools } from '../agent/tools';
 import { WorkflowRunner, WorkflowRunnerOptions } from './WorkflowRunner';
 import type { WorkflowRun, WorkflowVersion } from './types';
 import { extractionRequestSchema } from '../extraction/extractionSchema';
+import { preferProvidedPageForTools } from '../agent/tools/utils';
 
 const WORKFLOW_MAX_RETURN_CHARS = 20_000;
 
@@ -20,6 +21,7 @@ export class WorkflowService {
     // coupling the two modes, some factories pull in DOM-dependent code while
     // the service worker is still building the tool list.
     const getPage = () => options.pageRef?.current ?? page;
+    preferProvidedPageForTools(page);
     const memoryTool = lookupMemories(getPage());
     const tools: BrowserTool[] = [{
       name: memoryTool.name,
@@ -59,7 +61,9 @@ export class WorkflowService {
           name: candidate.name,
           description: candidate.description,
           func: (input: string) => {
-            const current = (getAllTools(getPage()) as any[]).find(tool => tool.name === candidate.name);
+            const currentPage = getPage();
+            preferProvidedPageForTools(currentPage);
+            const current = (getAllTools(currentPage) as any[]).find(tool => tool.name === candidate.name);
             return current ? current.func(input) : Promise.resolve(`Error: Tool unavailable: ${candidate.name}`);
           },
         });

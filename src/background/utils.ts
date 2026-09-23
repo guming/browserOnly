@@ -8,7 +8,7 @@ import { UIMessage } from './types';
  * @param tabId Optional tab ID to include in the message
  * @param windowId Optional window ID to include in the message
  */
-export function sendUIMessage(action: string, content: any, tabId?: number, windowId?: number, metadata?: Record<string, unknown>) {
+export function sendUIMessage(action: string, content: any, tabId?: number, windowId?: number, metadata?: Record<string, unknown>): Promise<void> {
   // Include the current tab ID and window ID in the message if available
   if (tabId) {
     // Get windowId from tabId if not provided
@@ -23,9 +23,13 @@ export function sendUIMessage(action: string, content: any, tabId?: number, wind
         console.warn('Could not get window ID for tab:', tabId);
       }
     }
-    chrome.runtime.sendMessage({ action, content, tabId, windowId, ...metadata });
+    return Promise.resolve(chrome.runtime.sendMessage({ action, content, tabId, windowId, ...metadata }))
+      .then(() => undefined)
+      .catch(() => undefined);
   } else {
-    chrome.runtime.sendMessage({ action, content, ...metadata });
+    return Promise.resolve(chrome.runtime.sendMessage({ action, content, ...metadata }))
+      .then(() => undefined)
+      .catch(() => undefined);
   }
 }
 

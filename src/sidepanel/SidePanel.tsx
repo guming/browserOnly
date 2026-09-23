@@ -43,6 +43,7 @@ export function SidePanel() {
   // State for approval requests
   const [approvalRequests, setApprovalRequests] = useState<Array<{
     requestId: string;
+    runId?: string;
     toolName: string;
     toolInput: string;
     reason: string;
@@ -245,22 +246,24 @@ export function SidePanel() {
   }, [isProcessing, tabId, windowId]);
 
   // Handlers for approval requests
-  const handleApprove = (requestId: string) => {
-    // Send approval to the background script
-    approveRequest(requestId);
-    // Remove the request from the list
-    setApprovalRequests(prev => prev.filter(req => req.requestId !== requestId));
-    // Add a system message to indicate approval
-    addSystemMessage(`✅ Approved action: ${requestId}`);
+  const handleApprove = async (requestId: string) => {
+    const request = approvalRequests.find(item => item.requestId === requestId);
+    if (await approveRequest(requestId, request?.runId)) {
+      setApprovalRequests(prev => prev.filter(req => req.requestId !== requestId));
+      addSystemMessage(`✅ Approved action: ${requestId}`);
+    } else {
+      addSystemMessage(`⚠️ Approval could not be applied: ${requestId}`);
+    }
   };
 
-  const handleReject = (requestId: string) => {
-    // Send rejection to the background script
-    rejectRequest(requestId);
-    // Remove the request from the list
-    setApprovalRequests(prev => prev.filter(req => req.requestId !== requestId));
-    // Add a system message to indicate rejection
-    addSystemMessage(`❌ Rejected action: ${requestId}`);
+  const handleReject = async (requestId: string) => {
+    const request = approvalRequests.find(item => item.requestId === requestId);
+    if (await rejectRequest(requestId, request?.runId)) {
+      setApprovalRequests(prev => prev.filter(req => req.requestId !== requestId));
+      addSystemMessage(`❌ Rejected action: ${requestId}`);
+    } else {
+      addSystemMessage(`⚠️ Rejection could not be applied: ${requestId}`);
+    }
   };
 
   // Set up Chrome messaging with callbacks
@@ -373,7 +376,7 @@ export function SidePanel() {
     if (approvalRequests.length > 0) {
       addSystemMessage(`❌ Cancelled execution - all pending approval requests were automatically rejected`);
       approvalRequests.forEach(req => {
-        rejectRequest(req.requestId);
+        rejectRequest(req.requestId, req.runId);
       });
       setApprovalRequests([]);
     }

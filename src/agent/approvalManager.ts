@@ -70,13 +70,15 @@ export async function requestApproval(
  * @param requestId The ID of the approval request
  * @param approved Whether the request was approved
  */
-export function handleApprovalResponse(requestId: string, approved: boolean, runId?: string): void {
+export function handleApprovalResponse(requestId: string, approved: boolean, runId?: string): boolean {
   const pendingApproval = pendingApprovals.get(requestId);
   if (pendingApproval && (!pendingApproval.runId || pendingApproval.runId === runId)) {
     pendingApproval.resolve(approved);
     pendingApprovals.delete(requestId);
+    return true;
   } else {
     console.warn(`No pending approval found for requestId: ${requestId}`);
+    return false;
   }
 }
 

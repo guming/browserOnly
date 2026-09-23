@@ -108,8 +108,11 @@ export function handleMessage(
         return true;
         
       case 'approvalResponse':
-        handleApprovalResponse(message.requestId, message.approved, message.runId);
-        sendResponse({ success: true });
+        if (handleApprovalResponse(message.requestId, message.approved, message.runId)) {
+          sendResponse({ success: true });
+        } else {
+          sendResponse({ success: false, error: 'No matching pending approval was found.' });
+        }
         return true;
         
       case 'reflectAndLearn':

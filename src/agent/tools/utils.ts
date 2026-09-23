@@ -1,6 +1,19 @@
 import type { Page, Dialog } from "playwright-crx";
 import { getCurrentPage } from "../PageContextManager";
 
+const pagesThatMustUseTheirOwnContext = new WeakSet<object>();
+
+/** Keep standalone workflow tools pinned to the page supplied by their run. */
+export function preferProvidedPageForTools(page: Page): void {
+  pagesThatMustUseTheirOwnContext.add(page as object);
+}
+
+function resolveToolPage(page: Page): Page {
+  return pagesThatMustUseTheirOwnContext.has(page as object)
+    ? page
+    : getCurrentPage(page);
+}
+
 /**
  * Helper function to get the current tab ID from a page
  * @param page The page to get the tab ID for
@@ -57,7 +70,7 @@ export async function withActivePage<T>(
   fn: (activePage: Page) => Promise<T>
 ): Promise<T> {
   // Get the current active page from PageContextManager
-  const activePage = getCurrentPage(page);
+  const activePage = resolveToolPage(page);
   
   // Add debugging logs
   try {
@@ -110,7 +123,7 @@ export function resetDialog() {
 
 export function installDialogListener(page: Page) {
   // Get the active page
-  const activePage = getCurrentPage(page);
+  const activePage = resolveToolPage(page);
   
   // Install the dialog listener on the active page
   activePage.on("dialog", dialog => {

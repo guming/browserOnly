@@ -267,6 +267,24 @@ function parseSnapshotOptions(input: string) {
   return options;
 }
 
+const NAVIGATION_CONTEXT_DESTROYED = /execution context was destroyed.*navigation/i;
+
+async function retryAfterNavigation<T>(page: Page, operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (!NAVIGATION_CONTEXT_DESTROYED.test(error instanceof Error ? error.message : String(error))) {
+      throw error;
+    }
+
+    // A recorded submit/click can start a navigation just before the next
+    // observation step. Wait for the replacement document, then evaluate the
+    // read-only operation once more in its new execution context.
+    await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => undefined);
+    return operation();
+  }
+}
+
 export const browserQuery: ToolFactory = (page: Page) =>
   new DynamicTool({
     name: "browser_query",
@@ -275,10 +293,10 @@ export const browserQuery: ToolFactory = (page: Page) =>
     func: async (selector: string) => {
       try {
         return await withActivePage(page, async (activePage) => {
-          const matches = (await activePage.$$eval(
-            selector,
-            (nodes: Element[]) => nodes.slice(0, 10).map((n) => n.outerHTML)
-          )) as string[];
+          const matches = (await retryAfterNavigation(activePage, () => activePage.$$eval(
+              selector,
+              (nodes: Element[]) => nodes.slice(0, 10).map((n) => n.outerHTML)
+            ))) as string[];
           if (!matches.length) return `Error: No nodes matched selector: ${selector}`;
           return truncate(matches.join("\n\n"));
         });
