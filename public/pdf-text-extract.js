@@ -5,6 +5,7 @@
   'use strict';
 
   let extractedText = '';
+  let extractedLinks = [];
   let isTextPanelOpen = false;
   let lastFocusedElement = null;
   let extractionCompleted = false;
@@ -19,6 +20,14 @@
 
   window.PDFTextExtractor.hasExtractedText = function() {
     return hasReadableText(extractedText);
+  };
+
+  window.PDFTextExtractor.getExtractedLinks = function() {
+    return extractedLinks.slice();
+  };
+
+  window.PDFTextExtractor.hasExtractedLinks = function() {
+    return extractedLinks.length > 0;
   };
 
   window.PDFTextExtractor.triggerExtraction = function() {
@@ -58,6 +67,7 @@
 
     document.getElementById('textPanelBackdrop')?.addEventListener('click', closeTextPanel);
     document.getElementById('copyMenuToggle')?.addEventListener('click', toggleCopyMenu);
+    document.getElementById('linksList')?.addEventListener('click', handleLinkAction);
     document.addEventListener('keydown', handleGlobalKeydown);
     document.addEventListener('click', handleDocumentClick);
 
@@ -213,11 +223,15 @@
       for (let pageNum = 1; pageNum <= numPages; pageNum++) {
         const page = await PDFViewerApplication.pdfDocument.getPage(pageNum);
         const viewport = page.getViewport({ scale: 1.0 });
-        const textContent = await page.getTextContent();
+        const [textContent, annotations] = await Promise.all([
+          page.getTextContent(),
+          page.getAnnotations({ intent: 'display' })
+        ]);
 
         allPagesData.push({
           pageNum,
           textContent,
+          annotations,
           pageHeight: viewport.height,
           pageWidth: viewport.width
         });
@@ -247,6 +261,7 @@
       }
 
       extractedText = fullText;
+      extractedLinks = extractDocumentLinks(allPagesData, fullText);
       extractionCompleted = true;
       if (hasReadableText(extractedText)) {
         renderMarkdown(extractedText);
@@ -255,6 +270,7 @@
       }
       paperContainer?.removeAttribute('hidden');
       loadingDiv.style.display = 'none';
+      renderExtractedLinks();
 
       return fullText;
 
@@ -269,6 +285,159 @@
 
   function hasReadableText(text) {
     return Boolean(text && text.replace(/## Page \d+/g, '').trim());
+  }
+
+  function extractDocumentLinks(allPagesData, fullText) {
+    const linksByUrl = new Map();
+
+    const addLink = (rawUrl, pageNum, source, label = '') => {
+      const normalized = normalizeExternalLink(rawUrl);
+      if (!normalized) return;
+
+      const existing = linksByUrl.get(normalized.url);
+      if (existing) {
+        if (pageNum && !existing.pages.includes(pageNum)) existing.pages.push(pageNum);
+        if (existing.source === 'text' && source === 'annotation') existing.source = source;
+        if (!existing.label && label) existing.label = label;
+        return;
+      }
+
+      linksByUrl.set(normalized.url, {
+        url: normalized.url,
+        label: typeof label === 'string' && label.trim() ? label.trim() : normalized.label,
+        pages: pageNum ? [pageNum] : [],
+        type: normalized.type,
+        source
+      });
+    };
+
+    allPagesData.forEach(({ pageNum, annotations, textContent }) => {
+      annotations.forEach(annotation => {
+        if (annotation.subtype !== 'Link') return;
+        addLink(annotation.url || annotation.unsafeUrl, pageNum, 'annotation', annotation.title || annotation.contents || '');
+      });
+
+      const pageText = textContent.items.map(item => item.str || '').join(' ');
+      findLinksInText(pageText).forEach(link => addLink(link, pageNum, 'text'));
+    });
+
+    findLinksInText(fullText).forEach(link => addLink(link, null, 'text'));
+    return Array.from(linksByUrl.values())
+      .map(link => ({ ...link, pages: link.pages.sort((a, b) => a - b) }))
+      .sort((a, b) => (a.pages[0] || Number.MAX_SAFE_INTEGER) - (b.pages[0] || Number.MAX_SAFE_INTEGER));
+  }
+
+  function findLinksInText(text) {
+    const matches = [];
+    const patterns = [
+      /https?:\/\/[^\s<>{}\[\]"']+/gi,
+      /\bdoi:\s*(10\.\d{4,9}\/[\w.()/:;-]+)/gi,
+      /\b(10\.\d{4,9}\/[\w.()/:;-]+)\b/gi
+    ];
+
+    patterns.forEach(pattern => {
+      let match;
+      while ((match = pattern.exec(text)) !== null) {
+        matches.push(match[1] ? `https://doi.org/${match[1]}` : match[0]);
+      }
+    });
+    return matches;
+  }
+
+  function normalizeExternalLink(rawUrl) {
+    if (!rawUrl || typeof rawUrl !== 'string') return null;
+    let candidate = rawUrl.trim().replace(/[),.;:]+$/, '');
+    if (/^doi:\s*/i.test(candidate)) candidate = `https://doi.org/${candidate.replace(/^doi:\s*/i, '')}`;
+    if (/^10\.\d{4,9}\//i.test(candidate)) candidate = `https://doi.org/${candidate}`;
+
+    try {
+      const parsed = new URL(candidate);
+      if (!['http:', 'https:', 'mailto:'].includes(parsed.protocol)) return null;
+      parsed.hash = '';
+      if ((parsed.protocol === 'http:' || parsed.protocol === 'https:') && parsed.pathname === '/') {
+        parsed.pathname = '';
+      }
+      const url = parsed.toString().replace(/\/$/, '');
+      const type = parsed.hostname === 'doi.org' ? 'doi' : parsed.protocol === 'mailto:' ? 'email' : 'web';
+      return {
+        url,
+        type,
+        label: type === 'doi' ? decodeURIComponent(parsed.pathname.replace(/^\//, '')) : parsed.hostname || parsed.pathname
+      };
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function renderExtractedLinks() {
+    const list = document.getElementById('linksList');
+    const count = document.getElementById('linksCount');
+    const loading = document.getElementById('linksLoading');
+    const empty = document.getElementById('linksEmptyState');
+    if (!list || !count || !loading || !empty) return;
+
+    loading.setAttribute('hidden', 'hidden');
+    count.textContent = String(extractedLinks.length);
+    list.replaceChildren();
+
+    if (extractedLinks.length === 0) {
+      empty.removeAttribute('hidden');
+      return;
+    }
+
+    empty.setAttribute('hidden', 'hidden');
+    extractedLinks.forEach((link, index) => {
+      const item = document.createElement('article');
+      item.className = 'link-item';
+
+      const details = document.createElement('div');
+      details.className = 'link-item-details';
+      const title = document.createElement('div');
+      title.className = 'link-item-title';
+      title.textContent = link.label || link.url;
+      const meta = document.createElement('div');
+      meta.className = 'link-item-meta';
+      meta.textContent = `${link.type.toUpperCase()}${link.pages.length ? ` · ${formatPageList(link.pages)}` : ''}`;
+      const address = document.createElement('div');
+      address.className = 'link-item-url';
+      address.textContent = link.url;
+      details.append(title, meta, address);
+
+      const actions = document.createElement('div');
+      actions.className = 'link-item-actions';
+      const open = document.createElement('a');
+      open.href = link.url;
+      open.target = '_blank';
+      open.rel = 'noopener noreferrer';
+      open.textContent = 'Open';
+      open.setAttribute('aria-label', `Open referenced link ${index + 1}`);
+      const copy = document.createElement('button');
+      copy.type = 'button';
+      copy.textContent = 'Copy';
+      copy.dataset.linkUrl = link.url;
+      copy.setAttribute('aria-label', `Copy referenced link ${index + 1}`);
+      actions.append(open, copy);
+
+      item.append(details, actions);
+      list.appendChild(item);
+    });
+  }
+
+  function formatPageList(pages) {
+    if (pages.length === 1) return `Page ${pages[0]}`;
+    if (pages.length <= 3) return `Pages ${pages.join(', ')}`;
+    return `Pages ${pages.slice(0, 3).join(', ')} +${pages.length - 3}`;
+  }
+
+  async function handleLinkAction(event) {
+    const button = event.target.closest('button[data-link-url]');
+    if (!button) return;
+    try {
+      await navigator.clipboard.writeText(button.dataset.linkUrl);
+      showToast('Link copied to clipboard');
+    } catch (_error) {
+      showToast('Failed to copy link', true);
+    }
   }
 
   function identifyRepetitiveElements(allPagesData) {

@@ -425,9 +425,9 @@ export function SidePanel() {
     const response = await chrome.runtime.sendMessage({ action: 'translatePage', tabId: targetTabId, windowId, mode: 'bilingual', translateTitle: true });
     console.info('[translation][sidepanel] start response', response);
     if (response?.success) {
-      addSystemMessage('页面翻译已开启，页面内容将自动翻译；选中文本也可快速翻译。');
+      addSystemMessage('Page translation is on. Page content will be translated automatically. You can also select text for a quick translation.');
     } else {
-      addSystemMessage(`页面翻译启动失败：${response?.error || '无法连接到当前页面'}`);
+      addSystemMessage(`Could not start page translation: ${response?.error || 'Could not connect to the current page'}`);
     }
   };
   const stopPageTranslation = () => {

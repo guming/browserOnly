@@ -2,6 +2,7 @@ import { DynamicTool } from "langchain/tools";
 import type { Page } from "playwright-crx";
 import { ToolFactory } from "./types";
 import { installDialogListener, lastDialog, resetDialog, withActivePage } from "./utils";
+import { selectorCandidates } from "./selectorUtils";
 
 export const browserClick: ToolFactory = (page: Page) =>
   new DynamicTool({
@@ -12,8 +13,16 @@ export const browserClick: ToolFactory = (page: Page) =>
       try {
         return await withActivePage(page, async (activePage) => {
           if (/[#.[]/.test(input)) {
-            await activePage.click(input);
-            return `Clicked selector: ${input}`;
+            let lastError: unknown;
+            for (const candidate of selectorCandidates(input)) {
+              try {
+                await activePage.click(candidate);
+                return `Clicked selector: ${input}`;
+              } catch (error) {
+                lastError = error;
+              }
+            }
+            throw lastError ?? new Error(`No selector matched: ${input}`);
           }
           await activePage.getByText(input).click();
           return `Clicked element containing text: ${input}`;

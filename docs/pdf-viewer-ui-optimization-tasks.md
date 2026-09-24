@@ -41,6 +41,7 @@ A task is `Done` only after its acceptance criteria and the relevant visual veri
 | M2 | Assistant panel and AI experience | PV04–PV06 | Text extraction and AI panels share one visual and interaction language. |
 | M3 | Responsive, accessible, verified reader | PV07–PV10 | P0/P1 behavior passes build checks and Chrome viewport acceptance. |
 | M4 | Optional reader polish | PV11–PV12 | Appearance preferences and low-frequency help are independently shippable. |
+| M5 | Guided PDF learning | PV13–PV16 | Learning guide, open question, quiz, and referenced links work without changing the background message contract. |
 
 ## 4. Dependency overview
 
@@ -248,7 +249,69 @@ PV07/PV08/PV09 ─► PV10 ─► PV11/PV12
   - Help surface is keyboard reachable and dismissible with Escape.
   - Narrow layouts keep the grouped actions accessible.
 
-## 9. Compatibility contract
+## 9. M5: Guided PDF learning
+
+### PV13 — Add a document learning guide
+
+- **Requirement:** Required
+- **Priority:** P1
+- **Status:** In review
+- **Dependencies:** PV06, PV08
+- **Target files:** `public/pdf-viewer.html`, `public/pdf-ai-assistant.js`, `public/pdf-text-extract.css`
+- **Description:** Generate a structured map of why the document matters, what the reader will understand, prerequisites, reading order, attention points, and observable completion criteria.
+- **Expected outcome:** The reader knows what to learn and how to approach the PDF before requesting a summary.
+- **Acceptance criteria:**
+  - Guide contains four to six measurable outcomes and three to five reading steps.
+  - Uncertain page ranges remain empty instead of being invented.
+  - Results are cached for the current viewer session.
+  - Guide actions lead directly to one open question or a five-question quiz.
+
+### PV14 — Add one-question understanding checks
+
+- **Requirement:** Required
+- **Priority:** P1
+- **Status:** In review
+- **Dependencies:** PV13
+- **Target files:** `public/pdf-ai-assistant.js`, `public/pdf-text-extract.css`
+- **Description:** Ask one document-grounded open question, treat the next composer message as the answer, and return a three-level assessment with missing points and a stronger answer.
+- **Expected outcome:** Readers can test depth of understanding without entering a continuous exam flow.
+- **Acceptance criteria:**
+  - The question does not reveal its answer.
+  - Assessment is one of Understood, Partly understood, or Review needed.
+  - Failed evaluation keeps the user's answer visible and retryable.
+  - Ask another and Explain this concept remain available after assessment.
+
+### PV15 — Add a five-question document quiz
+
+- **Requirement:** Required
+- **Priority:** P1
+- **Status:** In review
+- **Dependencies:** PV13
+- **Target files:** `public/pdf-ai-assistant.js`, `public/pdf-text-extract.css`
+- **Description:** Generate five four-option questions, reveal feedback after each answer, and finish with a score and missed-topic review.
+- **Expected outcome:** Readers can check breadth of understanding in a short, bounded session.
+- **Acceptance criteria:**
+  - Structured responses are validated and retried once when malformed.
+  - Exactly one question appears at a time and exactly one option is correct.
+  - Final score matches the recorded answers.
+  - Quiz progress survives Tab switching but not a viewer reload.
+
+### PV16 — Extract referenced links
+
+- **Requirement:** Required
+- **Priority:** P1
+- **Status:** In review
+- **Dependencies:** PV08
+- **Target files:** `public/pdf-viewer.html`, `public/pdf-text-extract.js`, `public/pdf-text-extract.css`
+- **Description:** Read PDF link annotations, visible HTTP/HTTPS URLs, and DOI references into a deduplicated Links Tab with source pages and safe open/copy actions.
+- **Expected outcome:** External resources embedded in a PDF are discoverable without an AI request.
+- **Acceptance criteria:**
+  - Only HTTP, HTTPS, and mailto protocols are exposed.
+  - Duplicate URLs merge page numbers and DOI values normalize to `doi.org`.
+  - Empty, loading, and populated states are visible.
+  - Long URLs do not create horizontal overflow at 375px.
+
+## 10. Compatibility contract
 
 - No new background API, Chrome message action, database, or storage schema is required.
 - Preserve these DOM IDs: `extractTextButton`, `textExtractionPanel`, `aiChatMessages`, `aiChatInput`, and `aiSendBtn`.
@@ -257,7 +320,7 @@ PV07/PV08/PV09 ─► PV10 ─► PV11/PV12
 - New CSS classes, ARIA attributes, and wrapper elements are internal PDF Viewer contracts.
 - Full localization is deferred; this pass keeps the existing English UI copy while removing emoji-based labels.
 
-## 10. Verification commands
+## 11. Verification commands
 
 ```text
 npm run build
@@ -268,6 +331,6 @@ node --check public/pdf-text-extract.js
 node --check public/pdf-ai-assistant.js
 ```
 
-## 11. Definition of Done
+## 12. Definition of Done
 
 A Required task is complete only when its acceptance criteria are demonstrably satisfied, the relevant automated checks pass, and the rendered Chrome extension has been checked at the required viewport and state combinations. A code-only change is `In review` until visual verification evidence is recorded.

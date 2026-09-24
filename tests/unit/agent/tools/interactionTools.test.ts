@@ -94,6 +94,18 @@ describe('Interaction Tools', () => {
       expect(result).toContain('Element not found');
     });
 
+    it('should fall back from an exact class selector when the class list changes', async () => {
+      const tool = browserClick(mockPage);
+      mockPage.click
+        .mockRejectedValueOnce(new Error('stale exact class selector'))
+        .mockResolvedValueOnce(undefined);
+
+      const result = await tool.func('a[class="p-o-btn addcart"]');
+
+      expect(result).toBe('Clicked selector: a[class="p-o-btn addcart"]');
+      expect(mockPage.click).toHaveBeenNthCalledWith(2, 'a.p-o-btn.addcart');
+    });
+
     it('should handle text-based click errors', async () => {
       const tool = browserClick(mockPage);
       const mockGetByText = {

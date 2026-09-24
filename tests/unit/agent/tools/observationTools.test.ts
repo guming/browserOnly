@@ -271,6 +271,31 @@ describe('Observation Tools', () => {
       expect(result).toContain('<button class="cta-button">Get Started</button>');
     });
 
+    it('should fall back from an exact tag/id selector to the stable id', async () => {
+      const tool = browserQuery(mockPage);
+      mockPage.$$eval
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce(['<ul id="J_goodsList"></ul>']);
+      mockPage.waitForSelector.mockRejectedValueOnce(new Error('exact tag selector not found'));
+
+      const result = await tool.func('div[id="J_goodsList"]');
+
+      expect(mockPage.$$eval).toHaveBeenCalledWith('#J_goodsList', expect.any(Function));
+      expect(result).toContain('<ul id="J_goodsList"></ul>');
+    });
+
+    it('should wait for an asynchronously rendered result list', async () => {
+      const tool = browserQuery(mockPage);
+      mockPage.$$eval
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce(['<div id="J_goodsList"></div>']);
+
+      const result = await tool.func('div[id="J_goodsList"]');
+
+      expect(mockPage.waitForSelector).toHaveBeenCalledWith('div[id="J_goodsList"]', { state: 'attached', timeout: 5000 });
+      expect(result).toContain('<div id="J_goodsList"></div>');
+    });
+
     it('should truncate long results', async () => {
       const tool = browserQuery(mockPage);
       const largeElements = Array.from({ length: 5 }, () => generateMockHTML(100));

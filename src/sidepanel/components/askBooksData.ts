@@ -17,6 +17,9 @@ export const bookCategories: BookCategory[] = [
   { id: 'productivity', name: 'Productivity & Habits' },
   { id: 'business', name: 'Business & Strategy' },
   { id: 'growth', name: 'Personal Growth' },
+  { id: 'learning', name: 'Learning & Research' },
+  { id: 'systems', name: 'Systems Thinking' },
+  { id: 'finance', name: 'Money & Finance' },
 ];
 
 export const availableBooks: BookGuide[] = [
@@ -128,6 +131,72 @@ export const availableBooks: BookGuide[] = [
     guideQuestions: [
       'A strategic situation you’re facing (e.g., business competition, negotiation, decision conflict)',
       'Your desired outcome (e.g., predict moves, strengthen position, design win-win solution)',
+    ],
+  },
+  {
+    id: 'makeItStick',
+    title: 'Make It Stick',
+    author: 'Peter C. Brown, Henry L. Roediger III & Mark A. McDaniel',
+    category: 'learning',
+    guideIntro: 'Ready to learn more effectively? Share:',
+    guideQuestions: [
+      'What you are learning and when you need to use it',
+      'How you currently study and what you tend to forget',
+    ],
+  },
+  {
+    id: 'craftOfResearch',
+    title: 'The Craft of Research',
+    author: 'Wayne C. Booth, Gregory G. Colomb, Joseph M. Williams et al.',
+    category: 'learning',
+    guideIntro: 'Ready to shape your research? Share:',
+    guideQuestions: [
+      'Your topic, question, or claim you want to investigate',
+      'The audience, evidence you have, and evidence you still need',
+    ],
+  },
+  {
+    id: 'thinkingInSystems',
+    title: 'Thinking in Systems',
+    author: 'Donella H. Meadows',
+    category: 'systems',
+    guideIntro: 'Ready to examine the system? Share:',
+    guideQuestions: [
+      'The recurring problem or surprising outcome you want to understand',
+      'The people, resources, feedback, and delays involved',
+    ],
+  },
+  {
+    id: 'momTest',
+    title: 'The Mom Test',
+    author: 'Rob Fitzpatrick',
+    category: 'business',
+    guideIntro: 'Ready to learn from customers? Share:',
+    guideQuestions: [
+      'Your product idea and the customer problem you want to test',
+      'Who you can interview and what you currently believe',
+    ],
+  },
+  {
+    id: 'designingYourLife',
+    title: 'Designing Your Life',
+    author: 'Bill Burnett & Dave Evans',
+    category: 'growth',
+    guideIntro: 'Ready to explore a life choice? Share:',
+    guideQuestions: [
+      'The career or life direction you are considering',
+      'Your constraints and a small experiment you could try',
+    ],
+  },
+  {
+    id: 'psychologyOfMoney',
+    title: 'The Psychology of Money',
+    author: 'Morgan Housel',
+    category: 'finance',
+    guideIntro: 'Ready to examine a money decision? Share:',
+    guideQuestions: [
+      'The money decision or behavior you want to understand',
+      'Your goal, time horizon, and worries about downside risk',
     ],
   },
 ];

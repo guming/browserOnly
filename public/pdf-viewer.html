@@ -795,6 +795,7 @@ See https://github.com/adobe-type-tools/cmap-resources
       <!-- Tab Navigation -->
       <div class="text-panel-tabs" role="tablist" aria-label="Reading assistant views">
         <button id="extractTabButton" class="tab-button active" data-tab="extract" role="tab" aria-selected="true" aria-controls="extractTab" tabindex="0">Text</button>
+        <button id="linksTabButton" class="tab-button" data-tab="links" role="tab" aria-selected="false" aria-controls="linksTab" tabindex="-1">Links</button>
         <button id="aiTabButton" class="tab-button" data-tab="ai" role="tab" aria-selected="false" aria-controls="aiTab" tabindex="-1">AI assistant</button>
       </div>
 
@@ -829,12 +830,34 @@ See https://github.com/adobe-type-tools/cmap-resources
         </div>
       </div>
 
+      <!-- Referenced Links Tab -->
+      <div id="linksTab" class="tab-content" role="tabpanel" aria-labelledby="linksTabButton" tabindex="0" hidden>
+        <div class="links-panel-header">
+          <div>
+            <div class="links-panel-title">Referenced links</div>
+            <div class="links-panel-copy">External resources found in this PDF</div>
+          </div>
+          <span id="linksCount" class="links-count" aria-live="polite">0</span>
+        </div>
+        <div id="linksLoading" class="links-state" role="status">Scanning document links</div>
+        <div id="linksEmptyState" class="links-state" hidden>No external links or DOI references were found.</div>
+        <div id="linksList" class="links-list" aria-live="polite"></div>
+      </div>
+
       <!-- AI Assistant Tab -->
       <div id="aiTab" class="tab-content" role="tabpanel" aria-labelledby="aiTabButton" tabindex="0" hidden>
         <div class="ai-panel-actions">
-          <button id="summarizePageBtn" class="ai-action-btn primary" type="button">Summarize page</button>
-          <button id="summarizeAllBtn" class="ai-action-btn" type="button">Summarize document</button>
-          <button id="clearChatBtn" class="ai-action-btn secondary" type="button">Clear chat</button>
+          <button id="learningGuideBtn" class="ai-action-btn primary" type="button">Learning guide</button>
+          <button id="askOneBtn" class="ai-action-btn" type="button">Ask me one</button>
+          <button id="startQuizBtn" class="ai-action-btn" type="button">Quiz</button>
+          <details class="ai-more-actions">
+            <summary aria-label="More AI actions">More</summary>
+            <div class="ai-more-menu">
+              <button id="summarizePageBtn" type="button">Summarize current page</button>
+              <button id="summarizeAllBtn" type="button">Summarize document</button>
+              <button id="clearChatBtn" class="danger" type="button">Clear chat</button>
+            </div>
+          </details>
         </div>
 
         <div class="ai-chat-container">
@@ -843,14 +866,13 @@ See https://github.com/adobe-type-tools/cmap-resources
               <div class="ai-message assistant">
                 <div class="ai-message-label">Assistant</div>
                 <div class="ai-message-content">
-                  I can help you read and understand this document:
+                  Build a path through this document, then check what you understood:
                   <ul>
-                    <li>Summarize pages or the entire document</li>
-                    <li>Answer questions about the content</li>
-                    <li>Explain complex concepts</li>
-                    <li>Find specific information</li>
+                    <li>See what you will understand and how to read it</li>
+                    <li>Answer one open question about a key idea</li>
+                    <li>Take a five-question quiz</li>
                   </ul>
-                  Start with a shortcut above or ask a question below.
+                  Choose a learning action above or ask your own question below.
                 </div>
               </div>
             </div>

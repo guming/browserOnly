@@ -27,7 +27,8 @@ import {
   getWindowForTab, 
   getAgentForWindow, 
   setAgentForWindow,
-  isConnectionHealthy
+  isConnectionHealthy,
+  attachToTab
 } from "./tabManager";
 import { ProviderType, AgentStatus, AgentStatusInfo } from "./types";
 import { sendUIMessage, logWithTimestamp, handleError } from "./utils";
@@ -556,9 +557,6 @@ export async function executePrompt(
         }, targetTabId);
       }
       
-      // Import the attachToTab function dynamically to avoid circular dependencies
-      const { attachToTab } = await import('./tabManager');
-      
       // Attach to the tab
       const attachResult = await attachToTab(targetTabId);
       
@@ -714,7 +712,6 @@ export async function executePrompt(
               if (!tabState?.page) {
                 try {
                   logWithTimestamp(`Temporarily attaching to tab ${tabId} for content extraction`);
-                  const { attachToTab } = await import('./tabManager');
                   await attachToTab(tabId);
                   tabState = getTabState(tabId);
                   temporarilyAttached = true;
@@ -826,17 +823,22 @@ export async function executePrompt(
 
         logWithTimestamp(`Multitab analysis summary: ${tabsWithContent}/${selectedTabIds.length} tabs with content, total ${totalContentLength} characters`);
 
-        enhancedPrompt = `MULTI-TAB RESEARCH ANALYSIS REQUEST
+        const isNotebookRequest = role?.startsWith('notebooklm-');
+        const sourceInstruction = isNotebookRequest
+          ? 'Create the requested learning output from the successfully extracted selected tabs. Treat each tab as a separate source. Attribute substantive points to the tab title and URL, distinguish agreement from disagreement, and state when a selected tab could not be read. Do not use the current tab unless it is selected.'
+          : 'Analyze the successfully extracted selected tabs to answer the original research request.';
+
+        enhancedPrompt = `MULTI-TAB SOURCE REQUEST
 
 Original Request: ${prompt}
 
-I have gathered content from ${selectedTabIds.length} tabs for your analysis. Successfully extracted meaningful content from ${tabsWithContent} tabs. Please analyze all the provided content comprehensively and answer the original request based on the information from all tabs.
+I have gathered content from ${selectedTabIds.length} tabs. Successfully extracted meaningful content from ${tabsWithContent} tabs. ${sourceInstruction}
 
 Here is the content from all selected tabs:
 
 ${combinedContent}
 
-Please provide a comprehensive analysis based on ALL the tab contents above, addressing the original request: "${prompt}"
+Follow the original request using only the readable selected-tab content above.
 
 Note: Focus on the actual content from the tabs that were successfully analyzed. If some tabs couldn't be accessed, work with the available content.`;
 

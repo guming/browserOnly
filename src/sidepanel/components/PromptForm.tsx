@@ -36,7 +36,7 @@ const operatorRoleOptions = [
 
 const notebookLMOptions = [
   { id: 'summary' as const, title: 'Summary', description: 'Generate a comprehensive summary of the content' },
-  { id: 'study-guide' as const, title: 'Study Guide', description: 'Create a detailed study guide with key points' },
+  { id: 'study-guide' as const, title: 'Quiz', description: 'Test your understanding of the selected pages' },
   { id: 'faq' as const, title: 'FAQ', description: 'Generate frequently asked questions and answers' },
   { id: 'mindmap' as const, title: 'Mind Map', description: 'Generate a visual mind map structure of the content' },
 ];
@@ -88,7 +88,7 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    if ((!prompt.trim() && !selectedAction) || isDisabled) return;
+    if ((!prompt.trim() && !selectedAction && role !== 'notebooklm') || isDisabled) return;
     if (selectedAction?.runBehavior === 'direct' && onRunDirectAction?.(selectedAction.id)) {
       setPrompt('');
       setSelectedAction(undefined);
@@ -100,11 +100,14 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
       : role === 'notebooklm'
           ? `notebooklm-${selectedNotebookLMOption}`
           : role;
-    const tabIds = role === 'researcher' && selectedTabIds.length > 0 ? selectedTabIds : undefined;
+    const tabIds = (role === 'researcher' || role === 'notebooklm') && selectedTabIds.length > 0 ? selectedTabIds : undefined;
     if (mode === 'ask') {
       onSubmit(actionPrompt(selectedAction, prompt), finalRole, tabIds, askTarget === 'books' ? 'standalone' : askContextMode);
     } else {
-      onSubmit(actionPrompt(selectedAction, prompt), finalRole, tabIds);
+      const instruction = role === 'notebooklm'
+        ? `#${selectedNotebookLMOption}${prompt.trim() ? `\n\nUser focus: ${prompt.trim()}` : ''}`
+        : actionPrompt(selectedAction, prompt);
+      onSubmit(instruction, finalRole, tabIds);
     }
     setPrompt('');
     setSelectedAction(undefined);
@@ -114,7 +117,7 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
     const ids = tabs.map(tab => tab.id);
     setSelectedTabIds(ids);
     setShowMultiTabSelector(false);
-    if (tabs.length > 0) {
+    if (role === 'researcher' && tabs.length > 0) {
       const urls = tabs.map(tab => `- ${tab.url} (${tab.title})`).join('\n');
       setPrompt(`Please conduct research on the following URLs, focusing on the topics covered by their content.\n\n${urls}`);
     }
@@ -274,7 +277,6 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
                     key={option.id}
                     onClick={() => {
                       setSelectedNotebookLMOption(option.id);
-                      onSubmit(`#${option.id}`, `notebooklm-${option.id}`);
                     }}
                     type="button"
                   >
@@ -289,13 +291,13 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
             </section>
           )}
 
-          {role === 'researcher' && (
+          {(role === 'researcher' || role === 'notebooklm') && (
             <section className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-semibold text-stone-900">Multi-Tab Analysis</h3>
+                  <h3 className="text-sm font-semibold text-stone-900">{role === 'notebooklm' ? 'Source Tabs' : 'Multi-Tab Analysis'}</h3>
                   <p className="mt-0.5 text-xs leading-5 text-stone-500">
-                    {selectedTabIds.length > 0 ? `${selectedTabIds.length} tabs selected for analysis` : 'Analyze several open tabs together.'}
+                    {selectedTabIds.length > 0 ? `${selectedTabIds.length} tabs selected` : role === 'notebooklm' ? 'Select pages to use together, or use the current tab.' : 'Analyze several open tabs together.'}
                   </p>
                 </div>
                 <button
@@ -373,8 +375,8 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
                 Cancel
               </button>
             ) : (
-              <button className="min-h-8 rounded-md bg-[#315a78] px-3 text-xs font-semibold text-white transition-colors duration-150 hover:bg-[#274a64] active:scale-96 disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transform-none" disabled={!prompt.trim() || tabStatus === 'detached'} type="submit">
-                Send
+              <button className="min-h-8 rounded-md bg-[#315a78] px-3 text-xs font-semibold text-white transition-colors duration-150 hover:bg-[#274a64] active:scale-96 disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transform-none" disabled={(!prompt.trim() && role !== 'notebooklm') || tabStatus === 'detached'} type="submit">
+                {role === 'notebooklm' ? 'Generate' : 'Send'}
               </button>
             )}
           </div>

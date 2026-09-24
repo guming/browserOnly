@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "skills": {
+    "cdc-data": {
+      "source": "clawhub.ai",
+      "sourceUrl": "https://clawhub.ai/miaoshou.dev/skills/cdc-data",
+      "sourceType": "well-known",
+      "computedHash": "c09745239d076ec193460f6a65972f788e86b06c0d24760f6891bab2c3f56527",
+      "wellKnownDigest": "sha256:70ddc439f2c005e4306655e02de6bbb706c463308078ed666654eb18ffda5c56"
+    }
+  }
+}

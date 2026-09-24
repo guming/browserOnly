@@ -2,6 +2,7 @@ import { DynamicTool } from "langchain/tools";
 import type { Page } from "playwright-crx";
 import { ToolFactory } from "./types";
 import { truncate, MAX_RETURN_CHARS, MAX_SCREENSHOT_CHARS, withActivePage, getCurrentTabId } from "./utils";
+import { selectorCandidates } from "./selectorUtils";
 
 export const browserGetTitle: ToolFactory = (page: Page) =>
   new DynamicTool({
@@ -268,6 +269,7 @@ function parseSnapshotOptions(input: string) {
 }
 
 const NAVIGATION_CONTEXT_DESTROYED = /execution context was destroyed.*navigation/i;
+const SELECTOR_WAIT_TIMEOUT_MS = 5000;
 
 async function retryAfterNavigation<T>(page: Page, operation: () => Promise<T>): Promise<T> {
   try {
@@ -293,12 +295,37 @@ export const browserQuery: ToolFactory = (page: Page) =>
     func: async (selector: string) => {
       try {
         return await withActivePage(page, async (activePage) => {
-          const matches = (await retryAfterNavigation(activePage, () => activePage.$$eval(
-              selector,
-              (nodes: Element[]) => nodes.slice(0, 10).map((n) => n.outerHTML)
-            ))) as string[];
-          if (!matches.length) return `Error: No nodes matched selector: ${selector}`;
-          return truncate(matches.join("\n\n"));
+          const candidates = selectorCandidates(selector);
+          let lastError: unknown;
+          for (const candidate of candidates) {
+            let matches: string[] = [];
+            try {
+              matches = (await retryAfterNavigation(activePage, () => activePage.$$eval(
+                candidate,
+                (nodes: Element[]) => nodes.slice(0, 10).map((n) => n.outerHTML)
+              ))) as string[];
+            } catch (error) {
+              lastError = error;
+              continue;
+            }
+
+            if (!matches.length && activePage.waitForSelector) {
+              try {
+                await activePage.waitForSelector(candidate, { state: 'attached', timeout: SELECTOR_WAIT_TIMEOUT_MS });
+                matches = (await retryAfterNavigation(activePage, () => activePage.$$eval(
+                  candidate,
+                  (nodes: Element[]) => nodes.slice(0, 10).map((n) => n.outerHTML)
+                ))) as string[];
+              } catch (error) {
+                lastError = error;
+              }
+            }
+
+            if (matches.length) return truncate(matches.join("\n\n"));
+          }
+
+          if (lastError && candidates.length === 1) throw lastError;
+          return `Error: No nodes matched selector: ${selector}`;
         });
       } catch (err) {
         return `Error querying '${selector}': ${

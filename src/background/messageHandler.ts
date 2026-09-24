@@ -56,8 +56,11 @@ export function handleMessage(
         return true; // Keep the message channel open for async response
 
       case 'runWorkflow':
-        handleRunWorkflow(message, sendResponse).catch(error => sendResponse({ success: false, error: String(error) }));
-        return true;
+        // Runs may outlive the runtime message channel. Completion is delivered
+        // through updateOutput/processingComplete, so acknowledge dispatch now.
+        void handleRunWorkflow(message).catch(error => console.error('[runWorkflow] unexpected failure', error));
+        sendResponse({ success: true, started: true });
+        return false;
       case 'invokeAction':
         putPendingAction(message.invocation);
         sendResponse({ success: true });
@@ -355,7 +358,6 @@ async function handleSelectionTranslation(
 
 async function handleRunWorkflow(
   message: Extract<BackgroundMessage, { action: 'runWorkflow' }>,
-  sendResponse: (response?: any) => void
 ): Promise<void> {
   let tabId = message.ownerTabId ?? message.tabId;
   let executionTabId: number | undefined;
@@ -426,7 +428,6 @@ async function handleRunWorkflow(
     }
     sendUIMessage('updateOutput', { type: 'system', content: `Automation ${run.status}: ${workflow.name}${run.failureMessage ? `\n${run.failureMessage}` : ''}` }, tabId, executionWindowId, { runId: run.id, workflowId: workflow.id, executionTabId: run.executionTabId });
     sendUIMessage('processingComplete', null, tabId, executionWindowId, { runId: run.id, workflowId: workflow.id, executionTabId: run.executionTabId });
-    sendResponse({ success: run.status === 'succeeded', run });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error('[runWorkflow] failed', {
@@ -440,7 +441,6 @@ async function handleRunWorkflow(
       sendUIMessage('updateOutput', { type: 'system', content: `Automation failed: ${errorMessage}` }, tabId);
       sendUIMessage('processingComplete', null, tabId);
     }
-    sendResponse({ success: false, error: errorMessage });
   }
 }
 

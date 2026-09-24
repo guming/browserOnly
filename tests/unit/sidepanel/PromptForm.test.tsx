@@ -96,13 +96,13 @@ describe('PromptForm operator roles', () => {
 
     selectRole('notebooklm');
     expect(await screen.findByRole('button', { name: /Summary/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Study Guide/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Quiz/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /FAQ/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Mind Map/ })).toBeInTheDocument();
 
     selectRole('health');
     await waitFor(() => {
-      expect(screen.queryByRole('button', { name: /Study Guide/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Quiz/ })).not.toBeInTheDocument();
     });
   });
 
@@ -134,7 +134,21 @@ describe('PromptForm operator roles', () => {
     selectRole('notebooklm');
     submitPrompt('Summarize this page');
 
-    expect(onSubmit).toHaveBeenCalledWith('Summarize this page', 'notebooklm-summary', undefined);
+    expect(onSubmit).toHaveBeenCalledWith('#summary\n\nUser focus: Summarize this page', 'notebooklm-summary', undefined);
+  });
+
+  it('selects NotebookLM output before generating from selected tabs', () => {
+    const { onSubmit } = renderPromptForm();
+
+    selectRole('notebooklm');
+    fireEvent.click(screen.getByRole('button', { name: /Quiz/ }));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByText('Source Tabs')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Select Tabs/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm mock tabs' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
+
+    expect(onSubmit).toHaveBeenCalledWith('#study-guide', 'notebooklm-study-guide', [11, 12]);
   });
 
   it('keeps research multi-tab selection and passes selected tab IDs', () => {

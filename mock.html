@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BrowserOnly · 让浏览器替你工作</title>
+  <style>
+    :root { --bg:#080a0d; --panel:#0d1117; --panel-hi:#111820; --line:rgba(206,229,255,.12); --text:#e8eef5; --muted:#84909d; --blue:#62b4ff; --green:#b7f36b; --orange:#ffb86b; --r1:6px; --r2:12px; }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body { margin:0; color:var(--text); background:var(--bg); font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,"Cascadia Code",monospace; -webkit-font-smoothing:antialiased; }
+    a { color:inherit; text-decoration:none; }
+    .wrap { width:min(1160px,calc(100% - 40px)); margin:auto; }
+    .skip { position:absolute; left:-999px; top:10px; } .skip:focus { left:16px; z-index:5; background:var(--green); color:#081008; padding:10px; }
+    header { height:76px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--line); }
+    .brand { display:flex; align-items:center; gap:10px; font-weight:800; letter-spacing:-.04em; }
+    .mark { width:25px; height:25px; display:grid; place-items:center; color:#071008; background:var(--green); border-radius:5px; font-size:13px; }
+    nav { display:flex; gap:25px; color:var(--muted); font-size:12px; } nav a:hover { color:var(--text); }
+    .nav-cta { color:var(--bg); background:var(--green); padding:10px 14px; border-radius:var(--r1); }
+    main { overflow:hidden; }
+    .hero { padding:92px 0 72px; display:grid; grid-template-columns:1fr 1.08fr; gap:72px; align-items:center; }
+    .eyebrow { color:var(--green); font-size:11px; letter-spacing:.12em; text-transform:uppercase; margin-bottom:22px; }
+    h1 { font-size:clamp(42px,6vw,76px); line-height:.98; letter-spacing:-.075em; margin:0 0 26px; max-width:650px; text-wrap:balance; }
+    h1 span { color:var(--blue); } p { color:var(--muted); line-height:1.8; font-size:14px; max-width:54ch; text-wrap:pretty; }
+    .actions { display:flex; align-items:center; gap:22px; margin-top:32px; font-size:12px; } .primary { background:var(--green); color:#081008; padding:14px 17px; border-radius:var(--r1); font-weight:800; } .text-link { color:var(--blue); }
+    .browser { background:var(--panel); border:1px solid var(--line); border-radius:var(--r2); box-shadow:0 18px 60px rgba(0,0,0,.3); transform:rotate(1.2deg); }
+    .browser-top { height:42px; display:flex; align-items:center; gap:7px; padding:0 14px; border-bottom:1px solid var(--line); color:var(--muted); font-size:10px; }
+    .dot { width:7px; height:7px; border-radius:50%; background:#ff6b6b; } .dot:nth-child(2){background:var(--orange)} .dot:nth-child(3){background:var(--green)}
+    .tab { margin-left:16px; background:var(--panel-hi); padding:7px 12px; border-radius:5px 5px 0 0; color:#bcc9d6; }
+    .browser-body { display:grid; grid-template-columns:1fr 190px; min-height:310px; }
+    .page { padding:28px; background:linear-gradient(145deg,#111820,#0d1218); } .page small { color:var(--blue); } .page h3 { font-size:24px; letter-spacing:-.06em; margin:36px 0 12px; } .fake-lines { display:grid; gap:9px; } .fake-lines i { display:block; height:7px; background:#28323d; border-radius:2px; } .fake-lines i:nth-child(2){width:76%}.fake-lines i:nth-child(3){width:61%}
+    .agent { padding:16px; border-left:1px solid var(--line); font-size:10px; } .agent-label { color:var(--green); margin-bottom:14px; } .prompt { color:#d9e5ef; line-height:1.7; border:1px solid rgba(98,180,255,.35); background:rgba(98,180,255,.07); padding:10px; border-radius:5px; } .logs { margin-top:20px; display:grid; gap:12px; color:var(--muted); } .log { display:flex; gap:8px; opacity:0; transform:translateY(7px); animation:show .45s forwards; } .log:nth-child(1){animation-delay:.5s}.log:nth-child(2){animation-delay:1.05s}.log:nth-child(3){animation-delay:1.6s}.log:nth-child(4){animation-delay:2.15s}.log b { color:var(--green); font-weight:400; }
+    @keyframes show { to { opacity:1; transform:none; } } @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.log{opacity:1;transform:none}}
+    .mode-tabs { display:flex; gap:1px; margin-bottom:18px; background:var(--line); border:1px solid var(--line); width:max-content; } .mode-tab { border:0; color:var(--muted); background:var(--panel); padding:11px 14px; font:inherit; font-size:11px; cursor:pointer; } .mode-tab.active { color:#071008; background:var(--green); } .mode-copy { min-height:48px; } .ask-view { display:none; } .ask-view.active { display:block; } .operator-view.hidden { display:none; } .ask-question { color:var(--text); border:1px solid rgba(98,180,255,.35); background:rgba(98,180,255,.07); padding:10px; line-height:1.7; } .answer { margin-top:18px; color:var(--muted); line-height:1.8; } .answer b { color:var(--blue); font-weight:400; }
+    .section { padding:76px 0; border-top:1px solid var(--line); } .section-head { display:flex; justify-content:space-between; align-items:end; gap:20px; margin-bottom:34px; } .kicker { color:var(--blue); font-size:11px; } h2 { font-size:34px; letter-spacing:-.07em; line-height:1.05; margin:10px 0 0; }
+    .feature-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; border:1px solid var(--line); background:var(--line); } .feature { background:var(--panel); padding:22px; min-height:190px; } .feature strong { display:block; color:var(--green); font-size:13px; margin-bottom:44px; } .feature h3 { font-size:16px; margin:0 0 10px; letter-spacing:-.04em; } .feature p { font-size:12px; line-height:1.7; }
+    .steps { display:grid; grid-template-columns:repeat(4,1fr); gap:28px; } .step { border-top:2px solid var(--blue); padding-top:15px; } .num { color:var(--blue); font-size:11px; } .step h3 { margin:36px 0 10px; font-size:16px; } .step p { font-size:12px; }
+    .mode-grid { display:grid; grid-template-columns:1.1fr .9fr; gap:1px; background:var(--line); border:1px solid var(--line); } .mode-panel { padding:28px; background:var(--panel); min-height:250px; } .mode-panel.operator { border-top:2px solid var(--green); } .mode-panel.ask { border-top:2px solid var(--blue); } .mode-panel strong { font-size:11px; color:var(--green); } .mode-panel.ask strong { color:var(--blue); } .mode-panel h3 { margin:40px 0 12px; font-size:21px; letter-spacing:-.06em; } .mode-panel p { font-size:12px; } .mode-panel code { display:block; color:#dce8f2; border:1px solid var(--line); padding:12px; margin-top:20px; font-size:11px; line-height:1.7; white-space:pre-wrap; }
+    .reading-grid { display:grid; grid-template-columns:1fr 1fr; gap:28px; } .reading-item { padding-top:18px; border-top:1px solid var(--line); } .reading-item .label { color:var(--orange); font-size:11px; } .reading-item h3 { margin:28px 0 10px; font-size:18px; } .reading-item p { font-size:12px; }
+    .closing { display:flex; justify-content:space-between; align-items:center; gap:30px; padding:54px 0 90px; } .closing h2 { max-width:620px; }
+    footer { border-top:1px solid var(--line); padding:23px 0; color:var(--muted); font-size:11px; display:flex; justify-content:space-between; }
+    @media(max-width:800px){ .wrap{width:min(100% - 28px,600px)} nav a:not(.nav-cta){display:none} .hero{grid-template-columns:1fr;gap:45px;padding-top:62px}.browser{transform:none}.browser-body{grid-template-columns:1fr}.agent{border-left:0;border-top:1px solid var(--line)}.feature-grid,.steps,.mode-grid,.reading-grid{grid-template-columns:1fr 1fr}.section-head,.closing{display:block}.section-head p{margin-top:20px}.closing .primary{display:inline-block;margin-top:25px} }
+    @media(max-width:480px){h1{font-size:43px}.feature-grid,.steps,.mode-grid,.reading-grid{grid-template-columns:1fr}.actions{align-items:flex-start;flex-direction:column;gap:16px}.page{padding:20px}.page h3{margin-top:28px}}
+  </style>
+</head>
+<body>
+  <a class="skip" href="#main-content">跳到主要内容</a>
+  <header class="wrap"><a class="brand" href="#"><span class="mark">⌁</span> BrowserOnly</a><nav><a href="#features">特点</a><a href="#how">如何使用</a><a href="https://github.com/gumingcn/BrowserOnly">GitHub</a><a class="nav-cta" href="#start">开始使用</a></nav></header>
+  <main id="main-content">
+    <section class="hero wrap"><div><div class="eyebrow">Your browser. Your rules.</div><h1>让浏览器<br><span>替你工作。</span></h1><p>用自然语言告诉 BrowserOnly 你想做什么。需要行动时使用 Operator，需要理解时使用 Ask。</p><div class="actions"><a class="primary" href="#start">开始使用　↗</a><a class="text-link" href="#modes">了解两种模式　↓</a></div></div><div class="browser" aria-label="BrowserOnly 双模式演示"><div class="browser-top"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span class="tab">research — browserOnly</span></div><div class="browser-body"><div class="page"><small>example.com / research</small><h3>AI browsers are<br>changing the web.</h3><div class="fake-lines"><i></i><i></i><i></i></div></div><aside class="agent"><div class="mode-tabs"><button class="mode-tab active" data-mode="operator">Operator</button><button class="mode-tab" data-mode="ask">Ask</button></div><div class="operator-view"><div class="agent-label">● OPERATOR / EXECUTING</div><div class="prompt">整理这篇文章的三个核心观点，并打开第二个来源。</div><div class="logs"><div class="log"><b>✓</b> 读取当前页面</div><div class="log"><b>✓</b> 提取文章内容</div><div class="log"><b>✓</b> 整理核心观点</div><div class="log"><b>→</b> 准备打开新标签页</div></div></div><div class="ask-view"><div class="agent-label" style="color:var(--blue)">● ASK / READY</div><div class="ask-question">这篇文章最重要的三个观点是什么？</div><div class="answer"><b>回答</b><br>1. 浏览器代理正在从搜索工具转向执行工具<br>2. 用户控制权是可信使用的前提<br>3. 多标签页理解是复杂任务的关键</div></div></aside></div></div></section>
+    <section class="section" id="modes"><div class="wrap"><div class="section-head"><div><div class="kicker">01 / TWO WAYS TO WORK</div><h2>让 AI 执行，<br>也让 AI 解释。</h2></div><p>Operator 和 Ask 共享同一个浏览器上下文，但承担完全不同的任务。</p></div><div class="mode-grid"><article class="mode-panel operator"><strong>OPERATOR MODE / ACTION</strong><h3>理解网页，然后采取行动。</h3><p>适合需要浏览、点击、输入、切换标签页和完成多步骤任务的场景。</p><code>“打开这三个来源，比较它们对 AI 浏览器的主要观点。”</code></article><article class="mode-panel ask"><strong>ASK MODE / UNDERSTAND</strong><h3>理解内容，然后回答问题。</h3><p>可以基于当前标签页提问，也可以使用 Books 或 Experts 进行独立对话。</p><code>“这篇文章的核心观点是什么？有哪些值得质疑的地方？”</code></article></div></div></section>
+    <section class="section" id="features"><div class="wrap"><div class="section-head"><div><div class="kicker">02 / CAPABILITIES</div><h2>从网页到文档，<br>都在同一个工作台。</h2></div><p>两种模式之外，BrowserOnly 还把翻译和 PDF 阅读整合进浏览器。</p></div><div class="feature-grid"><article class="feature"><strong>01 / LOCAL FIRST</strong><h3>数据留在你的浏览器</h3><p>没有 BrowserOnly 中间后端。登录状态、标签页和本地记忆由你掌控。</p></article><article class="feature"><strong>02 / PAGE TRANSLATION</strong><h3>翻译网页，不离开当前页面</h3><p>支持双语、仅译文、恢复原文，也可以直接翻译选中的文本。</p></article><article class="feature"><strong>03 / PDF VIEWER</strong><h3>阅读 PDF，也可以提问</h3><p>提取干净文本、总结页面、复制 Markdown，并针对文档内容进行问答。</p></article><article class="feature"><strong>04 / HUMAN IN LOOP</strong><h3>关键动作先问你</h3><p>购买、发布、发送等敏感操作，可以在执行前请求确认。</p></article></div><div class="reading-grid" style="margin-top:48px"><article class="reading-item"><div class="label">PAGE TRANSLATION</div><h3>让网页变成你的语言</h3><p>整页翻译、选中文本翻译，支持双语显示和译文优先阅读。</p></article><article class="reading-item"><div class="label">PDF VIEWER</div><h3>从打开 PDF 到读懂它</h3><p>内置阅读视图和 AI 对话，帮助你提取结构、总结结论、找到关键洞察。</p></article></div></div></section>
+    <section class="section" id="how"><div class="wrap"><div class="kicker">02 / HOW IT WORKS</div><h2>四步，开始使用。</h2><div class="steps" style="margin-top:38px"><div class="step"><div class="num">01</div><h3>安装扩展</h3><p>从 Chrome Web Store 或 GitHub 安装 BrowserOnly。</p></div><div class="step"><div class="num">02</div><h3>连接模型</h3><p>配置你已有的模型 Provider 和 API Key。</p></div><div class="step"><div class="num">03</div><h3>说出任务</h3><p>像告诉同事一样，描述你想完成的网页操作。</p></div><div class="step"><div class="num">04</div><h3>检查并完成</h3><p>查看执行步骤，在敏感操作前做最后确认。</p></div></div></div></section>
+    <section class="wrap closing" id="start"><h2>下一次打开浏览器时，<br><span style="color:var(--green)">从一句话开始。</span></h2><a class="primary" href="https://github.com/gumingcn/BrowserOnly">在 GitHub 上开始　↗</a></section>
+  </main>
+  <footer class="wrap"><span>BrowserOnly · Open source browser agent</span><span>Privacy　·　Docs　·　GitHub</span></footer>
+  <script>
+    document.querySelectorAll('[data-mode]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const mode = button.dataset.mode;
+        document.querySelectorAll('[data-mode]').forEach((item) => item.classList.toggle('active', item.dataset.mode === mode));
+        document.querySelector('.operator-view').classList.toggle('hidden', mode !== 'operator');
+        document.querySelector('.ask-view').classList.toggle('active', mode === 'ask');
+      });
+    });
+  </script>
+</body>
+</html>

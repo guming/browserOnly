@@ -18,6 +18,7 @@ export interface WorkflowRunnerOptions {
   runner?: WorkflowRunner;
   pageRef?: { current: any };
   onPageHandoff?: (page: any, tabId?: number) => void;
+  repairQuery?: (step: WorkflowStep, failedSelector: string) => Promise<string | undefined>;
 }
 
 export class WorkflowRunner {
@@ -70,6 +71,9 @@ export class WorkflowRunner {
         const tool = options.tools.find(candidate => candidate.name === step.toolName);
         if (!tool) throw new Error(`Tool not found: ${step.toolName}`);
         const input = substituteVariables(step.input, options.variables ?? {});
+        for (const assertion of step.preconditions ?? []) {
+          if (!(await evaluateAssertion(assertion, options.tools))) throw new Error(`Precondition failed: ${assertion.type}`);
+        }
         const pagesBefore = step.toolName === 'browser_click' && options.pageRef?.current?.context
           ? options.pageRef.current.context().pages()
           : undefined;
@@ -85,9 +89,17 @@ export class WorkflowRunner {
           if (!approved) throw new Error('Action rejected by user');
         }
         const candidates = step.locator ? locatorCandidates(step.locator, input) : [input];
+        // A write may have happened even when its response was lost; never replay it blindly.
+        const maxAttempts = step.risk === 'read'
+          ? Math.max(1, Math.min(3, step.retryPolicy?.maxAttempts ?? 1)) : 1;
         let result = '';
         let lastError: unknown;
-        for (const candidate of candidates) {
+        for (let index = 0; index < candidates.length * maxAttempts; index++) {
+          if (this.cancelled) throw new Error('Workflow cancelled');
+          if (index > 0 && index % candidates.length === 0 && step.retryPolicy.delayMs > 0) {
+            await new Promise(resolve => setTimeout(resolve, step.retryPolicy.delayMs));
+          }
+          const candidate = candidates[index % candidates.length];
           try {
             result = await withTimeout(tool.func(typeof candidate === 'string' ? candidate : JSON.stringify(candidate)), step.timeoutMs);
             // AST extraction relies on page.evaluate(), which is not available
@@ -121,8 +133,29 @@ export class WorkflowRunner {
             lastError = error;
           }
         }
+        if ((!result && lastError || /^error\b|^Action cancelled/i.test(result.trim()))
+          && step.onFailure === 'repair' && ['browser_query', 'browser_click', 'browser_type'].includes(step.toolName)
+          && typeof input === 'string' && options.repairQuery && !this.cancelled) {
+          const repaired = await options.repairQuery(step, input);
+          if (repaired && repaired !== input) {
+            if ((step.risk === 'write' || step.risk === 'irreversible') && options.context?.tabId) {
+              const approved = await requestApproval(
+                options.context.tabId, step.toolName, repaired,
+                `Workflow repair proposes a different target: ${step.label}`,
+                options.context.windowId,
+                { runId: run.id, workflowId, executionTabId: options.context.tabId, ownerTabId: options.context.ownerTabId },
+              );
+              if (!approved) throw new Error('Repaired action rejected by user');
+            }
+            const repairedResult = await withTimeout(tool.func(repaired), step.timeoutMs);
+            if (!/^error\b|^Action cancelled/i.test(repairedResult.trim())) {
+              result = repairedResult;
+              run.llmCalls += 1;
+            }
+          }
+        }
         if (!result && lastError) throw lastError;
-        if (/^error\b|^Error\b|^Action cancelled/i.test(result.trim())) throw new Error(result);
+        if (/^error\b|^Action cancelled/i.test(result.trim())) throw new Error(result);
         if (pagesBefore && options.pageRef?.current?.context) {
           const pagesAfter = options.pageRef.current.context().pages();
           const newPages = pagesAfter.filter((candidate: any) => !pagesBefore.includes(candidate));
@@ -244,7 +277,7 @@ export function matchesAssertion(assertion: WorkflowAssertion, state: { url?: st
     case 'element_absent': return state.elementVisible === false;
     case 'value_equals': return state.value === String(assertion.expected);
     case 'row_count': return state.rowCount === Number(assertion.expected);
-    default: return true;
+    default: return false;
   }
 }
 
@@ -253,7 +286,8 @@ async function evaluateAssertion(assertion: WorkflowAssertion, tools: BrowserToo
   try {
     if (assertion.type === 'url_matches') {
       const result = await find('browser_get_active_tab')?.func('');
-      return matchesAssertion(assertion, { url: result });
+      const url = result ? JSON.parse(result).url : undefined;
+      return matchesAssertion(assertion, { url });
     }
     if (assertion.type === 'text_present') {
       const result = await (find('browser_read_text') ?? find('browser_read_text_enhanced'))?.func('');
@@ -263,9 +297,10 @@ async function evaluateAssertion(assertion: WorkflowAssertion, tools: BrowserToo
       const locator = assertion.locator?.css || assertion.locator?.text || assertion.locator?.accessibleName;
       if (!locator) return false;
       const result = await find('browser_query')?.func(locator);
-      const visible = !!result && !/^error\b|^Error\b/i.test(result) && result !== '[]';
+      if (!result || /^error\b/i.test(result.trim())) return false;
+      const visible = result !== '[]';
       return assertion.type === 'element_visible' ? visible : !visible;
     }
-    return true;
+    return false;
   } catch { return false; }
 }

@@ -6,6 +6,10 @@ import { WorkflowRunner, WorkflowRunnerOptions } from './WorkflowRunner';
 import type { WorkflowRun, WorkflowVersion } from './types';
 import { extractionRequestSchema } from '../extraction/extractionSchema';
 import { preferProvidedPageForTools } from '../agent/tools/utils';
+import { proposeQuerySelector } from './WorkflowQueryRepair';
+import { WorkflowStore } from './WorkflowStore';
+import { ConfigManager } from '../background/configManager';
+import { createProvider } from '../models/providers/factory';
 
 const WORKFLOW_MAX_RETURN_CHARS = 20_000;
 
@@ -154,6 +158,49 @@ export class WorkflowService {
       throw new Error(`Unsupported workflow tools: ${unsupportedTools.join(', ')}`);
     }
 
-    return (options.runner ?? new WorkflowRunner()).run(workflowId, version, { ...options, tools });
+    const repairedSelectors = new Map<string, string>();
+    const run = await (options.runner ?? new WorkflowRunner()).run(workflowId, version, {
+      ...options,
+      tools,
+      repairQuery: async (step, failedSelector) => {
+        try {
+          const config = await ConfigManager.getInstance().getProviderConfig();
+          if (!config.apiKey && config.provider !== 'ollama') return undefined;
+          const provider = await createProvider(config.provider, {
+            apiKey: config.apiKey || 'dummy-key-for-ollama', apiModelId: config.apiModelId,
+            baseUrl: config.baseUrl, thinkingBudgetTokens: config.thinkingBudgetTokens,
+            openaiCompatibleModels: config.openaiCompatibleModels,
+          });
+          const proposal = await proposeQuerySelector(provider, step, failedSelector.split('|', 1)[0], getPage());
+          if (!proposal) return undefined;
+          const target = getPage().locator(proposal.selector);
+          const count = await target.count();
+          if (count < 1 || (step.toolName !== 'browser_query' && count !== 1)) return undefined;
+          const targetHtml = await target.first().evaluate((element: Element) => element.outerHTML);
+          if (!targetHtml.includes(proposal.evidenceText)) return undefined;
+          const suffix = step.toolName === 'browser_type' ? failedSelector.slice(failedSelector.indexOf('|')) : '';
+          if (step.toolName === 'browser_type' && !failedSelector.includes('|')) return undefined;
+          const repaired = proposal.selector + suffix;
+          repairedSelectors.set(step.id, repaired);
+          return repaired;
+        } catch (error) {
+          console.warn('[WorkflowService] query repair unavailable', error);
+          return undefined;
+        }
+      },
+    });
+    if (run.status === 'succeeded' && repairedSelectors.size) {
+      const store = WorkflowStore.getInstance();
+      const next = {
+        ...version, id: `version-${crypto.randomUUID()}`, version: version.version + 1,
+        source: 'ai_repair' as const, sourceRunId: run.id, createdAt: Date.now(),
+        steps: version.steps.map(step => repairedSelectors.has(step.id)
+          ? { ...step, input: repairedSelectors.get(step.id), locator: undefined } : step),
+      };
+      await store.saveVersion(next);
+      const workflow = await store.getWorkflow(workflowId);
+      if (workflow) await store.saveWorkflow({ ...workflow, activeVersionId: next.id, updatedAt: Date.now() });
+    }
+    return run;
   }
 }
