@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faFlask } from '@fortawesome/free-solid-svg-icons';
 
 export type WorkspaceView = 'tasks' | 'workflows' | 'monitors' | 'runs';
 
@@ -23,7 +25,13 @@ export function WorkspaceSwitcher({ value, onChange, workflowCount = 0, failedRu
       {(['tasks', 'workflows', 'monitors'] as const).map(item => (
         <button key={item} type="button" onClick={() => onChange(item)} aria-current={value === item ? 'page' : undefined}
           className={`min-h-8 rounded-md px-2.5 text-xs font-semibold transition-colors ${value === item ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500 hover:text-stone-800'}`}>
-          {item === 'tasks' ? 'Tasks' : item === 'workflows' ? <>Automations{workflowCount ? <span className="ml-1 text-[10px] text-stone-400">{workflowCount}</span> : null}</> : <>Monitors{monitorCount ? <span className="ml-1 text-[10px] text-stone-400">{monitorCount}</span> : null}</>}
+          {item === 'tasks' ? 'Tasks' : item === 'workflows' ? <>Automations{workflowCount ? <span className="ml-1 text-[10px] text-stone-400">{workflowCount}</span> : null}</> : <>
+            Monitors
+            <span className="ml-1 inline-flex text-[10px] text-amber-600" role="img" aria-label="Beta feature" title="Beta: monitoring runs on a best-effort basis">
+              <FontAwesomeIcon icon={faFlask} aria-hidden="true" />
+            </span>
+            {monitorCount ? <span className="ml-1 text-[10px] text-stone-400">{monitorCount}</span> : null}
+          </>}
         </button>
       ))}
       <button type="button" aria-label="More workspace views" aria-expanded={open} onClick={() => setOpen(current => !current)}
