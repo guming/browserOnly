@@ -59,6 +59,22 @@ export async function getCurrentTabId(page: Page): Promise<number | undefined> {
 export const MAX_RETURN_CHARS = 20000;
 export const MAX_SCREENSHOT_CHARS = 500000;
 
+const NAVIGATION_CONTEXT_DESTROYED = /execution context was destroyed.*navigation/i;
+
+/** Retry a read-only page operation once after an in-flight navigation settles. */
+export async function retryAfterNavigation<T>(page: Page, operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (!NAVIGATION_CONTEXT_DESTROYED.test(error instanceof Error ? error.message : String(error))) {
+      throw error;
+    }
+
+    await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => undefined);
+    return operation();
+  }
+}
+
 /**
  * Helper function to execute a function with the active page from PageContextManager
  * @param page The original page reference

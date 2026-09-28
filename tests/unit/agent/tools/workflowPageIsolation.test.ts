@@ -1,5 +1,5 @@
 import { PageContextManager } from '../../../../src/agent/PageContextManager';
-import { preferProvidedPageForTools, withActivePage } from '../../../../src/agent/tools/utils';
+import { preferProvidedPageForTools, retryAfterNavigation, withActivePage } from '../../../../src/agent/tools/utils';
 
 describe('workflow page isolation', () => {
   afterEach(() => PageContextManager.getInstance().reset());
@@ -13,5 +13,18 @@ describe('workflow page isolation', () => {
     const selected = await withActivePage(workflowPage, async page => page);
 
     expect(selected).toBe(workflowPage);
+  });
+
+  it('retries a read-only operation after navigation replaces its execution context', async () => {
+    const page = { waitForLoadState: jest.fn().mockResolvedValue(undefined) } as any;
+    const operation = jest.fn()
+      .mockRejectedValueOnce(new Error('Execution context was destroyed, most likely because of a navigation'))
+      .mockResolvedValueOnce('JD Search Results');
+
+    const result = await retryAfterNavigation(page, operation);
+
+    expect(page.waitForLoadState).toHaveBeenCalledWith('domcontentloaded', { timeout: 5000 });
+    expect(operation).toHaveBeenCalledTimes(2);
+    expect(result).toBe('JD Search Results');
   });
 });

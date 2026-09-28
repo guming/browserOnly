@@ -5,7 +5,7 @@ import { getAllTools } from '../agent/tools';
 import { WorkflowRunner, WorkflowRunnerOptions } from './WorkflowRunner';
 import type { WorkflowRun, WorkflowVersion } from './types';
 import { extractionRequestSchema } from '../extraction/extractionSchema';
-import { preferProvidedPageForTools } from '../agent/tools/utils';
+import { preferProvidedPageForTools, retryAfterNavigation } from '../agent/tools/utils';
 import { proposeQuerySelector } from './WorkflowQueryRepair';
 import { WorkflowStore } from './WorkflowStore';
 import { ConfigManager } from '../background/configManager';
@@ -25,6 +25,10 @@ export class WorkflowService {
     // coupling the two modes, some factories pull in DOM-dependent code while
     // the service worker is still building the tool list.
     const getPage = () => options.pageRef?.current ?? page;
+    const withStablePageRead = async <T>(operation: (currentPage: Page) => Promise<T>): Promise<T> => {
+      const currentPage = getPage();
+      return retryAfterNavigation(currentPage, () => operation(currentPage));
+    };
     preferProvidedPageForTools(page);
     const memoryTool = lookupMemories(getPage());
     const tools: BrowserTool[] = [{
@@ -48,6 +52,8 @@ export class WorkflowService {
       },
     }];
 
+    const getStableTitle = async (): Promise<string> => withStablePageRead(currentPage => currentPage.title());
+
     // Workflow runs may use browser primitives, but must not inherit the
     // full agent registry (database, knowledge graph, or external services).
     const workflowBrowserTools = new Set([
@@ -59,8 +65,15 @@ export class WorkflowService {
       'browser_get_active_tab', 'browser_read_text_ast', 'browser_get_overview',
       'browser_get_section', 'browser_get_summary', 'browser_get_summary_ast',
     ]);
+    const workflowOverrides = new Set([
+      'browser_get_title', 'browser_read_text', 'browser_read_text_ast',
+      'browser_read_text_enhanced', 'browser_get_overview', 'browser_get_section',
+      'browser_get_summary', 'browser_get_summary_ast',
+    ]);
     for (const candidate of getAllTools(getPage()) as any[]) {
-      if (workflowBrowserTools.has(candidate.name) && !tools.some(tool => tool.name === candidate.name)) {
+      if (workflowBrowserTools.has(candidate.name)
+        && !workflowOverrides.has(candidate.name)
+        && !tools.some(tool => tool.name === candidate.name)) {
         tools.push({
           name: candidate.name,
           description: candidate.description,
@@ -74,21 +87,21 @@ export class WorkflowService {
       }
     }
 
-    const readMain = async (): Promise<string> => {
+    const readMain = async (): Promise<string> => withStablePageRead(async currentPage => {
       const selectors = ['main', 'article', '[role="main"]', '#content', '#main', '.content', '.main-content'];
       for (const selector of selectors) {
-        const locator = getPage().locator(selector).first();
+        const locator = currentPage.locator(selector).first();
         if (await locator.count()) {
           const text = (await locator.innerText()).trim();
           if (text) return text.slice(0, WORKFLOW_MAX_RETURN_CHARS);
         }
       }
-      return (await getPage().locator('body').innerText()).trim().slice(0, WORKFLOW_MAX_RETURN_CHARS);
-    };
-    const getOverview = async (): Promise<string> => {
-      const title = await getPage().title();
-      const headings = await getPage().locator('h1, h2').allInnerTexts();
-      const bodyText = await getPage().locator('body').innerText();
+      return (await currentPage.locator('body').innerText()).trim().slice(0, WORKFLOW_MAX_RETURN_CHARS);
+    });
+    const getOverview = async (): Promise<string> => withStablePageRead(async currentPage => {
+      const title = await currentPage.title();
+      const headings = await currentPage.locator('h1, h2').allInnerTexts();
+      const bodyText = await currentPage.locator('body').innerText();
       const wordCount = bodyText.trim() ? bodyText.trim().split(/\s+/).length : 0;
       return JSON.stringify({
         title,
@@ -97,12 +110,14 @@ export class WorkflowService {
         estimatedReadingTime: Math.max(1, Math.ceil(wordCount / 200)),
         sections: headings.map((text: string) => text.trim()).filter(Boolean),
       });
-    };
-    const getSummary = async (input: string): Promise<string> => {
+    });
+    const getSummary = async (input: string): Promise<string> => withStablePageRead(async currentPage => {
       const requestedLength = Number.parseInt(input, 10);
       const maxLength = Number.isFinite(requestedLength) && requestedLength > 0 ? requestedLength : 500;
-      return `${await getPage().title()}\n\n${(await readMain()).slice(0, maxLength)}`;
-    };
+      const title = await currentPage.title();
+      const body = (await currentPage.locator('body').innerText()).trim();
+      return `${title}\n\n${body.slice(0, maxLength)}`;
+    });
 
     tools.push({ name: 'browser_read_main_for_workflow', description: 'Workflow-only main content.', func: readMain });
     tools.push({ name: 'browser_get_overview', description: 'Workflow-safe page overview.', func: getOverview });
@@ -113,19 +128,23 @@ export class WorkflowService {
     for (const name of ['browser_get_summary', 'browser_get_summary_ast']) {
       tools.push({ name, description: `Workflow-safe page summary (${name}).`, func: getSummary });
     }
-    tools.push({ name: 'browser_get_title', description: 'Workflow-safe page title.', func: async () => getPage().title() });
+    tools.push({
+      name: 'browser_get_title',
+      description: 'Workflow-safe page title.',
+      func: getStableTitle,
+    });
     tools.push({
       name: 'browser_extract_structured',
       description: 'Extract user-confirmed fields from the current page table into standard JSON.',
-      func: async (input: string) => {
+      func: async (input: string) => withStablePageRead(async currentPage => {
         const request = extractionRequestSchema.parse(typeof input === 'string' ? JSON.parse(input || '{}') : input);
-        const rows = await getPage().locator('table tr').allInnerTexts();
+        const rows = await currentPage.locator('table tr').allInnerTexts();
         const values = rows.slice(1, (request.maxRows ?? 100) + 1).map((line: string) => {
           const cells = line.split(/\s{2,}|\t/).map(cell => cell.trim());
           return Object.fromEntries(request.fields.map((field, index) => [field.key, cells[index] ?? null]));
         });
-        return JSON.stringify({ fields: request.fields, rows: values, sourceUrls: [getPage().url()], warnings: values.length ? [] : ['No table rows found'], generatedAt: new Date().toISOString() });
-      },
+        return JSON.stringify({ fields: request.fields, rows: values, sourceUrls: [currentPage.url()], warnings: values.length ? [] : ['No table rows found'], generatedAt: new Date().toISOString() });
+      }),
     });
     tools.push({
       name: 'browser_export_data',

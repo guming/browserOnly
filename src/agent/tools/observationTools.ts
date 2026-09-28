@@ -1,7 +1,7 @@
 import { DynamicTool } from "langchain/tools";
 import type { Page } from "playwright-crx";
 import { ToolFactory } from "./types";
-import { truncate, MAX_RETURN_CHARS, MAX_SCREENSHOT_CHARS, withActivePage, getCurrentTabId } from "./utils";
+import { truncate, MAX_RETURN_CHARS, MAX_SCREENSHOT_CHARS, withActivePage, getCurrentTabId, retryAfterNavigation } from "./utils";
 import { selectorCandidates } from "./selectorUtils";
 
 export const browserGetTitle: ToolFactory = (page: Page) =>
@@ -11,7 +11,7 @@ export const browserGetTitle: ToolFactory = (page: Page) =>
     func: async () => {
       try {
         return await withActivePage(page, async (activePage) => {
-          const title = await activePage.title();
+          const title = await retryAfterNavigation(activePage, () => activePage.title());
           
           // Get the tab ID and send a tabTitleChanged message
           try {
@@ -51,7 +51,7 @@ export const browserSnapshotDom: ToolFactory = (page: Page) =>
       "  • limit=<number> - max character length (default 20000)",
     func: async (input: string) => {
       try {
-        return await withActivePage(page, async (activePage) => {
+        return await withActivePage(page, async (activePage) => retryAfterNavigation(activePage, async () => {
           // Parse options from the input string
           const options = parseSnapshotOptions(input);
           const limit = options.limit ? parseInt(options.limit, 10) : MAX_RETURN_CHARS;
@@ -222,7 +222,7 @@ export const browserSnapshotDom: ToolFactory = (page: Page) =>
           }
           
           return truncate(html, isNaN(limit) ? MAX_RETURN_CHARS : limit);
-        });
+        }));
       } catch (err) {
         return `Error capturing DOM snapshot: ${
           err instanceof Error ? err.message : String(err)
@@ -268,24 +268,7 @@ function parseSnapshotOptions(input: string) {
   return options;
 }
 
-const NAVIGATION_CONTEXT_DESTROYED = /execution context was destroyed.*navigation/i;
 const SELECTOR_WAIT_TIMEOUT_MS = 5000;
-
-async function retryAfterNavigation<T>(page: Page, operation: () => Promise<T>): Promise<T> {
-  try {
-    return await operation();
-  } catch (error) {
-    if (!NAVIGATION_CONTEXT_DESTROYED.test(error instanceof Error ? error.message : String(error))) {
-      throw error;
-    }
-
-    // A recorded submit/click can start a navigation just before the next
-    // observation step. Wait for the replacement document, then evaluate the
-    // read-only operation once more in its new execution context.
-    await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => undefined);
-    return operation();
-  }
-}
 
 export const browserQuery: ToolFactory = (page: Page) =>
   new DynamicTool({
@@ -363,7 +346,7 @@ export const browserReadText: ToolFactory = (page: Page) =>
       "Return all visible text on the page, concatenated in DOM order.",
     func: async () => {
       try {
-        return await withActivePage(page, async (activePage) => {
+        return await withActivePage(page, async (activePage) => retryAfterNavigation(activePage, async () => {
           const text = await activePage.evaluate(() => {
             const walker = document.createTreeWalker(
               document.body,
@@ -383,7 +366,7 @@ export const browserReadText: ToolFactory = (page: Page) =>
             return out.join("\n");
           });
           return truncate(text as string);
-        });
+        }));
       } catch (err) {
         return `Error extracting text: ${
           err instanceof Error ? err.message : String(err)
@@ -400,7 +383,7 @@ export const browserReadPage: ToolFactory = (page: Page) =>
         "Return all visible text and image on the page, concatenated in DOM order.",
       func: async () => {
         try {
-          return await withActivePage(page, async (activePage) => {
+          return await withActivePage(page, async (activePage) => retryAfterNavigation(activePage, async () => {
             const text = await activePage.evaluate(() => {
               const walker = document.createTreeWalker(
                 document.body,
@@ -438,7 +421,7 @@ export const browserReadPage: ToolFactory = (page: Page) =>
               }
             });
             return truncate(text as string);
-          });
+          }));
         } catch (err) {
           return `Error extracting page content: ${
             err instanceof Error ? err.message : String(err)

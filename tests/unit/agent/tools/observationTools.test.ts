@@ -21,6 +21,17 @@ global.chrome = mockChromeAPIs as any;
 // Mock the utils module to avoid circular dependencies
 jest.mock('../../../../src/agent/tools/utils', () => ({
   withActivePage: jest.fn().mockImplementation((page, fn) => fn(page)),
+  retryAfterNavigation: jest.fn().mockImplementation(async (page, operation) => {
+    try {
+      return await operation();
+    } catch (error) {
+      if (!/execution context was destroyed.*navigation/i.test(error instanceof Error ? error.message : String(error))) {
+        throw error;
+      }
+      await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => undefined);
+      return operation();
+    }
+  }),
   getCurrentTabId: jest.fn().mockResolvedValue(123),
   truncate: jest.fn().mockImplementation((str, maxLength = 20000) => {
     if (str.length <= maxLength) return str;
@@ -37,6 +48,7 @@ import {
   browserQuery,
   browserAccessibleTree,
   browserReadText,
+  browserReadPage,
   browserScreenshot
 } from '../../../../src/agent/tools/observationTools';
 
@@ -66,6 +78,20 @@ describe('Observation Tools', () => {
       const result = await tool.func('');
 
       expect(result).toContain('Error getting title: Page not loaded');
+    });
+
+    it('should wait for an in-progress navigation and retry the title', async () => {
+      const tool = browserGetTitle(mockPage);
+      mockPage.title
+        .mockRejectedValueOnce(new Error('Execution context was destroyed, most likely because of a navigation'))
+        .mockResolvedValueOnce('JD Search Results');
+      mockPage.waitForLoadState.mockResolvedValue(undefined);
+
+      const result = await tool.func('');
+
+      expect(mockPage.waitForLoadState).toHaveBeenCalledWith('domcontentloaded', { timeout: 5000 });
+      expect(mockPage.title).toHaveBeenCalledTimes(2);
+      expect(result).toBe('Current page title: JD Search Results');
     });
 
     it('should send tab title changed message when tab ID is available', async () => {
@@ -193,6 +219,19 @@ describe('Observation Tools', () => {
       const result = await tool.func('');
 
       expect(result).toContain('Error capturing DOM snapshot: Page not loaded');
+    });
+
+    it('should retry a DOM snapshot after navigation replaces the execution context', async () => {
+      const tool = browserSnapshotDom(mockPage);
+      mockPage.content
+        .mockRejectedValueOnce(new Error('Execution context was destroyed, most likely because of a navigation'))
+        .mockResolvedValueOnce(mockDOMSnapshots.simple);
+
+      const result = await tool.func('');
+
+      expect(mockPage.waitForLoadState).toHaveBeenCalledWith('domcontentloaded', { timeout: 5000 });
+      expect(mockPage.content).toHaveBeenCalledTimes(2);
+      expect(result).toContain('<html><body><h1>Simple Page</h1>');
     });
   });
 
@@ -408,6 +447,34 @@ describe('Observation Tools', () => {
       const result = await tool.func('');
 
       expect(result).toContain('Error extracting text: Script execution failed');
+    });
+
+    it('should retry text extraction after navigation replaces the execution context', async () => {
+      const tool = browserReadText(mockPage);
+      mockPage.evaluate
+        .mockRejectedValueOnce(new Error('Execution context was destroyed, most likely because of a navigation'))
+        .mockResolvedValueOnce(mockPageText.simple);
+
+      const result = await tool.func('');
+
+      expect(mockPage.waitForLoadState).toHaveBeenCalledWith('domcontentloaded', { timeout: 5000 });
+      expect(mockPage.evaluate).toHaveBeenCalledTimes(2);
+      expect(result).toBe(mockPageText.simple);
+    });
+  });
+
+  describe('browserReadPage', () => {
+    it('should retry page extraction after navigation replaces the execution context', async () => {
+      const tool = browserReadPage(mockPage);
+      mockPage.evaluate
+        .mockRejectedValueOnce(new Error('Execution context was destroyed, most likely because of a navigation'))
+        .mockResolvedValueOnce(mockPageText.simple);
+
+      const result = await tool.func('');
+
+      expect(mockPage.waitForLoadState).toHaveBeenCalledWith('domcontentloaded', { timeout: 5000 });
+      expect(mockPage.evaluate).toHaveBeenCalledTimes(2);
+      expect(result).toBe(mockPageText.simple);
     });
   });
 
