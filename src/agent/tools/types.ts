@@ -8,6 +8,8 @@ export interface BrowserTool {
 }
 
 export interface ToolExecutionContext {
+  signal?: AbortSignal;
+  onProgress?: (result: string) => Promise<void>;
   requiresApproval?: boolean; // Set to true if approval was requested and granted
   approvalReason?: string; // Reason why approval was required
 }

@@ -23,13 +23,15 @@ export interface WorkflowRunnerOptions {
 
 export class WorkflowRunner {
   private cancelled = false;
+  private abortController = new AbortController();
   currentRunId?: string;
   private readonly store = WorkflowStore.getInstance();
 
-  cancel(): void { this.cancelled = true; }
+  cancel(): void { this.cancelled = true; this.abortController.abort(); }
 
   async run(workflowId: string, version: WorkflowVersion, options: WorkflowRunnerOptions): Promise<WorkflowRun> {
     this.cancelled = false;
+    this.abortController = new AbortController();
     const run: WorkflowRun = {
       id: `run-${crypto.randomUUID()}`,
       workflowId,
@@ -101,7 +103,14 @@ export class WorkflowRunner {
           }
           const candidate = candidates[index % candidates.length];
           try {
-            result = await withTimeout(tool.func(typeof candidate === 'string' ? candidate : JSON.stringify(candidate)), step.timeoutMs);
+            const toolContext = step.toolName === 'browser_inspect_office_table' ? {
+              signal: this.abortController.signal,
+              onProgress: async (output: string) => {
+                stepRun.officeReport = JSON.parse(output);
+                await this.store.saveStepRun(stepRun);
+              },
+            } : undefined;
+            result = await withTimeout(tool.func(typeof candidate === 'string' ? candidate : JSON.stringify(candidate), toolContext), step.timeoutMs, () => { if (toolContext) this.abortController.abort(); });
             // AST extraction relies on page.evaluate(), which is not available
             // in every extension/isolated-world context. Keep recorded
             // automations runnable by falling back to the plain page reader.
@@ -156,6 +165,10 @@ export class WorkflowRunner {
         }
         if (!result && lastError) throw lastError;
         if (/^error\b|^Action cancelled/i.test(result.trim())) throw new Error(result);
+        if (step.toolName === 'browser_inspect_office_table') {
+          stepRun.officeReport = JSON.parse(result);
+          await this.store.saveStepRun(stepRun);
+        }
         if (pagesBefore && options.pageRef?.current?.context) {
           const pagesAfter = options.pageRef.current.context().pages();
           const newPages = pagesAfter.filter((candidate: any) => !pagesBefore.includes(candidate));
@@ -262,9 +275,9 @@ function substituteVariables(value: unknown, variables: Record<string, unknown>)
   return value.replace(/\{\{\s*([\w.-]+)\s*\}\}/g, (_, key: string) => String(variables[key] ?? `{{${key}}}`));
 }
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, onTimeout?: () => void): Promise<T> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`Step timed out after ${timeoutMs}ms`)), timeoutMs);
+    const timer = setTimeout(() => { onTimeout?.(); reject(new Error(`Step timed out after ${timeoutMs}ms`)); }, timeoutMs);
     promise.then(value => { clearTimeout(timer); resolve(value); }, error => { clearTimeout(timer); reject(error); });
   });
 }

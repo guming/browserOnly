@@ -1,3 +1,4 @@
+jest.mock('../../src/workflows/WorkflowService', () => ({ WorkflowService: jest.fn() }));
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { WorkflowDetailView } from '../../src/sidepanel/components/WorkflowDetailView';

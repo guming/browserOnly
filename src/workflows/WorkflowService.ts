@@ -10,6 +10,7 @@ import { proposeQuerySelector } from './WorkflowQueryRepair';
 import { WorkflowStore } from './WorkflowStore';
 import { ConfigManager } from '../background/configManager';
 import { createProvider } from '../models/providers/factory';
+import { createOfficeInspectionTool } from '../office/inspectionTool';
 
 const WORKFLOW_MAX_RETURN_CHARS = 20_000;
 
@@ -169,6 +170,7 @@ export class WorkflowService {
       },
     });
 
+    tools.push(createOfficeInspectionTool(() => options.context?.tabId, workflowId));
     const registeredNames = new Set(tools.map(tool => tool.name));
     const unsupportedTools = [...new Set(version.steps
       .filter(step => step.enabled && step.toolName && !registeredNames.has(step.toolName))

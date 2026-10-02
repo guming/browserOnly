@@ -102,6 +102,7 @@ export interface WorkflowRun {
 }
 
 export interface WorkflowStepRun {
+  officeReport?: import('../office/types').OfficeReport;
   id: string;
   runId: string;
   stepId: string;

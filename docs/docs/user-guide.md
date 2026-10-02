@@ -242,3 +242,13 @@ However, be aware that:
 
 - Text sent to LLM providers is subject to their privacy policies
 - Be cautious when asking BrowserOnly to interact with sensitive websites like banking portals
+
+## Repeated office tasks
+
+Under **Automations**, choose **Inspection & summary** or **Download & archive**. Open the target list page first, then select a visible HTML table with column headers. Review the sample, choose a unique record ID for comparisons, and optionally filter rows by text, a plain numeric threshold, or an ISO date older than a number of days.
+
+Save the task and run it from Automations. Each run opens the saved URL in a new tab using your browser session. Filters must be represented in the saved URL; transient page filters are not recorded. Pagination is optional: configure a unique CSS selector for the next-page button and a maximum of 20 pages. The task reads at most 1,000 rows. Virtualized grids, merged cells, and custom site exports need a custom workflow.
+
+Open **Runs**, select the run, and review the office report. It shows pages inspected, rows scanned, matching rows, source links, warnings, and a CSV export. Partial results never produce a comparison. Complete runs with unchanged configuration and a unique record ID show new, changed, unchanged, and no-longer-matching records. A record that no longer matches is not necessarily resolved.
+
+Archive tasks collect supported document links from matching rows, up to 100 files. Select files in the report and click **Download selected**. Files go into `Downloads/BrowserOnly/<task>/<date>/`, with safe names and no overwriting. Use **Refresh status** to check actual completion or interruption. Failed files can be selected again; files whose dispatch status is unknown should first be checked in Chrome Downloads. Download buttons that generate files, blob URLs, and sites requiring special download requests are not supported by this link-based archive flow.

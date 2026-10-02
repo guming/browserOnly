@@ -20,6 +20,7 @@ import { TranslationQueue } from '../translation/translationQueue';
 import { createPageTranslationStartMessage, deliverTranslationBatchResult, sendToTranslationContentScript } from '../translation/translationContentScript';
 import { dispatchTranslationBatch } from '../translation/translationBatchDispatcher';
 import { handleMonitorMessage, isMonitorMessage } from '../monitoring/backgroundIntegration';
+import { handleOfficeArchive } from '../office/archive';
 const translationQueue = new TranslationQueue((request, signal) => translateBatch(request, signal));
 const activeTranslationSessions = new Map<number, string>();
 
@@ -38,6 +39,10 @@ export function handleMessage(
   sendResponse: (response?: any) => void
 ): boolean {
   try {
+    if (message.action === 'officeArchiveDownload' || message.action === 'officeArchiveRefresh') {
+      handleOfficeArchive(message).then(data => sendResponse({ success: true, data })).catch(error => sendResponse({ success: false, error: String(error) }));
+      return true;
+    }
     if (isMonitorMessage(message)) {
       handleMonitorMessage(message).then(sendResponse).catch(error => sendResponse({ success: false, error: { code: 'UNKNOWN', message: String(error) } }));
       return true;
