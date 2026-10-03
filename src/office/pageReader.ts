@@ -40,7 +40,7 @@ export function officeNextPage(input: { selector: string; click: boolean }): boo
   return true;
 }
 
-export function readOfficeTable(input: { selector: string; limit: number }): OfficePage {
+export function readOfficeTable(input: { selector: string; limit: number; detailLinkColumn?: number }): OfficePage {
   const tables = document.querySelectorAll(input.selector);
   if (tables.length !== 1 || !(tables[0] instanceof HTMLTableElement)) throw new Error('Table changed or is ambiguous. Re-select the table.');
   const table = tables[0];
@@ -68,7 +68,17 @@ export function readOfficeTable(input: { selector: string; limit: number }): Off
         return [{ url: url.href, name: link.download || decodeURIComponent(url.pathname.split('/').pop() || '') || (link.innerText || 'document').trim() }];
       } catch { return []; }
     });
-    return { cells, sourceUrl: location.href, links };
+    let detailUrl: string | undefined;
+    if (input.detailLinkColumn !== undefined) {
+      const candidates = [...(row.cells[input.detailLinkColumn]?.querySelectorAll<HTMLAnchorElement>('a[href]') ?? [])].flatMap(link => {
+        try {
+          const url = new URL(link.href, location.href);
+          return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? [url.href] : [];
+        } catch { return []; }
+      });
+      if (new Set(candidates).size === 1) detailUrl = candidates[0];
+    }
+    return { cells, sourceUrl: location.href, detailUrl, links };
   });
   if (rows.some(row => row.cells.length !== headers.length)) throw new Error('Table columns are inconsistent. Check loading or empty-state rows.');
   return { headers, rows, url: location.href, truncated };

@@ -21,6 +21,7 @@ import { createPageTranslationStartMessage, deliverTranslationBatchResult, sendT
 import { dispatchTranslationBatch } from '../translation/translationBatchDispatcher';
 import { handleMonitorMessage, isMonitorMessage } from '../monitoring/backgroundIntegration';
 import { handleOfficeArchive } from '../office/archive';
+import { handleOfficeRecord } from '../office/handledRecords';
 const translationQueue = new TranslationQueue((request, signal) => translateBatch(request, signal));
 const activeTranslationSessions = new Map<number, string>();
 
@@ -39,6 +40,10 @@ export function handleMessage(
   sendResponse: (response?: any) => void
 ): boolean {
   try {
+    if (message.action === 'officeRecordHandled') {
+      handleOfficeRecord(message).then(data => sendResponse({ success: true, data })).catch(error => sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) }));
+      return true;
+    }
     if (message.action === 'officeArchiveDownload' || message.action === 'officeArchiveRefresh') {
       handleOfficeArchive(message).then(data => sendResponse({ success: true, data })).catch(error => sendResponse({ success: false, error: String(error) }));
       return true;

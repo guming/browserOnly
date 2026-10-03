@@ -31,6 +31,22 @@ const version: WorkflowVersion = {
 };
 
 describe('WorkflowDetailView', () => {
+  it('edits and validates saved inspection rules through fields', async () => {
+    const store = WorkflowStore.getInstance();
+    const inspectionVersion: WorkflowVersion = { ...version, steps: [{ id: 'inspect', type: 'action', label: 'Inspect', enabled: true, timeoutMs: 1000, retryPolicy: { maxAttempts: 1, delayMs: 0 }, onFailure: 'stop', toolName: 'browser_inspect_office_table', input: JSON.stringify({ mode: 'inspection', name: 'Follow-up', tableSelector: '#tickets', headers: ['ID', 'Level'], keyColumn: 0, maxPages: 1, maxRows: 1000, nextSelector: '' }), risk: 'read' }] };
+    jest.spyOn(store, 'getVersion').mockResolvedValue(inspectionVersion);
+    jest.spyOn(store, 'listVersions').mockResolvedValue([inspectionVersion]);
+    const saveVersion = jest.spyOn(store, 'saveVersion').mockResolvedValue();
+    jest.spyOn(store, 'saveWorkflow').mockResolvedValue();
+    render(<WorkflowDetailView workflow={workflow} onBack={jest.fn()} onSaved={jest.fn()} />);
+    fireEvent.change(await screen.findByLabelText('Sort matching rows by'), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText('Priority values, first to last'), { target: { value: 'VIP\nStandard\n' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save version' }));
+    await waitFor(() => expect(saveVersion).toHaveBeenCalled());
+    const saved = saveVersion.mock.calls[0][0];
+    expect(JSON.parse(saved.steps[0].input as string).sort).toEqual({ column: 1, direction: 'ascending', priority: ['VIP', 'Standard'] });
+    expect(JSON.parse(inspectionVersion.steps[0].input as string).sort).toBeUndefined();
+  });
   it('normalizes a hostname and saves the workflow instead of silently returning', async () => {
     const store = WorkflowStore.getInstance();
     jest.spyOn(store, 'getVersion').mockResolvedValue(version);

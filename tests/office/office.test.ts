@@ -1,5 +1,6 @@
 import { inspectOfficeTable } from '../../src/office/inspectionTool';
-import { matchesOfficeRule, compareOfficeReports, reportCsv, safePathPart } from '../../src/office/report';
+import { matchesOfficeRule, compareOfficeReports, reportCsv, safePathPart, sortOfficeRows } from '../../src/office/report';
+import { readOfficeTable } from '../../src/office/pageReader';
 import { officeConfigSchema, OfficePage } from '../../src/office/types';
 import { handleOfficeArchive } from '../../src/office/archive';
 import { WorkflowStore } from '../../src/workflows/WorkflowStore';
@@ -42,4 +43,29 @@ test('archive refresh recognizes completed downloads and avoids duplicate dispat
   await handleOfficeArchive(request); await handleOfficeArchive(request);
   expect(chrome.downloads.download).toHaveBeenCalledTimes(1); expect(report.files[0].status).toBe('complete');
   jest.restoreAllMocks();
+});
+
+test('priority sorting places named levels first without changing collected records', () => {
+  const rows = ['Standard', 'Unknown', 'VIP', 'Premium', 'VIP'].map((level, index) => ({ key: String(index), cells: [String(index), level], sourceUrl: 'https://example.com', links: [] }));
+  expect(sortOfficeRows(rows, { column: 1, direction: 'descending', priority: ['VIP', 'Premium', 'Standard'] }).map(row => row.key)).toEqual(['2', '4', '3', '0', '1']);
+  expect(rows.map(row => row.key)).toEqual(['0', '1', '2', '3', '4']);
+  expect(sortOfficeRows(rows, { column: 0, direction: 'descending' })[0].key).toBe('4');
+});
+
+test('record links come only from the selected column and ambiguous links fall back to the list', () => {
+  jest.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({ width: 100, height: 20 } as DOMRect);
+  document.body.innerHTML = '<table id="records"><tr><th>ID</th><th>Files</th></tr><tr><td><a href="https://example.com/ticket/1">1</a></td><td><a href="https://example.com/file.pdf">PDF</a></td></tr></table>';
+  const result = readOfficeTable({ selector: '#records', limit: 10, detailLinkColumn: 0 });
+  expect(result.rows[0].detailUrl).toBe('https://example.com/ticket/1');
+  expect(result.rows[0].links).toEqual([{ url: 'https://example.com/file.pdf', name: 'file.pdf' }]);
+  document.querySelector('td')!.insertAdjacentHTML('beforeend', '<a href="https://example.com/ticket/2">2</a>');
+  expect(readOfficeTable({ selector: '#records', limit: 10, detailLinkColumn: 0 }).rows[0].detailUrl).toBeUndefined();
+  jest.restoreAllMocks();
+});
+
+test('completed inspection applies saved priority order and config edits reset comparison', async () => {
+  const sortedConfig = { ...config, rule: undefined, nextSelector: '', maxPages: 1, sort: { column: 1, direction: 'ascending' as const, priority: ['VIP', 'Standard'] } };
+  const result = await inspectOfficeTable(sortedConfig, { read: async () => ({ ...page('1'), rows: [page('1', 'Standard').rows[0], page('2', 'VIP').rows[0]] }), next: async () => false, wait: async () => {} });
+  expect(result.rows.map(row => row.key)).toEqual(['2', '1']);
+  expect(compareOfficeReports(result, { ...result, config: { ...sortedConfig, sort: undefined } })).toBeUndefined();
 });

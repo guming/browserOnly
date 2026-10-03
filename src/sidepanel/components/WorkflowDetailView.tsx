@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { normalizeHttpUrl, WorkflowStore } from '../../workflows';
 import type { Workflow, WorkflowExecutionMode, WorkflowStep, WorkflowVersion, WorkflowVariable, WorkflowVariableType } from '../../workflows';
+import { OfficeConfigFields, officeConfigError, parseOfficeConfig } from './office/OfficeConfigFields';
 
 interface Props { workflow: Workflow; onBack: () => void; onSaved: (workflow: Workflow) => void; }
 
@@ -40,7 +41,7 @@ export function WorkflowDetailView({ workflow, onBack, onSaved }: Props) {
       id: `version-${crypto.randomUUID()}`,
       version: version.version + 1,
       source: 'manual_edit',
-      steps,
+      steps: steps.map(step => ({ ...step })),
       createdAt: Date.now()
     };
     const normalizedStartUrl = normalizeHttpUrl(startUrl);
@@ -51,13 +52,18 @@ export function WorkflowDetailView({ workflow, onBack, onSaved }: Props) {
     }
     const nextWorkflow: Workflow = { ...workflow, name: name.trim() || workflow.name, description, variables, startUrl: normalizedStartUrl, executionMode, activeVersionId: nextVersion.id, status: 'active', expiresAt: undefined, updatedAt: Date.now() };
     try {
+      for (const step of nextVersion.steps) {
+        if (step.enabled && step.toolName === 'browser_inspect_office_table') {
+          step.input = JSON.stringify(parseOfficeConfig(step.input));
+        }
+      }
       await WorkflowStore.getInstance().saveVersion(nextVersion);
       await WorkflowStore.getInstance().saveWorkflow(nextWorkflow);
       setStartUrl(normalizedStartUrl ?? '');
       setVersion(nextVersion);
       onSaved(nextWorkflow);
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : 'Unable to save this workflow.');
+      setSaveError(officeConfigError(error));
     } finally {
       setSaving(false);
     }
@@ -80,9 +86,13 @@ export function WorkflowDetailView({ workflow, onBack, onSaved }: Props) {
 
 function StepEditor({ step, index, onChange }: { step: WorkflowStep; index: number; onChange: (patch: Partial<WorkflowStep>) => void }) {
   const inputValue = typeof step.input === 'string' ? step.input : JSON.stringify(step.input ?? '', null, 2);
+  let officeConfig;
+  if (step.toolName === 'browser_inspect_office_table') {
+    try { officeConfig = JSON.parse(inputValue); } catch { /* Legacy invalid input remains editable below. */ }
+  }
   return <div className={`rounded-lg border p-3 ${step.enabled ? 'border-stone-200 bg-white' : 'border-stone-200 bg-stone-50 opacity-60'}`}>
     <div className="flex items-center gap-2"><span className="text-[11px] font-semibold text-stone-400">{index + 1}</span><input value={step.label} onChange={event => onChange({ label: event.target.value })} className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-stone-800 outline-none" /><label className="flex shrink-0 items-center gap-1 text-[11px] text-stone-500"><input type="checkbox" checked={step.enabled} onChange={event => onChange({ enabled: event.target.checked })} /> enabled</label></div>
-    <textarea value={inputValue} onChange={event => onChange({ input: event.target.value })} rows={2} className="mt-2 w-full resize-none rounded-md border border-stone-200 bg-stone-50 px-2 py-1.5 font-mono text-[10px] text-stone-600 outline-none focus:border-[#315a78]" aria-label={`Input for step ${index + 1}`} />
+    {officeConfig && Array.isArray(officeConfig.headers) ? <div className="mt-3"><OfficeConfigFields config={officeConfig} onChange={config => onChange({ input: JSON.stringify(config) })} /><p className="mt-3 text-[11px] leading-5 text-stone-500">Save this version to use the updated rule. The next complete run starts a new comparison baseline when settings change.</p></div> : <textarea value={inputValue} onChange={event => onChange({ input: event.target.value })} rows={2} className="mt-2 w-full resize-none rounded-md border border-stone-200 bg-stone-50 px-2 py-1.5 font-mono text-[10px] text-stone-600 outline-none focus:border-[#315a78]" aria-label={`Input for step ${index + 1}`} />}
     <div className="mt-1 text-[10px] text-stone-400">{step.toolName || step.type} · failure: {step.onFailure}</div>
   </div>;
 }

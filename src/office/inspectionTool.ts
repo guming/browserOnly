@@ -2,7 +2,8 @@ import type { BrowserTool, ToolExecutionContext } from '../agent/tools/types';
 import { WorkflowStore } from '../workflows/WorkflowStore';
 import { officeConfigSchema, type OfficeConfig, type OfficePage, type OfficeReport } from './types';
 import { readOfficeTable, officeNextPage } from './pageReader';
-import { addArchiveFiles, compareOfficeReports, matchesOfficeRule } from './report';
+import { applyHandledRecords } from './handledRecords';
+import { addArchiveFiles, compareOfficeReports, matchesOfficeRule, sortOfficeRows } from './report';
 
 export interface InspectionAccess {
   read: () => Promise<OfficePage>;
@@ -17,7 +18,7 @@ export async function inspectOfficeTable(config: OfficeConfig, access: Inspectio
   const seenKeys = new Set<string>();
   const checkCancelled = () => { if (context?.signal?.aborted) throw new Error('Inspection cancelled. Collected results are retained.'); };
   const warn = (message: string) => { report.complete = false; if (!report.warnings.includes(message)) report.warnings.push(message); };
-  const progress = async () => context?.onProgress?.(JSON.stringify({ ...report, complete: false }));
+  const progress = async () => context?.onProgress?.(JSON.stringify({ ...report, rows: sortOfficeRows(report.rows, config.sort), complete: false }));
   let precedingFingerprint: string | undefined;
   try {
     for (let pageIndex = 0; pageIndex < config.maxPages; pageIndex++) {
@@ -72,6 +73,7 @@ export async function inspectOfficeTable(config: OfficeConfig, access: Inspectio
     await progress();
     if (!report.pages || context?.signal?.aborted) throw error;
   }
+  report.rows = sortOfficeRows(report.rows, config.sort);
   return report;
 }
 
@@ -83,7 +85,7 @@ export function createOfficeInspectionTool(getTabId: () => number | undefined, w
       if (tabId === undefined) throw new Error('No workflow tab');
       const report = await inspectOfficeTable(config, {
         read: async () => {
-          const results = await chrome.scripting.executeScript({ target: { tabId }, func: readOfficeTable, args: [{ selector: config.tableSelector, limit: config.maxRows }] });
+          const results = await chrome.scripting.executeScript({ target: { tabId }, func: readOfficeTable, args: [{ selector: config.tableSelector, limit: config.maxRows, detailLinkColumn: config.detailLinkColumn }] });
           if (!results[0]?.result) throw new Error('Unable to read table. Check login and page access.');
           return results[0].result;
         },
@@ -100,6 +102,7 @@ export function createOfficeInspectionTool(getTabId: () => number | undefined, w
         const previous = (await store.listStepRuns(previousRuns[0].id)).find(step => step.officeReport)?.officeReport;
         report.comparison = compareOfficeReports(report, previous);
       }
+      await applyHandledRecords(workflowId, report);
       return JSON.stringify(report);
     },
   };

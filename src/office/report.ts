@@ -1,5 +1,21 @@
 import type { OfficeConfig, OfficeReport, OfficeRow } from './types';
 
+export function sortOfficeRows(rows: OfficeRow[], sort: OfficeConfig['sort']): OfficeRow[] {
+  if (!sort) return rows;
+  const priority = sort.priority?.map(value => value.toLocaleLowerCase()) ?? [];
+  return [...rows].sort((left, right) => {
+    const a = left.cells[sort.column]?.trim() ?? '';
+    const b = right.cells[sort.column]?.trim() ?? '';
+    if (priority.length) {
+      const rank = (value: string) => { const index = priority.indexOf(value.toLocaleLowerCase()); return index < 0 ? priority.length : index; };
+      const difference = rank(a) - rank(b);
+      if (difference) return difference;
+    }
+    const difference = a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+    return sort.direction === 'descending' ? -difference : difference;
+  });
+}
+
 export function matchesOfficeRule(cells: string[], rule: OfficeConfig['rule'], now: number): boolean | undefined {
   if (!rule) return true;
   const value = cells[rule.column]?.trim() ?? '';
@@ -44,5 +60,5 @@ export function safePathPart(value: string): string {
 
 export function reportCsv(report: OfficeReport): string {
   const escape = (value: string) => `"${(/^[\s]*[=+\-@]/.test(value) ? "'" : '') + value.replace(/"/g, '""')}"`;
-  return '\uFEFF' + [[...report.config.headers, 'Source URL'], ...report.rows.map(row => [...row.cells, row.sourceUrl])].map(row => row.map(escape).join(',')).join('\r\n');
+  return '\uFEFF' + [[...report.config.headers, 'Source URL', 'Record URL'], ...report.rows.map(row => [...row.cells, row.sourceUrl, row.detailUrl ?? ''])].map(row => row.map(escape).join(',')).join('\r\n');
 }
