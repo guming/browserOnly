@@ -52,6 +52,7 @@ export class WorkflowRunner {
     await this.store.saveRun(run);
     options.callbacks?.onStatus?.('running');
 
+    let repairCount = 0;
     let currentStepRun: WorkflowStepRun | undefined;
     try {
       if (options.allowedDomains?.length) {
@@ -150,7 +151,12 @@ export class WorkflowRunner {
           && (!replayAction || lastError instanceof ReplayFailure && lastError.phase === 'locate')
           && step.onFailure === 'repair' && ['browser_query', 'browser_click', 'browser_type'].includes(step.toolName)
           && typeof input === 'string' && options.repairQuery && !this.cancelled) {
+          if (version.replayFormat === 'steps-v2' && repairCount >= Math.min(3, version.replayPolicy?.maxRepairsPerRun ?? 3)) throw new Error('Repair budget exhausted');
+          repairCount++;
+          stepRun.repairAttempts = 1;
+          if (version.replayFormat === 'steps-v2') run.llmCalls++;
           const repaired = await options.repairQuery(step, input);
+          if (this.cancelled) throw new Error('Workflow cancelled');
           if (repaired && repaired !== input) {
             if ((step.risk === 'write' || step.risk === 'irreversible') && options.context?.tabId) {
               const approved = await requestApproval(
@@ -161,10 +167,13 @@ export class WorkflowRunner {
               );
               if (!approved) throw new Error('Repaired action rejected by user');
             }
-            const repairedResult = await withTimeout(tool.func(repaired), step.timeoutMs);
+            if (this.cancelled) throw new Error('Workflow cancelled');
+            const repairedStep = { ...step, locator: { css: repaired.split('|', 1)[0], fallbackOrder: ['css' as const] } };
+            const repairedResult = await withTimeout(replayAction ? options.executeReplay!(repairedStep, repaired, this.abortController.signal) : tool.func(repaired), step.timeoutMs);
             if (!/^error\b|^Action cancelled/i.test(repairedResult.trim())) {
               result = repairedResult;
-              run.llmCalls += 1;
+              stepRun.executionMode = 'repaired';
+              if (version.replayFormat !== 'steps-v2') run.llmCalls += 1;
             }
           }
         }
