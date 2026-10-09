@@ -1,3 +1,4 @@
+import { compileReplaySteps } from './ReplayStepCompiler';
 import { resolveRecordedEntry } from './WorkflowEntryResolver';
 import type { ToolTraceEvent, Workflow, WorkflowStep, WorkflowVersion } from './types';
 import { buildStableLocator } from './locator';
@@ -10,7 +11,7 @@ const workflowToolName = (toolName: string) =>
 
 export function compileTrace(trace: ToolTraceEvent[], domain: string, name = 'Recorded workflow', startUrl?: string, taskInstruction?: string): { workflow: Workflow; version: WorkflowVersion } {
   const createdAt = now();
-  const recordedSteps: WorkflowStep[] = trace
+  const recordedSteps: WorkflowStep[] = taskInstruction !== undefined ? compileReplaySteps(trace) : trace
     .filter(event => event.result?.ok !== false)
     .filter((event, index, events) => index === 0 || event.toolName !== events[index - 1].toolName || JSON.stringify(event.input) !== JSON.stringify(events[index - 1].input))
     .map(event => ({
