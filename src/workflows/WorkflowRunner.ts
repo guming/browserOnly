@@ -175,7 +175,7 @@ export class WorkflowRunner {
             }
             if (this.cancelled) throw new Error('Workflow cancelled');
             const repairedStep = { ...step, locator: { css: repaired.split('|', 1)[0], fallbackOrder: ['css' as const] } };
-            const repairedResult = await withTimeout(replayAction ? options.executeReplay!(repairedStep, repaired, this.abortController.signal) : tool.func(repaired), step.timeoutMs);
+            const repairedResult = await withTimeout(replayAction ? options.executeReplay!(repairedStep, repaired, this.abortController.signal) : tool.func(repaired), step.timeoutMs, () => { if (replayAction) this.abortController.abort(); });
             if (!/^error\b|^Action cancelled/i.test(repairedResult.trim())) {
               result = repairedResult;
               stepRun.executionMode = 'repaired';
@@ -189,6 +189,7 @@ export class WorkflowRunner {
         }
         if (!result && lastError) throw lastError;
         if (/^error\b|^Action cancelled/i.test(result.trim())) throw new Error(result);
+        if (this.cancelled) throw new Error('Workflow cancelled');
         if (step.toolName === 'browser_inspect_office_table') {
           stepRun.officeReport = JSON.parse(result);
           await this.store.saveStepRun(stepRun);

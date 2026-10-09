@@ -40,3 +40,8 @@ test('run repair budget limits failed steps and preserves subsequent steps', asy
   const run = await runner.run('w', { ...version, replayPolicy: { maxRepairsPerRun: 1 }, steps: [step, { ...step, id: 'second' }] }, options);
   expect(run.status).toBe('failed'); expect(run.failureMessage).toContain('Repair budget exhausted'); expect(options.repairQuery).toHaveBeenCalledTimes(1);
 });
+test('cancellation during final action cannot report successful completion', async () => {
+  const { runner, options } = setup();
+  options.executeReplay.mockImplementation(async () => { runner.cancel(); return 'Clicked'; });
+  expect((await runner.run('w', version, options)).status).toBe('cancelled');
+});
