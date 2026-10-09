@@ -194,7 +194,7 @@ export class WorkflowService {
             baseUrl: config.baseUrl, thinkingBudgetTokens: config.thinkingBudgetTokens,
             openaiCompatibleModels: config.openaiCompatibleModels,
           });
-          const proposal = await proposeQuerySelector(provider, step, failedSelector.split('|', 1)[0], getPage());
+          const proposal = await proposeQuerySelector(provider, step, failedSelector.split('|', 1)[0], getPage(), version.taskInstruction);
           if (!proposal) return undefined;
           const target = getPage().locator(proposal.selector);
           const count = await target.count();
