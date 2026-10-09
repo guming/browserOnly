@@ -1,3 +1,4 @@
+import { resolveRecordedEntry } from './WorkflowEntryResolver';
 import type { ToolTraceEvent, Workflow, WorkflowStep, WorkflowVersion } from './types';
 import { buildStableLocator } from './locator';
 
@@ -25,11 +26,12 @@ export function compileTrace(trace: ToolTraceEvent[], domain: string, name = 'Re
       locator: /click|type|keyboard|drag/i.test(event.toolName) ? buildStableLocator(typeof event.input === 'string' ? event.input.split('|', 1)[0] : (event.input as { selector?: string } | undefined)?.selector) : undefined,
       risk: /type|click|keyboard|drag/i.test(event.toolName) ? 'write' : 'read'
     }));
-  const normalizedStartUrl = normalizeHttpUrl(startUrl);
+  const entryContext = taskInstruction !== undefined ? resolveRecordedEntry(trace, startUrl) : undefined;
+  const normalizedStartUrl = entryContext?.kind === 'url' ? entryContext.url : normalizeHttpUrl(startUrl);
   const firstRecordedUrl = recordedSteps[0]?.toolName === 'browser_navigate'
     ? normalizeHttpUrl(typeof recordedSteps[0].input === 'string' ? recordedSteps[0].input : undefined)
     : undefined;
-  const steps: WorkflowStep[] = normalizedStartUrl && firstRecordedUrl !== normalizedStartUrl
+  const steps: WorkflowStep[] = normalizedStartUrl && firstRecordedUrl !== normalizedStartUrl && !entryContext
     ? [{
         id: id('step'),
         type: 'navigate',
@@ -46,7 +48,7 @@ export function compileTrace(trace: ToolTraceEvent[], domain: string, name = 'Re
 
   const version: WorkflowVersion = {
     id: id('version'), workflowId: id('workflow'), version: 1,
-    source: 'recording', taskInstruction, steps, finalAssertions: [], createdAt
+    source: 'recording', taskInstruction, replayFormat: taskInstruction !== undefined ? 'steps-v2' : undefined, entryContext, steps, finalAssertions: [], createdAt
   };
   const workflow: Workflow = {
     id: version.workflowId, name, description: `Recorded on ${domain}`,

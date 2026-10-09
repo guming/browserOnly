@@ -12,6 +12,7 @@ import { attachToTab, createWorkflowExecutionTab, getTabState, getWindowForTab, 
 import { BackgroundMessage, DownloadMarkdownMessage } from './types';
 import { logWithTimestamp, handleError, sendUIMessage } from './utils';
 import { SimpleChatAgent } from '../agent/SimpleChatAgent';
+import { replayEntry } from '../workflows/WorkflowEntryResolver';
 import { WorkflowStore } from '../workflows/WorkflowStore';
 import { WorkflowService } from '../workflows/WorkflowService';
 import { WorkflowRunner } from '../workflows/WorkflowRunner';
@@ -382,13 +383,14 @@ async function handleRunWorkflow(
     const ownerTab = await chrome.tabs.get(tabId);
     const ownerWindowId = message.ownerWindowId ?? ownerTab.windowId ?? getWindowForTab(tabId);
     if (ownerWindowId === undefined) throw new Error('Workflow owner window is unavailable');
-    const executionMode = message.executionMode ?? workflow.executionMode ?? 'current_tab';
-    const startUrl = resolveWorkflowStartUrl(workflow.startUrl, version.steps);
+    const entry = replayEntry(version);
+    const executionMode = entry?.kind === 'current_page' ? 'current_tab' : message.executionMode ?? workflow.executionMode ?? 'current_tab';
+    const startUrl = entry?.kind === 'standalone' ? 'about:blank' : entry?.kind === 'url' ? entry.url : resolveWorkflowStartUrl(workflow.startUrl, version.steps);
     let executionPage: any;
     let executionWindowId = ownerWindowId;
     if (executionMode === 'new_tab') {
       if (!startUrl) throw new Error('INVALID_START_URL: Workflow requires an HTTP(S) start URL for new-tab execution');
-      const created = await createWorkflowExecutionTab(ownerWindowId, startUrl);
+      const created = await createWorkflowExecutionTab(ownerWindowId, entry ? 'about:blank' : startUrl);
       executionTabId = created.tabId;
       executionWindowId = created.windowId;
       executionPage = created.page;
@@ -403,6 +405,12 @@ async function handleRunWorkflow(
     }
     if (!executionPage || executionTabId === undefined) throw new Error('TAB_ATTACH_FAILED: Workflow could not connect to its execution tab.');
 
+    if (entry?.kind === 'url') {
+      const firstPageStep = version.steps.find(step => step.enabled && step.toolName !== 'lookup_memories');
+      if (firstPageStep?.toolName !== 'browser_navigate' || firstPageStep.input !== entry.url) {
+        await executionPage.goto(entry.url, { waitUntil: 'domcontentloaded', timeout: 10000 });
+      }
+    }
     sendUIMessage('updateOutput', { type: 'system', content: `▶ Running automation: ${workflow.name}` }, tabId, executionWindowId);
     // This message is initiated by the user pressing Run. Trigger domains are
     // for unattended/automatic runs and must not block an explicit manual run
