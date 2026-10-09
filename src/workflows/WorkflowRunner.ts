@@ -93,6 +93,7 @@ export class WorkflowRunner {
           if (!approved) throw new Error('Action rejected by user');
         }
         const replayAction = version.replayFormat === 'steps-v2' && ['browser_click', 'browser_type'].includes(step.toolName) && options.executeReplay;
+        if (this.cancelled) throw new Error('Workflow cancelled');
         const candidates = replayAction ? [input] : step.locator ? locatorCandidates(step.locator, input) : [input];
         // A write may have happened even when its response was lost; never replay it blindly.
         const maxAttempts = step.risk === 'read'
@@ -146,6 +147,7 @@ export class WorkflowRunner {
           }
         }
         if ((!result && lastError || /^error\b|^Action cancelled/i.test(result.trim()))
+          && (!replayAction || lastError instanceof ReplayFailure && lastError.phase === 'locate')
           && step.onFailure === 'repair' && ['browser_query', 'browser_click', 'browser_type'].includes(step.toolName)
           && typeof input === 'string' && options.repairQuery && !this.cancelled) {
           const repaired = await options.repairQuery(step, input);
@@ -165,6 +167,10 @@ export class WorkflowRunner {
               run.llmCalls += 1;
             }
           }
+        }
+        if (!result && lastError && replayAction && lastError instanceof ReplayFailure && lastError.phase === 'act' && step.postconditions?.length) {
+          const checks = await Promise.all(step.postconditions.map(assertion => evaluateAssertion(assertion, options.tools)));
+          if (checks.every(Boolean)) result = 'Action result verified after response failure';
         }
         if (!result && lastError) throw lastError;
         if (/^error\b|^Action cancelled/i.test(result.trim())) throw new Error(result);
