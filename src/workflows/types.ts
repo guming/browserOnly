@@ -72,7 +72,17 @@ export interface Workflow {
   updatedAt: number;
 }
 
+export type WorkflowEntryContext =
+  | { kind: 'current_page' }
+  | { kind: 'url'; url: string }
+  | { kind: 'standalone' };
+
 export interface WorkflowVersion {
+  replayFormat?: 'steps-v2';
+  taskInstruction?: string;
+  entryContext?: WorkflowEntryContext;
+  replayPolicy?: { maxRepairsPerRun: number };
+  suggestedFromRunId?: string;
   id: string;
   workflowId: string;
   version: number;
@@ -98,6 +108,8 @@ export interface WorkflowRun {
   executionTabId?: number;
   executionWindowId?: number;
   failureStepId?: string;
+  verification?: 'verified' | 'unverified';
+  suggestedVersionId?: string;
   failureMessage?: string;
 }
 
@@ -111,6 +123,8 @@ export interface WorkflowStepRun {
   endedAt?: number;
   errorCode?: string;
   errorMessage?: string;
+  executionMode?: 'direct' | 'repaired';
+  repairAttempts?: number;
   screenshotId?: string;
 }
 
