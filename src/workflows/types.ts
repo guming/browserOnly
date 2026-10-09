@@ -150,3 +150,13 @@ export interface WorkflowPatch {
   reason: string;
   confidence: number;
 }
+
+export interface WorkflowTraceEvent {
+  id: string;
+  runId: string;
+  sequence: number;
+  stepId?: string;
+  kind: 'execute' | 'repair' | 'verify' | 'failure';
+  message: string;
+  timestamp: number;
+}

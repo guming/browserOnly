@@ -33,7 +33,7 @@ export class TraceRecorder {
   }
 }
 
-function redactValue(value: unknown): unknown {
+export function redactValue(value: unknown): unknown {
   if (typeof value === 'string') {
     return value.replace(/(password|passwd|secret|token|api[_-]?key|card(number)?|cvv)\s*[:=]\s*[^,;&\s]+/gi, '$1=[REDACTED]');
   }

@@ -1,7 +1,8 @@
-import type { Workflow, WorkflowRun, WorkflowStepRun, WorkflowVersion } from './types';
+import { redactValue } from './TraceRecorder';
+import type { Workflow, WorkflowRun, WorkflowStepRun, WorkflowVersion, WorkflowTraceEvent } from './types';
 
 const DB_NAME = 'BrowserOnly-workflows';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export class WorkflowStore {
   private static instance: WorkflowStore;
@@ -18,6 +19,10 @@ export class WorkflowStore {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
       request.onupgradeneeded = () => {
         const db = request.result;
+        if (!db.objectStoreNames.contains('traceEvents')) {
+          const traces = db.createObjectStore('traceEvents', { keyPath: 'id' });
+          traces.createIndex('runId', 'runId');
+        }
         if (!db.objectStoreNames.contains('workflows')) {
           const store = db.createObjectStore('workflows', { keyPath: 'id' });
           store.createIndex('updatedAt', 'updatedAt');
@@ -107,6 +112,13 @@ export class WorkflowStore {
     return this.readByIndex<WorkflowVersion>(db, 'versions', 'workflowId', workflowId);
   }
 
+  async saveTraceEvent(event: WorkflowTraceEvent): Promise<void> {
+    await this.put(await this.open(), 'traceEvents', { ...event, message: redactValue(event.message.slice(0, 2000)) });
+  }
+  async listTraceEvents(runId: string): Promise<WorkflowTraceEvent[]> {
+    return (await this.readByIndex<WorkflowTraceEvent>(await this.open(), 'traceEvents', 'runId', runId)).sort((a, b) => a.sequence - b.sequence);
+  }
+
   async saveRun(run: WorkflowRun): Promise<void> {
     const db = await this.open();
     await this.put(db, 'runs', run);
@@ -161,16 +173,16 @@ export class WorkflowStore {
   private put(db: IDBDatabase, storeName: string, value: unknown): Promise<void> {
     return new Promise((resolve, reject) => {
       const request = db.transaction(storeName, 'readwrite').objectStore(storeName).put(value);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
+      request.transaction.oncomplete = () => resolve();
+      request.transaction.onerror = request.transaction.onabort = () => reject(request.transaction.error);
     });
   }
 
   private delete(db: IDBDatabase, storeName: string, key: IDBValidKey): Promise<void> {
     return new Promise((resolve, reject) => {
       const request = db.transaction(storeName, 'readwrite').objectStore(storeName).delete(key);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
+      request.transaction.oncomplete = () => resolve();
+      request.transaction.onerror = request.transaction.onabort = () => reject(request.transaction.error);
     });
   }
 }

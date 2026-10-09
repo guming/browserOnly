@@ -27,7 +27,7 @@ export class WorkflowRunner {
   private cancelled = false;
   private abortController = new AbortController();
   currentRunId?: string;
-  constructor(private readonly store: Pick<WorkflowStore, 'saveRun' | 'saveStepRun'> = WorkflowStore.getInstance()) {}
+  constructor(private readonly store: Pick<WorkflowStore, 'saveRun' | 'saveStepRun'> & Partial<Pick<WorkflowStore, 'saveTraceEvent'>> = WorkflowStore.getInstance()) {}
 
   cancel(): void { this.cancelled = true; this.abortController.abort(); }
 
@@ -52,6 +52,10 @@ export class WorkflowRunner {
     await this.store.saveRun(run);
     options.callbacks?.onStatus?.('running');
 
+    let sequence = 0;
+    const record = async (kind: 'execute' | 'repair' | 'verify' | 'failure', message: string, stepId?: string) => {
+      if (version.replayFormat === 'steps-v2') await this.store.saveTraceEvent?.({ id: `${run.id}-${sequence}`, runId: run.id, sequence: sequence++, kind, message, stepId, timestamp: Date.now() });
+    };
     let repairCount = 0;
     let currentStepRun: WorkflowStepRun | undefined;
     try {
@@ -72,6 +76,7 @@ export class WorkflowRunner {
         };
         currentStepRun = stepRun;
         await this.store.saveStepRun(stepRun);
+        await record('execute', step.label, step.id);
         options.callbacks?.onStepStart?.(step);
         const tool = options.tools.find(candidate => candidate.name === step.toolName);
         if (!tool) throw new Error(`Tool not found: ${step.toolName}`);
@@ -152,6 +157,7 @@ export class WorkflowRunner {
           && step.onFailure === 'repair' && ['browser_query', 'browser_click', 'browser_type'].includes(step.toolName)
           && typeof input === 'string' && options.repairQuery && !this.cancelled) {
           if (version.replayFormat === 'steps-v2' && repairCount >= Math.min(3, version.replayPolicy?.maxRepairsPerRun ?? 3)) throw new Error('Repair budget exhausted');
+          await record('repair', 'Requesting local selector repair', step.id);
           repairCount++;
           stepRun.repairAttempts = 1;
           if (version.replayFormat === 'steps-v2') run.llmCalls++;
@@ -217,6 +223,8 @@ export class WorkflowRunner {
       for (const assertion of version.finalAssertions) {
         if (!(await evaluateAssertion(assertion, options.tools))) throw new Error(`Final assertion failed: ${assertion.type}`);
       }
+      run.verification = version.finalAssertions.length ? 'verified' : 'unverified';
+      await record('verify', run.verification);
       run.status = 'succeeded';
     } catch (error) {
       run.status = this.cancelled ? 'cancelled' : 'failed';
@@ -227,6 +235,7 @@ export class WorkflowRunner {
       run.failureMessage = currentStepRun
         ? `Step failed: ${failedStep?.label ?? currentStepRun.stepId} [tool=${failedStep?.toolName ?? 'unknown'}, stepId=${currentStepRun.stepId}]. ${rawMessage}`
         : rawMessage;
+      await record('failure', run.failureMessage, currentStepRun?.stepId);
       console.error('[WorkflowRunner] execution failed', {
         workflowId,
         toolName: failedStep?.toolName,
