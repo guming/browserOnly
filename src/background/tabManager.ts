@@ -513,9 +513,9 @@ export interface WorkflowExecutionTab {
 }
 
 /** Create and attach a visible tab for a Workflow run. */
-export async function createWorkflowExecutionTab(windowId: number, startUrl: string): Promise<WorkflowExecutionTab> {
+export async function createWorkflowExecutionTab(windowId: number, startUrl: string, allowBlank = false): Promise<WorkflowExecutionTab> {
   const parsed = new URL(startUrl);
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:' && !(allowBlank && startUrl === 'about:blank')) {
     throw new Error('INVALID_START_URL: Workflow start URL must use http or https');
   }
   return createTabPage(windowId, startUrl, true);

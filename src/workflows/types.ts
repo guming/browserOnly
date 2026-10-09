@@ -108,6 +108,7 @@ export interface WorkflowRun {
   executionTabId?: number;
   executionWindowId?: number;
   failureStepId?: string;
+  traceIncomplete?: boolean;
   verification?: 'verified' | 'unverified';
   suggestedVersionId?: string;
   failureMessage?: string;

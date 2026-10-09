@@ -1,0 +1,10 @@
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, copyFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+const output = mkdtempSync(join(tmpdir(), 'browseronly-replay-'));
+execFileSync('node', ['node_modules/esbuild/bin/esbuild', 'src/workflows/WorkflowStore.ts', 'src/workflows/ReplayStepExecutor.ts', '--bundle', '--format=esm', '--platform=browser', `--outdir=${output}`], { stdio: 'inherit' });
+copyFileSync('tests/fixtures/replay-product.html', join(output, 'product.html'));
+copyFileSync('tests/fixtures/replay-browser-check.html', join(output, 'check.html'));
+console.log(`Browser fixture: ${output}`);
+console.log(`Serve this directory on localhost and open /check.html. All assertions must show PASS.`);

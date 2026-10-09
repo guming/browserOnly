@@ -84,3 +84,15 @@ describe('WorkflowDetailView', () => {
     expect(saveWorkflow).not.toHaveBeenCalled();
   });
 });
+test('new replay instruction edit preserves steps and activates atomically', async () => {
+  const store = WorkflowStore.getInstance();
+  const replay: WorkflowVersion = { ...version, replayFormat: 'steps-v2', taskInstruction: 'Open JD', entryContext: { kind: 'url', url: 'https://www.jd.com/' } };
+  jest.spyOn(store, 'getVersion').mockResolvedValue(replay);
+  jest.spyOn(store, 'listVersions').mockResolvedValue([replay]);
+  const activate = jest.spyOn(store, 'activateVersion').mockResolvedValue();
+  render(<WorkflowDetailView workflow={workflow} onBack={jest.fn()} onSaved={jest.fn()} />);
+  fireEvent.change(await screen.findByLabelText('Task instruction'), { target: { value: 'Search 肽敏舒' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save version' }));
+  await waitFor(() => expect(activate).toHaveBeenCalled());
+  expect(activate.mock.calls[0][1]).toMatchObject({ taskInstruction: 'Search 肽敏舒', steps: [], replayFormat: 'steps-v2' });
+});

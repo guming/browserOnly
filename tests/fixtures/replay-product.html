@@ -1,0 +1,8 @@
+<!doctype html><html lang="zh"><meta charset="utf-8"><title>Automation replay fixture</title>
+<h1>商品测试页</h1><label>搜索<input id="search"></label><button id="search-submit">搜索</button>
+<section id="results" hidden><article data-testid="self-operated"><h2>肽敏舒 400g</h2><p>京东自营</p><button id="cart">加入购物车</button></article><article><h2>肽敏舒 800g</h2><p>第三方</p><button>加入购物车</button></article></section>
+<p id="status"></p><script>
+window.cartCount=0;
+document.querySelector('#search-submit').onclick=()=>setTimeout(()=>document.querySelector('#results').hidden=false,100);
+document.querySelector('#cart').onclick=()=>{window.cartCount++;document.querySelector('#status').textContent='已加入购物车：'+window.cartCount;};
+</script></html>

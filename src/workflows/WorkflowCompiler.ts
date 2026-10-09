@@ -1,3 +1,4 @@
+import { redactValue } from './TraceRecorder';
 import { compileReplaySteps } from './ReplayStepCompiler';
 import { resolveRecordedEntry } from './WorkflowEntryResolver';
 import type { ToolTraceEvent, Workflow, WorkflowStep, WorkflowVersion } from './types';
@@ -49,7 +50,7 @@ export function compileTrace(trace: ToolTraceEvent[], domain: string, name = 'Re
 
   const version: WorkflowVersion = {
     id: id('version'), workflowId: id('workflow'), version: 1,
-    source: 'recording', taskInstruction, replayFormat: taskInstruction !== undefined ? 'steps-v2' : undefined, entryContext, steps, finalAssertions: [], createdAt
+    source: 'recording', taskInstruction: taskInstruction === undefined ? undefined : String(redactValue(taskInstruction)), replayFormat: taskInstruction !== undefined ? 'steps-v2' : undefined, entryContext, steps, finalAssertions: [], createdAt
   };
   const workflow: Workflow = {
     id: version.workflowId, name, description: `Recorded on ${domain}`,

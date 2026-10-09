@@ -199,8 +199,7 @@ export class WorkflowService {
           const target = getPage().locator(proposal.selector);
           const count = await target.count();
           if (count < 1 || (step.toolName !== 'browser_query' && count !== 1)) return undefined;
-          const targetHtml = await target.first().evaluate((element: Element) => element.outerHTML);
-          if (!targetHtml.includes(proposal.evidenceText)) return undefined;
+          if (!(await target.first().innerText()).includes(proposal.evidenceText) && !(await target.first().getAttribute('aria-label'))?.includes(proposal.evidenceText)) return undefined;
           const suffix = step.toolName === 'browser_type' ? failedSelector.slice(failedSelector.indexOf('|')) : '';
           if (step.toolName === 'browser_type' && !failedSelector.includes('|')) return undefined;
           const repaired = proposal.selector + suffix;

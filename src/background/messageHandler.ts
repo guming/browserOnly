@@ -390,7 +390,7 @@ async function handleRunWorkflow(
     let executionWindowId = ownerWindowId;
     if (executionMode === 'new_tab') {
       if (!startUrl) throw new Error('INVALID_START_URL: Workflow requires an HTTP(S) start URL for new-tab execution');
-      const created = await createWorkflowExecutionTab(ownerWindowId, startUrl);
+      const created = await createWorkflowExecutionTab(ownerWindowId, startUrl, entry?.kind === 'standalone');
       executionTabId = created.tabId;
       executionWindowId = created.windowId;
       executionPage = created.page;

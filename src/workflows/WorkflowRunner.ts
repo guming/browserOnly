@@ -54,7 +54,7 @@ export class WorkflowRunner {
 
     let sequence = 0;
     const record = async (kind: 'execute' | 'repair' | 'verify' | 'failure', message: string, stepId?: string) => {
-      if (version.replayFormat === 'steps-v2') await this.store.saveTraceEvent?.({ id: `${run.id}-${sequence}`, runId: run.id, sequence: sequence++, kind, message, stepId, timestamp: Date.now() });
+      if (version.replayFormat === 'steps-v2') await this.store.saveTraceEvent?.({ id: `${run.id}-${sequence}`, runId: run.id, sequence: sequence++, kind, message, stepId, timestamp: Date.now() }).catch(() => { run.traceIncomplete = true; });
     };
     let repairCount = 0;
     let currentStepRun: WorkflowStepRun | undefined;
@@ -76,7 +76,7 @@ export class WorkflowRunner {
         };
         currentStepRun = stepRun;
         await this.store.saveStepRun(stepRun);
-        await record('execute', step.label, step.id);
+        await record('execute', JSON.stringify({ tool: step.toolName, label: step.label, input: step.toolName === 'browser_type' && /password|passwd|secret|token|cvv|card/i.test(String(step.input).split('|', 1)[0]) ? '[REDACTED]' : step.input }), step.id);
         options.callbacks?.onStepStart?.(step);
         const tool = options.tools.find(candidate => candidate.name === step.toolName);
         if (!tool) throw new Error(`Tool not found: ${step.toolName}`);
@@ -120,7 +120,7 @@ export class WorkflowRunner {
                 await this.store.saveStepRun(stepRun);
               },
             } : undefined;
-            result = await withTimeout(replayAction ? options.executeReplay!(step, String(candidate), this.abortController.signal) : tool.func(typeof candidate === 'string' ? candidate : JSON.stringify(candidate), toolContext), step.timeoutMs, () => { if (toolContext) this.abortController.abort(); });
+            result = await withTimeout(replayAction ? options.executeReplay!(step, String(candidate), this.abortController.signal) : tool.func(typeof candidate === 'string' ? candidate : JSON.stringify(candidate), toolContext), step.timeoutMs, () => { if (toolContext || replayAction) this.abortController.abort(); });
             // AST extraction relies on page.evaluate(), which is not available
             // in every extension/isolated-world context. Keep recorded
             // automations runnable by falling back to the plain page reader.

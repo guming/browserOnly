@@ -42,7 +42,11 @@ export class WorkflowStore {
           store.createIndex('runId', 'runId');
         }
       };
-      request.onsuccess = () => resolve(request.result);
+      request.onblocked = () => reject(new Error('Workflow database upgrade is blocked. Close other extension views and retry.'));
+      request.onsuccess = () => {
+        request.result.onversionchange = () => { request.result.close(); this.db = null; };
+        resolve(request.result);
+      };
       request.onerror = () => reject(request.error ?? new Error('Unable to open workflow database'));
     });
     return this.db;
@@ -173,16 +177,16 @@ export class WorkflowStore {
   private put(db: IDBDatabase, storeName: string, value: unknown): Promise<void> {
     return new Promise((resolve, reject) => {
       const request = db.transaction(storeName, 'readwrite').objectStore(storeName).put(value);
-      request.transaction.oncomplete = () => resolve();
-      request.transaction.onerror = request.transaction.onabort = () => reject(request.transaction.error);
+      request.transaction!.oncomplete = () => resolve();
+      request.transaction!.onerror = request.transaction!.onabort = () => reject(request.transaction!.error);
     });
   }
 
   private delete(db: IDBDatabase, storeName: string, key: IDBValidKey): Promise<void> {
     return new Promise((resolve, reject) => {
       const request = db.transaction(storeName, 'readwrite').objectStore(storeName).delete(key);
-      request.transaction.oncomplete = () => resolve();
-      request.transaction.onerror = request.transaction.onabort = () => reject(request.transaction.error);
+      request.transaction!.oncomplete = () => resolve();
+      request.transaction!.onerror = request.transaction!.onabort = () => reject(request.transaction!.error);
     });
   }
 }

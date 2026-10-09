@@ -1112,7 +1112,13 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
         if (trace.length > 0 && !isReflectionPrompt && !isMultiTabAnalysis) {
           const domain = currentDomain;
           const candidate = compileTrace(trace, domain, prompt.slice(0, 60) || 'Recorded workflow', currentUrl, originalTaskInstruction);
-          void WorkflowStore.getInstance().saveVersion(candidate.version)
+          candidate.version.sourceRunId = `recording-${candidate.version.id}`;
+          void Promise.all(trace.map((event, sequence) => WorkflowStore.getInstance().saveTraceEvent({
+            id: `${candidate.version.sourceRunId}-${sequence}`, runId: candidate.version.sourceRunId!, sequence,
+            kind: event.result?.ok === false ? 'failure' : 'execute',
+            message: JSON.stringify({ tool: event.toolName, input: event.toolName === 'browser_type' && /password|secret|token|cvv|card/i.test(String(event.input).split('|', 1)[0]) ? '[REDACTED]' : event.input, error: event.result?.error?.message }),
+            timestamp: event.startedAt,
+          }))).then(() => WorkflowStore.getInstance().saveVersion(candidate.version))
             .then(() => WorkflowStore.getInstance().saveWorkflow(candidate.workflow))
             .then(() => sendUIMessage('updateOutput', { type: 'system', content: `Automation candidate available for 24 hours: ${candidate.workflow.name}` }, targetTabId))
             .catch(error => logWithTimestamp(`Could not save workflow draft: ${String(error)}`, 'warn'));
