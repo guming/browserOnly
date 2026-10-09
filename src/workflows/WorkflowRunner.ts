@@ -1,3 +1,4 @@
+import { ReplayFailure } from './ReplayLocatorResolver';
 import type { BrowserTool } from '../agent/tools/types';
 import type { WorkflowAssertion, WorkflowRun, WorkflowStep, WorkflowStepRun, WorkflowVersion } from './types';
 import { WorkflowStore } from './WorkflowStore';
@@ -18,6 +19,7 @@ export interface WorkflowRunnerOptions {
   runner?: WorkflowRunner;
   pageRef?: { current: any };
   onPageHandoff?: (page: any, tabId?: number) => void;
+  executeReplay?: (step: WorkflowStep, input: string, signal: AbortSignal) => Promise<string>;
   repairQuery?: (step: WorkflowStep, failedSelector: string) => Promise<string | undefined>;
 }
 
@@ -25,7 +27,7 @@ export class WorkflowRunner {
   private cancelled = false;
   private abortController = new AbortController();
   currentRunId?: string;
-  private readonly store = WorkflowStore.getInstance();
+  constructor(private readonly store: Pick<WorkflowStore, 'saveRun' | 'saveStepRun'> = WorkflowStore.getInstance()) {}
 
   cancel(): void { this.cancelled = true; this.abortController.abort(); }
 
@@ -90,7 +92,8 @@ export class WorkflowRunner {
           );
           if (!approved) throw new Error('Action rejected by user');
         }
-        const candidates = step.locator ? locatorCandidates(step.locator, input) : [input];
+        const replayAction = version.replayFormat === 'steps-v2' && ['browser_click', 'browser_type'].includes(step.toolName) && options.executeReplay;
+        const candidates = replayAction ? [input] : step.locator ? locatorCandidates(step.locator, input) : [input];
         // A write may have happened even when its response was lost; never replay it blindly.
         const maxAttempts = step.risk === 'read'
           ? Math.max(1, Math.min(3, step.retryPolicy?.maxAttempts ?? 1)) : 1;
@@ -110,7 +113,7 @@ export class WorkflowRunner {
                 await this.store.saveStepRun(stepRun);
               },
             } : undefined;
-            result = await withTimeout(tool.func(typeof candidate === 'string' ? candidate : JSON.stringify(candidate), toolContext), step.timeoutMs, () => { if (toolContext) this.abortController.abort(); });
+            result = await withTimeout(replayAction ? options.executeReplay!(step, String(candidate), this.abortController.signal) : tool.func(typeof candidate === 'string' ? candidate : JSON.stringify(candidate), toolContext), step.timeoutMs, () => { if (toolContext) this.abortController.abort(); });
             // AST extraction relies on page.evaluate(), which is not available
             // in every extension/isolated-world context. Keep recorded
             // automations runnable by falling back to the plain page reader.
@@ -190,6 +193,7 @@ export class WorkflowRunner {
         for (const assertion of step.postconditions ?? []) {
           if (!(await evaluateAssertion(assertion, options.tools))) throw new Error(`Postcondition failed: ${assertion.type}`);
         }
+        stepRun.executionMode ??= 'direct';
         stepRun.status = 'succeeded';
         stepRun.endedAt = Date.now();
         await this.store.saveStepRun(stepRun);

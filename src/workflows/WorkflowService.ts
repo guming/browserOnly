@@ -1,3 +1,4 @@
+import { executeReplayStep } from './ReplayStepExecutor';
 import type { Page } from 'playwright-crx';
 import type { BrowserTool } from '../agent/tools/types';
 import { lookupMemories } from '../agent/tools/memoryTools';
@@ -183,6 +184,7 @@ export class WorkflowService {
     const run = await (options.runner ?? new WorkflowRunner()).run(workflowId, version, {
       ...options,
       tools,
+      executeReplay: (step, input, signal) => executeReplayStep(getPage(), step, input, signal),
       repairQuery: async (step, failedSelector) => {
         try {
           const config = await ConfigManager.getInstance().getProviderConfig();
