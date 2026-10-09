@@ -390,7 +390,7 @@ async function handleRunWorkflow(
     let executionWindowId = ownerWindowId;
     if (executionMode === 'new_tab') {
       if (!startUrl) throw new Error('INVALID_START_URL: Workflow requires an HTTP(S) start URL for new-tab execution');
-      const created = await createWorkflowExecutionTab(ownerWindowId, entry ? 'about:blank' : startUrl);
+      const created = await createWorkflowExecutionTab(ownerWindowId, startUrl);
       executionTabId = created.tabId;
       executionWindowId = created.windowId;
       executionPage = created.page;
@@ -407,7 +407,7 @@ async function handleRunWorkflow(
 
     if (entry?.kind === 'url') {
       const firstPageStep = version.steps.find(step => step.enabled && step.toolName !== 'lookup_memories');
-      if (firstPageStep?.toolName !== 'browser_navigate' || firstPageStep.input !== entry.url) {
+      if (executionMode !== 'new_tab' && (firstPageStep?.toolName !== 'browser_navigate' || firstPageStep.input !== entry.url)) {
         await executionPage.goto(entry.url, { waitUntil: 'domcontentloaded', timeout: 10000 });
       }
     }
@@ -421,7 +421,8 @@ async function handleRunWorkflow(
     const pageRef = { current: executionPage };
     workflowRunners.set(`pending:${executionTabId}`, { runner, executionTabId, ownerTabId: tabId });
     workflowRunByExecutionTab.set(executionTabId, runner);
-    const runPromise = new WorkflowService().run(workflow.id, version, executionPage, {
+    const runVersion = entry?.kind === 'url' && executionMode === 'new_tab' ? { ...version, steps: version.steps.filter((step, index) => !(index === 0 && step.toolName === 'browser_navigate' && typeof step.input === 'string' && new URL(step.input).toString() === entry.url)) } : version;
+    const runPromise = new WorkflowService().run(workflow.id, runVersion, executionPage, {
       variables: message.variables,
       context: runContext,
       pageRef,

@@ -85,6 +85,18 @@ export class WorkflowStore {
     await this.put(db, 'versions', version);
   }
 
+  async activateVersion(workflow: Workflow, version: WorkflowVersion): Promise<void> {
+    if (version.workflowId !== workflow.id) throw new Error('Version belongs to another workflow');
+    const db = await this.open();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(['workflows', 'versions'], 'readwrite');
+      tx.oncomplete = () => resolve();
+      tx.onerror = tx.onabort = () => reject(tx.error ?? new Error('Version transaction failed'));
+      tx.objectStore('versions').put(version);
+      tx.objectStore('workflows').put({ ...workflow, activeVersionId: version.id, updatedAt: Date.now() });
+    });
+  }
+
   async getVersion(id: string): Promise<WorkflowVersion | undefined> {
     const db = await this.open();
     return this.read<WorkflowVersion>(db, 'versions', id);

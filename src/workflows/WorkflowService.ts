@@ -216,13 +216,14 @@ export class WorkflowService {
       const store = WorkflowStore.getInstance();
       const next = {
         ...version, id: `version-${crypto.randomUUID()}`, version: version.version + 1,
-        source: 'ai_repair' as const, sourceRunId: run.id, createdAt: Date.now(),
+        source: 'ai_repair' as const, sourceRunId: run.id, suggestedFromRunId: version.replayFormat === 'steps-v2' ? run.id : undefined, createdAt: Date.now(),
         steps: version.steps.map(step => repairedSelectors.has(step.id)
-          ? { ...step, input: repairedSelectors.get(step.id), locator: undefined } : step),
+          ? { ...step, input: repairedSelectors.get(step.id), locator: { css: repairedSelectors.get(step.id)!.split('|', 1)[0], fallbackOrder: ['css' as const] } } : step),
       };
       await store.saveVersion(next);
       const workflow = await store.getWorkflow(workflowId);
-      if (workflow) await store.saveWorkflow({ ...workflow, activeVersionId: next.id, updatedAt: Date.now() });
+      if (version.replayFormat === 'steps-v2') { run.suggestedVersionId = next.id; await store.saveRun(run); }
+      else if (workflow) await store.saveWorkflow({ ...workflow, activeVersionId: next.id, updatedAt: Date.now() });
     }
     return run;
   }

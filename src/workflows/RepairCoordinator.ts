@@ -18,6 +18,7 @@ export class RepairCoordinator {
     if (!validation.valid) throw new Error(validation.error);
     const steps = version.steps.map(step => step.id === patch.targetStepId ? mergeStep(step, patch) : step);
     const next: WorkflowVersion = { ...version, id: `version-${crypto.randomUUID()}`, version: version.version + 1, source: 'ai_repair', steps, createdAt: Date.now() };
+    if (version.replayFormat === 'steps-v2') { await this.store.saveVersion({ ...next, suggestedFromRunId: version.sourceRunId }); return next; }
     await this.store.saveVersion(next);
     const workflow = await this.store.getWorkflow(workflowId);
     if (workflow) await this.store.saveWorkflow({ ...workflow, activeVersionId: next.id, status: 'active', updatedAt: Date.now() });
