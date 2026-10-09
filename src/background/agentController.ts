@@ -501,6 +501,7 @@ export async function executePrompt(
   selectedTabIds?: number[],
   contextMode?: 'current-tab' | 'standalone',
 ): Promise<void> {
+  const originalTaskInstruction = prompt;
   try {
     // Get provider configuration from ConfigManager
     const configManager = ConfigManager.getInstance();
@@ -1110,7 +1111,7 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
         const trace = traceRecorder.finish();
         if (trace.length > 0 && !isReflectionPrompt && !isMultiTabAnalysis) {
           const domain = currentDomain;
-          const candidate = compileTrace(trace, domain, prompt.slice(0, 60) || 'Recorded workflow', currentUrl);
+          const candidate = compileTrace(trace, domain, prompt.slice(0, 60) || 'Recorded workflow', currentUrl, originalTaskInstruction);
           void WorkflowStore.getInstance().saveVersion(candidate.version)
             .then(() => WorkflowStore.getInstance().saveWorkflow(candidate.workflow))
             .then(() => sendUIMessage('updateOutput', { type: 'system', content: `Automation candidate available for 24 hours: ${candidate.workflow.name}` }, targetTabId))

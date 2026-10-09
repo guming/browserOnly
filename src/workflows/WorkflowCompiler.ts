@@ -7,7 +7,7 @@ export const WORKFLOW_CANDIDATE_TTL_MS = 24 * 60 * 60 * 1000;
 const workflowToolName = (toolName: string) =>
   toolName === 'browser_read_main' ? 'browser_read_main_for_workflow' : toolName;
 
-export function compileTrace(trace: ToolTraceEvent[], domain: string, name = 'Recorded workflow', startUrl?: string): { workflow: Workflow; version: WorkflowVersion } {
+export function compileTrace(trace: ToolTraceEvent[], domain: string, name = 'Recorded workflow', startUrl?: string, taskInstruction?: string): { workflow: Workflow; version: WorkflowVersion } {
   const createdAt = now();
   const recordedSteps: WorkflowStep[] = trace
     .filter(event => event.result?.ok !== false)
@@ -46,7 +46,7 @@ export function compileTrace(trace: ToolTraceEvent[], domain: string, name = 'Re
 
   const version: WorkflowVersion = {
     id: id('version'), workflowId: id('workflow'), version: 1,
-    source: 'recording', steps, finalAssertions: [], createdAt
+    source: 'recording', taskInstruction, steps, finalAssertions: [], createdAt
   };
   const workflow: Workflow = {
     id: version.workflowId, name, description: `Recorded on ${domain}`,
