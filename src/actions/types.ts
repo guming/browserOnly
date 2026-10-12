@@ -14,12 +14,22 @@ export interface ActionDefinition {
   supportedContexts: ActionContextType[];
   workflowId?: string;
   templateId?: string;
+  triggerDomains?: string[];
+  useCount?: number;
+  lastUsedAt?: number;
 }
 
 export interface ActionSearchContext {
   hasPage?: boolean;
   hasSelection?: boolean;
   comparableTabCount?: number;
+  pageUrl?: string;
+}
+
+export interface ActionOutputDefinition {
+  type: 'markdown' | 'table' | 'json' | 'download';
+  title?: string;
+  downloadableFormats?: Array<'csv' | 'json'>;
 }
 
 export interface ActionInvocation {
@@ -32,6 +42,7 @@ export interface ActionInvocation {
   selectionText?: string;
   instruction?: string;
   presetValues?: Record<string, unknown>;
+  createdAt?: number;
 }
 
 export interface ActionResult {
@@ -40,4 +51,11 @@ export interface ActionResult {
   output?: unknown;
   error?: string;
   runId?: string;
+  outputDefinition?: ActionOutputDefinition;
+  warnings?: string[];
 }
+
+export type ActionResolution =
+  | { type: 'direct'; definition: ActionDefinition; invocation: ActionInvocation }
+  | { type: 'configure'; definition: ActionDefinition; invocation: ActionInvocation }
+  | { type: 'confirm'; definition: ActionDefinition; invocation: ActionInvocation };

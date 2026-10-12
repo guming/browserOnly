@@ -71,7 +71,7 @@ export const MultiTabStatusBar: React.FC<MultiTabStatusBarProps> = ({
       sender: chrome.runtime.MessageSender,
       sendResponse: (response?: any) => void
     ) => {
-      if (sender.id !== chrome.runtime.id) return;
+      if (sender.id !== chrome.runtime.id) return false;
 
       if (message.action === 'targetChanged' && message.tabId && message.url) {
         setTabUrl(message.url);
@@ -81,17 +81,20 @@ export const MultiTabStatusBar: React.FC<MultiTabStatusBarProps> = ({
             : tab
         ));
         sendResponse({ received: true });
+        return false;
       }
 
       if (message.action === 'tabStatusUpdate') {
         setAvailableTabs(prev => prev.map(tab => 
           tab.id === message.tabId 
-            ? { ...tab, status: message.status }
-            : tab
+          ? { ...tab, status: message.status }
+          : tab
         ));
+        sendResponse({ received: true });
+        return false;
       }
 
-      return true;
+      return false;
     };
     // Get initial tab URL for selected tab
     chrome.tabs.get(selectedTabId, (tab) => {

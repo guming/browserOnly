@@ -557,7 +557,24 @@ describe('Observation Tools', () => {
       expect(resultObj.type).toBe('screenshotRef');
     });
 
-    it('should handle downscaling errors', async () => {
+    it('should shrink dimensions when minimum JPEG quality still exceeds the limit', async () => {
+      const oversized = 'x'.repeat(600000);
+      mockPage.screenshot.mockResolvedValue(Buffer.from(oversized));
+      mockPage.evaluate.mockResolvedValueOnce({ width: 1200, height: 24000 })
+        .mockResolvedValueOnce({ base64: oversized, width: 1000, height: 20000 });
+      for (let i = 0; i < 6; i++) mockPage.evaluate.mockResolvedValueOnce({ base64: oversized });
+      mockPage.evaluate.mockResolvedValueOnce({ base64: mockScreenshotData.small });
+
+      const result = await browserScreenshot(mockPage).func('full');
+
+      expect(JSON.parse(result).type).toBe('screenshotRef');
+      expect(mockPage.evaluate.mock.calls[8][1]).toEqual({ b64: oversized, w: 700, h: 14000, q: 10 });
+      expect(mockScreenshotManager.getInstance().storeScreenshot).toHaveBeenCalledWith(
+        expect.objectContaining({ source: expect.objectContaining({ data: mockScreenshotData.small }) })
+      );
+    });
+
+    it('should handle downscaling errors' , async () => {
       const tool = browserScreenshot(mockPage);
       const largeScreenshot = 'x'.repeat(600000);
       mockPage.screenshot.mockResolvedValue(Buffer.from(largeScreenshot));

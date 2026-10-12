@@ -73,12 +73,19 @@ export function handleMessage(
         sendResponse({ success: true, started: true });
         return false;
       case 'invokeAction':
-        putPendingAction(message.invocation);
-        sendResponse({ success: true });
-        return false;
+        putPendingAction(message.invocation).then(() => sendResponse({ success: true })).catch(error => sendResponse({ success: false, error: String(error) }));
+        return true;
       case 'getPendingAction':
-        sendResponse({ success: true, invocation: consumePendingAction(message.windowId, message.tabId) });
-        return false;
+        consumePendingAction(message.windowId, message.tabId).then(async invocation => {
+          if (!invocation) return sendResponse({ success: true });
+          try {
+            const tab = await chrome.tabs.get(invocation.tabId);
+            if (tab.windowId !== invocation.windowId) throw new Error('The source tab moved to another window');
+            if (!tab.url || !/^https?:/i.test(tab.url)) throw new Error('The source page is no longer readable');
+            sendResponse({ success: true, invocation: { ...invocation, pageUrl: tab.url, pageTitle: tab.title } });
+          } catch (error) { sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) }); }
+        }).catch(error => sendResponse({ success: false, error: String(error) }));
+        return true;
 
       case 'cancelExecution':
         handleCancelExecution(message, sendResponse);
@@ -375,9 +382,9 @@ async function handleRunWorkflow(
   try {
     tabId ??= (await chrome.tabs.query({ active: true, lastFocusedWindow: true }))[0]?.id;
     if (!tabId) throw new Error('No active tab');
-    const workflow = await WorkflowStore.getInstance().getWorkflow(message.workflowId);
+    const workflow = message.transientWorkflow ?? await WorkflowStore.getInstance().getWorkflow(message.workflowId);
     if (!workflow) throw new Error('Workflow not found');
-    const version = await WorkflowStore.getInstance().getVersion(message.versionId || workflow.activeVersionId);
+    const version = message.transientVersion ?? await WorkflowStore.getInstance().getVersion(message.versionId || workflow.activeVersionId);
     if (!version) throw new Error('Workflow version not found');
     if (workflow.status === 'archived') throw new Error('Archived workflows cannot be run');
     const ownerTab = await chrome.tabs.get(tabId);

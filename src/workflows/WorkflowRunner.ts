@@ -57,6 +57,7 @@ export class WorkflowRunner {
       if (version.replayFormat === 'steps-v2') await this.store.saveTraceEvent?.({ id: `${run.id}-${sequence}`, runId: run.id, sequence: sequence++, kind, message, stepId, timestamp: Date.now() }).catch(() => { run.traceIncomplete = true; });
     };
     let repairCount = 0;
+    let previousResult = '';
     let currentStepRun: WorkflowStepRun | undefined;
     try {
       if (options.allowedDomains?.length) {
@@ -80,7 +81,13 @@ export class WorkflowRunner {
         options.callbacks?.onStepStart?.(step);
         const tool = options.tools.find(candidate => candidate.name === step.toolName);
         if (!tool) throw new Error(`Tool not found: ${step.toolName}`);
-        const input = substituteVariables(step.input, options.variables ?? {});
+        let input = substituteVariables(step.input, options.variables ?? {});
+        if (input && typeof input === 'object' && !Array.isArray(input) && (input as { previousResult?: boolean }).previousResult) {
+          let parsedPrevious: unknown;
+          try { parsedPrevious = JSON.parse(previousResult); } catch { throw new Error('Previous workflow result is not structured JSON'); }
+          input = { ...(parsedPrevious as Record<string, unknown>), ...input };
+          delete (input as { previousResult?: boolean }).previousResult;
+        }
         for (const assertion of step.preconditions ?? []) {
           if (!(await evaluateAssertion(assertion, options.tools))) throw new Error(`Precondition failed: ${assertion.type}`);
         }
@@ -213,16 +220,17 @@ export class WorkflowRunner {
           }
         }
         for (const assertion of step.postconditions ?? []) {
-          if (!(await evaluateAssertion(assertion, options.tools))) throw new Error(`Postcondition failed: ${assertion.type}`);
+          if (!(await evaluateAssertion(assertion, options.tools, result))) throw new Error(`Postcondition failed: ${assertion.type}`);
         }
         stepRun.executionMode ??= 'direct';
         stepRun.status = 'succeeded';
         stepRun.endedAt = Date.now();
         await this.store.saveStepRun(stepRun);
         options.callbacks?.onStepEnd?.(step, result);
+        previousResult = result;
       }
       for (const assertion of version.finalAssertions) {
-        if (!(await evaluateAssertion(assertion, options.tools))) throw new Error(`Final assertion failed: ${assertion.type}`);
+        if (!(await evaluateAssertion(assertion, options.tools, previousResult))) throw new Error(`Final assertion failed: ${assertion.type}`);
       }
       run.verification = version.finalAssertions.length ? 'verified' : 'unverified';
       await record('verify', run.verification);
@@ -300,7 +308,11 @@ function locatorCandidates(locator: NonNullable<WorkflowStep['locator']>, input:
 }
 
 function substituteVariables(value: unknown, variables: Record<string, unknown>): unknown {
+  if (Array.isArray(value)) return value.map(item => substituteVariables(item, variables));
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, substituteVariables(item, variables)]));
   if (typeof value !== 'string') return value;
+  const exact = value.match(/^\{\{\s*([\w.-]+)\s*\}\}$/);
+  if (exact && exact[1] in variables) return variables[exact[1]];
   return value.replace(/\{\{\s*([\w.-]+)\s*\}\}/g, (_, key: string) => String(variables[key] ?? `{{${key}}}`));
 }
 
@@ -318,12 +330,12 @@ export function matchesAssertion(assertion: WorkflowAssertion, state: { url?: st
     case 'element_visible': return state.elementVisible === true;
     case 'element_absent': return state.elementVisible === false;
     case 'value_equals': return state.value === String(assertion.expected);
-    case 'row_count': return state.rowCount === Number(assertion.expected);
+    case 'row_count': return typeof assertion.expected === 'object' && assertion.expected !== null && 'min' in assertion.expected ? (state.rowCount ?? 0) >= Number((assertion.expected as { min: number }).min) : state.rowCount === Number(assertion.expected);
     default: return false;
   }
 }
 
-async function evaluateAssertion(assertion: WorkflowAssertion, tools: BrowserTool[]): Promise<boolean> {
+async function evaluateAssertion(assertion: WorkflowAssertion, tools: BrowserTool[], previousResult?: string): Promise<boolean> {
   const find = (name: string) => tools.find(tool => tool.name === name);
   try {
     if (assertion.type === 'url_matches') {
@@ -343,6 +355,8 @@ async function evaluateAssertion(assertion: WorkflowAssertion, tools: BrowserToo
       const visible = result !== '[]';
       return assertion.type === 'element_visible' ? visible : !visible;
     }
+    if (assertion.type === 'row_count') { try { const value = JSON.parse(previousResult ?? '{}'); return matchesAssertion(assertion, { rowCount: Array.isArray(value) ? value.length : Array.isArray(value.rows) ? value.rows.length : 0 }); } catch { return false; } }
+    if (assertion.type === 'download_exists') { try { return typeof JSON.parse(previousResult ?? '{}').downloadId === 'number'; } catch { return false; } }
     return false;
   } catch { return false; }
 }

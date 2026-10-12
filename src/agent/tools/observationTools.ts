@@ -611,8 +611,15 @@ export const browserScreenshot: ToolFactory = (page: Page) =>
             dimensions.height = result.height;
             
             // If still too big, reduce quality until it fits
-            while (base64.length > MAX_CHARS && quality > 10) {
-              quality -= 5;
+            while (base64.length > MAX_CHARS && (quality > 10 || dimensions.width > 1 || dimensions.height > 1)) {
+              if (quality > 10) {
+                quality -= 5;
+              } else {
+                // Quality alone cannot bound a tall full-page image. Reduce both
+                // dimensions together to preserve its aspect ratio and content.
+                dimensions.width = Math.max(1, Math.floor(dimensions.width * 0.7));
+                dimensions.height = Math.max(1, Math.floor(dimensions.height * 0.7));
+              }
               
               interface RecompressResult {
                 base64: string;

@@ -5,7 +5,8 @@ import { lookupMemories } from '../agent/tools/memoryTools';
 import { getAllTools } from '../agent/tools';
 import { WorkflowRunner, WorkflowRunnerOptions } from './WorkflowRunner';
 import type { WorkflowRun, WorkflowVersion } from './types';
-import { extractionRequestSchema } from '../extraction/extractionSchema';
+import { extractionRequestSchema, validateExtractionResult } from '../extraction/extractionSchema';
+import { toCsv, toJson } from '../extraction/exporters';
 import { preferProvidedPageForTools, retryAfterNavigation } from '../agent/tools/utils';
 import { proposeQuerySelector } from './WorkflowQueryRepair';
 import { WorkflowStore } from './WorkflowStore';
@@ -137,28 +138,54 @@ export class WorkflowService {
     });
     tools.push({
       name: 'browser_extract_structured',
-      description: 'Extract user-confirmed fields from the current page table into standard JSON.',
+      description: 'Extract user-confirmed fields from a table, semantic list, or repeated cards into standard JSON.',
       func: async (input: string) => withStablePageRead(async currentPage => {
-        const request = extractionRequestSchema.parse(typeof input === 'string' ? JSON.parse(input || '{}') : input);
-        const rows = await currentPage.locator('table tr').allInnerTexts();
-        const values = rows.slice(1, (request.maxRows ?? 100) + 1).map((line: string) => {
-          const cells = line.split(/\s{2,}|\t/).map(cell => cell.trim());
-          return Object.fromEntries(request.fields.map((field, index) => [field.key, cells[index] ?? null]));
-        });
-        return JSON.stringify({ fields: request.fields, rows: values, sourceUrls: [currentPage.url()], warnings: values.length ? [] : ['No table rows found'], generatedAt: new Date().toISOString() });
+        const request = extractionRequestSchema.parse(parseToolInput(input));
+        const candidates = ['table tbody tr', 'table tr', '[role="grid"] [role="row"]', '[role="list"] > [role="listitem"]', 'ul > li', 'ol > li', 'main article', '[class*="card"]'];
+        let selector = request.plan?.itemSelector ?? request.plan?.listSelector ?? '';
+        if (selector && await currentPage.locator(selector).count() < 2) throw new Error('Saved extraction plan no longer matches at least two records; reconfigure the extraction');
+        if (!selector) for (const candidate of candidates) { if (await currentPage.locator(candidate).count() >= 2) { selector = candidate; break; } }
+        const warnings: string[] = [];
+        if (!selector) warnings.push('No repeated table, list, or card structure was found');
+        const locator = selector ? currentPage.locator(selector) : currentPage.locator('body');
+        const count = Math.min(await locator.count(), request.maxRows);
+        const values: Array<Record<string, unknown>> = [];
+        for (let index = selector === 'table tr' ? 1 : 0; index < count; index += 1) {
+          const item = locator.nth(index);
+          const cells = selector.startsWith('table') ? await item.locator('th,td').allInnerTexts() : [];
+          const text = (await item.innerText()).trim();
+          const parts = cells.length ? cells : text.split(/\s{2,}|\t|\n/).map(value => value.trim()).filter(Boolean);
+          const entries: Array<[string, unknown]> = [];
+          for (let fieldIndex = 0; fieldIndex < request.fields.length; fieldIndex += 1) {
+            const field = request.fields[fieldIndex];
+            const planned = request.plan?.fields.find(candidate => candidate.name === field.key || candidate.name === field.label);
+            let value: unknown = parts[planned?.column ?? fieldIndex] ?? null;
+            if (planned?.selector) { const target = item.locator(planned.selector).first(); value = await target.count() ? (field.type === 'url' ? await target.getAttribute('href') : await target.innerText()) : null; }
+            entries.push([field.key, value]);
+          }
+          values.push(Object.fromEntries(entries));
+        }
+        if ((await locator.count()) > request.maxRows) warnings.push(`Result limited to ${request.maxRows} rows`);
+        const unique = [...new Map(values.map(row => [JSON.stringify(row), row])).values()];
+        if (unique.length < values.length) warnings.push(`${values.length - unique.length} duplicate records were removed`);
+        const result = validateExtractionResult({ fields: request.fields, rows: unique, sourceUrls: [currentPage.url()], warnings, generatedAt: new Date().toISOString(), plan: request.plan });
+        if (request.plan && (result.completeness ?? 0) < 0.8) throw new Error('Saved extraction plan field coverage fell below 80%; reconfigure the extraction');
+        return JSON.stringify(result);
       }),
     });
     tools.push({
       name: 'browser_export_data',
-      description: 'Convert a standard structured extraction result to JSON or CSV.',
+      description: 'Download a standard structured extraction result as JSON or CSV.',
       func: async (input: string) => {
-        const payload = JSON.parse(input || '{}');
+        const payload = parseToolInput(input) as any;
         if (!Array.isArray(payload.fields) || !Array.isArray(payload.rows)) throw new Error('browser_export_data requires a standard extraction result');
-        const keys = payload.fields.map((field: { key: string }) => field.key);
         const format = payload.format ?? 'json';
-        if (format === 'json') return JSON.stringify(payload.rows, null, 2);
-        const cell = (value: unknown) => { if (value == null) return ''; const text = typeof value === 'object' ? JSON.stringify(value) : String(value); return /[,"\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text; };
-        return [keys.join(','), ...payload.rows.map((row: Record<string, unknown>) => keys.map((key: string) => cell(row[key])).join(','))].join('\r\n');
+        if (format !== 'json' && format !== 'csv') throw new Error('browser_export_data format must be json or csv');
+        const result = validateExtractionResult({ ...payload, sourceUrls: payload.sourceUrls ?? [], warnings: payload.warnings ?? [], generatedAt: payload.generatedAt ?? new Date().toISOString() });
+        const content = format === 'json' ? toJson(result) : toCsv(result);
+        const encoded = btoa(unescape(encodeURIComponent(content)));
+        const downloadId = await chrome.downloads.download({ url: `data:${format === 'json' ? 'application/json' : 'text/csv'};base64,${encoded}`, filename: `browseronly-extraction-${Date.now()}.${format}`, saveAs: true });
+        return JSON.stringify({ downloadId, format, rows: result.rows.length });
       },
     });
     tools.push({
@@ -226,4 +253,10 @@ export class WorkflowService {
     }
     return run;
   }
+}
+
+function parseToolInput(input: unknown): unknown {
+  if (typeof input !== 'string') return input;
+  const trimmed = input.trim();
+  return trimmed ? JSON.parse(trimmed) : {};
 }

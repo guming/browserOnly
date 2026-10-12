@@ -44,7 +44,7 @@ describe('Navigation Tools', () => {
       const result = await tool.func('https://example.com');
 
       expect(result).toBe('Successfully navigated to https://example.com');
-      expect(mockPage.goto).toHaveBeenCalledWith('https://example.com');
+      expect(mockPage.goto).toHaveBeenCalledWith('https://example.com', { waitUntil: "domcontentloaded", timeout: 10000 });
     });
 
     it('should send Chrome messages after successful navigation', async () => {
@@ -74,18 +74,31 @@ describe('Navigation Tools', () => {
 
       // Test HTTPS URL
       await tool.func('https://secure.example.com');
-      expect(mockPage.goto).toHaveBeenCalledWith('https://secure.example.com');
+      expect(mockPage.goto).toHaveBeenCalledWith('https://secure.example.com', { waitUntil: "domcontentloaded", timeout: 10000 });
 
       // Test HTTP URL
       await tool.func('http://example.com');
-      expect(mockPage.goto).toHaveBeenCalledWith('http://example.com');
+      expect(mockPage.goto).toHaveBeenCalledWith('http://example.com', { waitUntil: "domcontentloaded", timeout: 10000 });
 
       // Test URL with path and query
       await tool.func('https://example.com/path?query=value');
-      expect(mockPage.goto).toHaveBeenCalledWith('https://example.com/path?query=value');
+      expect(mockPage.goto).toHaveBeenCalledWith('https://example.com/path?query=value', { waitUntil: "domcontentloaded", timeout: 10000 });
     });
 
-    it('should handle navigation errors gracefully', async () => {
+    it('should finish when DOM is ready even if full load never completes', async () => {
+      mockPage.goto.mockImplementation(async (_url: string, options: any) => {
+        if (options?.waitUntil !== 'domcontentloaded') throw new Error('Load is blocked');
+      });
+      expect(await browserNavigate(mockPage).func('https://example.com')).toContain('Successfully navigated');
+    });
+
+    it('should tolerate a closed UI message channel', async () => {
+      utilsMock.getCurrentTabId.mockResolvedValue(123);
+      mockChromeAPIs.runtime.sendMessage.mockRejectedValueOnce(new Error('message channel closed'));
+      expect(await browserNavigate(mockPage).func('https://example.com')).toContain('Successfully navigated');
+    });
+
+    it('should handle navigation errors gracefully' , async () => {
       const tool = browserNavigate(mockPage);
       mockPage.goto.mockRejectedValue(new Error('Navigation failed'));
 
@@ -104,7 +117,7 @@ describe('Navigation Tools', () => {
       const result = await tool.func('https://example.com');
 
       expect(result).toBe('Successfully navigated to https://example.com');
-      expect(mockPage.goto).toHaveBeenCalledWith('https://example.com');
+      expect(mockPage.goto).toHaveBeenCalledWith('https://example.com', { waitUntil: "domcontentloaded", timeout: 10000 });
     });
 
     it('should handle missing tab ID gracefully', async () => {

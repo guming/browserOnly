@@ -16,6 +16,9 @@ import { WorkflowListView } from './components/WorkflowListView';
 import { RunListView } from './components/RunListView';
 import { WorkflowStore } from '../workflows';
 import { PendingActionRouter } from './components/actions/PendingActionRouter';
+import { PageActionBar } from './components/actions/PageActionBar';
+import { WorkflowPicker } from './components/actions/WorkflowPicker';
+import { instantiateTemplate } from '../templates';
 import type { ActionInvocation } from '../actions';
 import { MonitorListView } from './components/monitors/MonitorListView';
 
@@ -25,6 +28,8 @@ export function SidePanel() {
   const [failedRunCount, setFailedRunCount] = useState(0);
   const [monitorCount, setMonitorCount] = useState(0);
   const [pendingAction, setPendingAction] = useState<ActionInvocation>();
+  const [showWorkflowPicker, setShowWorkflowPicker] = useState(false);
+  useEffect(() => { if (pendingAction?.actionId === 'workflow-picker') setShowWorkflowPicker(true); }, [pendingAction]);
   useEffect(() => {
     const refreshCounts = async () => {
       const store = WorkflowStore.getInstance();
@@ -553,16 +558,33 @@ export function SidePanel() {
         <div className={`mt-3 space-y-3 flex-shrink-0 ${isOutputExpanded ? 'hidden' : ''}`}>
           <div className="rounded-xl border border-slate-200 bg-white p-4">
             <PendingActionRouter tabId={tabId ?? undefined} windowId={windowId ?? undefined} onAction={setPendingAction} />
+            {activeView === 'tasks' && <PageActionBar
+              readable={tabStatus !== 'detached' && /^https?:/i.test(currentTabUrl)}
+              disabled={isProcessing}
+              onSummarize={() => void handleSubmit('Summarize the current page.', 'operator')}
+              onTranslate={() => void startPageTranslation()}
+              onExtract={() => { if (typeof tabId === 'number' && typeof windowId === 'number') setPendingAction({ actionId: 'extract', source: 'page_actions', tabId, windowId, pageUrl: currentTabUrl, pageTitle: tabTitle, createdAt: Date.now() }); }}
+              onWorkflows={() => setShowWorkflowPicker(true)}
+            />}
+            {activeView === 'tasks' && showWorkflowPicker && <WorkflowPicker pageUrl={currentTabUrl} onClose={() => setShowWorkflowPicker(false)} onWorkflow={workflow => { setShowWorkflowPicker(false); if (workflow.variables.length) return setActiveView('workflows'); const targetTabId = currentSelectedTabId ?? tabId; if (typeof targetTabId === 'number') chrome.runtime.sendMessage({ action: 'runWorkflow', workflowId: workflow.id, versionId: workflow.activeVersionId, ownerTabId: targetTabId, ownerWindowId: windowId, executionMode: workflow.executionMode }); }} onTemplate={template => { setShowWorkflowPicker(false); const candidate = instantiateTemplate(template); const targetTabId = currentSelectedTabId ?? tabId; if (candidate.workflow.variables.length) return setActiveView('workflows'); if (typeof targetTabId === 'number') chrome.runtime.sendMessage({ action: 'runWorkflow', workflowId: candidate.workflow.id, versionId: candidate.version.id, transientWorkflow: candidate.workflow, transientVersion: candidate.version, ownerTabId: targetTabId, ownerWindowId: windowId, executionMode: candidate.workflow.executionMode }); }} />}
             {activeView === 'tasks' && <PromptForm
               onSubmit={handleSubmit}
               onCancel={handleCancel}
               isProcessing={isProcessing}
               tabStatus={tabStatus}
               initialAction={pendingAction}
-              onRunDirectAction={actionId => {
-                if (actionId !== 'translate') return false;
-                void startPageTranslation();
-                return true;
+              onRunDirectAction={(actionId, invocation) => {
+                if (actionId === 'translate') {
+                  if (invocation?.selectionText && typeof invocation.tabId === 'number') void chrome.runtime.sendMessage({ action: 'translateSelection', tabId: invocation.tabId, windowId: invocation.windowId, text: invocation.selectionText, requestId: `${Date.now()}`, engine: 'auto', style: 'natural' });
+                  else void startPageTranslation();
+                  return true;
+                }
+                if (actionId === 'summarize' && invocation) {
+                  setIsProcessing(true); setTabStatus('running'); addSystemMessage(invocation.selectionText ? 'Summarizing selected text…' : 'Summarizing current page…');
+                  void executePrompt(invocation.selectionText ? `Summarize only this selected text:\n${invocation.selectionText}` : 'Summarize the current page.', 'operator').catch(error => { addSystemMessage(`Error: ${error instanceof Error ? error.message : String(error)}`); setIsProcessing(false); setTabStatus('error'); });
+                  return true;
+                }
+                return false;
               }}
             />}
           </div>

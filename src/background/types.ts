@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { BrowserAgent } from "../agent/AgentCore";
-import type { WorkflowExecutionMode } from '../workflows/types';
+import type { Workflow, WorkflowExecutionMode, WorkflowVersion } from '../workflows/types';
 import type { ActionInvocation } from '../actions/types';
 
 // Provider types
@@ -97,6 +97,8 @@ export interface RunWorkflowMessage {
   ownerTabId?: number;
   ownerWindowId?: number;
   executionMode?: WorkflowExecutionMode;
+  transientWorkflow?: Workflow;
+  transientVersion?: WorkflowVersion;
   /** @deprecated Use ownerTabId/ownerWindowId. Kept for message compatibility during migration. */
   tabId?: number;
 }

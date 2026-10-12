@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { NotionSDKClient } from '../../agent/notionClient';
+import { OfficeResponseCard, parseOfficeReportResponse } from './office/OfficeResponseCard';
 
 interface LlmContentProps {
   content: string;
@@ -450,8 +451,16 @@ export const LlmContent: React.FC<LlmContentProps> = ({
 
           {/* Response content */}
           <div className="llm-response-content">
-            {textParts.map((part, index) => (
-              <ReactMarkdown 
+            {textParts.map((part, index) => {
+              const officeResponse = parseOfficeReportResponse(part.content);
+              if (officeResponse) {
+                const prefix = part.content.slice(0, officeResponse.start).trim();
+                return <React.Fragment key={index}>
+                  {prefix && <p className="mb-2">{prefix}</p>}
+                  <OfficeResponseCard report={officeResponse.report} rawJson={officeResponse.raw} />
+                </React.Fragment>;
+              }
+              return <ReactMarkdown 
                 key={index}
                 remarkPlugins={[remarkGfm]}
                 components={{
@@ -591,8 +600,8 @@ export const LlmContent: React.FC<LlmContentProps> = ({
                 }}
               >
                 {part.content}
-              </ReactMarkdown>
-            ))}
+              </ReactMarkdown>;
+            })}
           </div>
         </div>
       )}

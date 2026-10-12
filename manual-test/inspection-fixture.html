@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BrowserOnly 巡检测试列表</title>
+  <style>
+    body { margin: 0; padding: 32px; color: #24313a; font: 14px/1.5 system-ui, sans-serif; background: #f5f7f8; }
+    main { max-width: 960px; margin: auto; padding: 24px; background: white; border: 1px solid #dbe2e6; border-radius: 12px; }
+    h1 { margin-top: 0; font-size: 20px; } p { color: #64717a; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; } th, td { padding: 12px; border-bottom: 1px solid #e7ecef; text-align: left; }
+    th { background: #f1f4f5; } a { color: #315a78; } button { margin-top: 18px; padding: 8px 12px; border: 1px solid #9eabb3; border-radius: 6px; background: white; cursor: pointer; }
+    .hint { padding: 10px 12px; border-radius: 7px; background: #eef5f8; color: #315a78; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>BrowserOnly 巡检测试列表</h1>
+    <p class="hint">这是本地测试数据，不会提交到任何后台。用 BrowserOnly 创建“Inspection & summary”任务即可。</p>
+    <p>当前页是第 <strong id="page-number">1</strong> 页。第一页有 10 条记录，第二页保留少量记录用于测试分页和增量对比。</p>
+    <table id="support-tickets">
+      <thead><tr><th>工单号</th><th>客户等级</th><th>最后响应时间</th><th>状态</th><th>详情</th></tr></thead>
+      <tbody id="ticket-rows"></tbody>
+    </table>
+    <button id="next-page" type="button">下一页</button>
+  </main>
+  <script>
+    const pages = [
+      [
+        ['T-1001', 'VIP', '2026-10-05', '待跟进', 'ticket-1001'],
+        ['T-1002', 'Standard', '2026-10-08', '已回复', 'ticket-1002'],
+        ['T-1003', 'Premium', '2026-10-04', '待跟进', 'ticket-1003'],
+        ['T-1004', 'VIP', '2026-10-09', '新建', 'ticket-1004'],
+        ['T-1005', 'Premium', '2026-10-03', '待跟进', 'ticket-1005'],
+        ['T-1006', 'Standard', '2026-10-07', '待跟进', 'ticket-1006'],
+        ['T-1007', 'VIP', '2026-10-02', '待跟进', 'ticket-1007'],
+        ['T-1008', 'Premium', '2026-10-08', '已回复', 'ticket-1008'],
+        ['T-1009', 'Standard', '2026-10-01', '待跟进', 'ticket-1009'],
+        ['T-1010', 'VIP', '2026-10-06', '待跟进', 'ticket-1010'],
+      ],
+      [
+        ['T-1011', 'Premium', '2026-09-30', '待跟进', 'ticket-1011'],
+        ['T-1012', 'VIP', '2026-09-29', '待跟进', 'ticket-1012'],
+      ],
+    ];
+    let page = 0;
+    const rows = document.querySelector('#ticket-rows');
+    const pageNumber = document.querySelector('#page-number');
+    const next = document.querySelector('#next-page');
+    function render() {
+      pageNumber.textContent = String(page + 1);
+      rows.innerHTML = pages[page].map(([id, level, lastResponse, status, slug]) => `<tr><td>${id}</td><td>${level}</td><td>${lastResponse}</td><td>${status}</td><td><a href="/manual-test/${slug}.html">打开工单</a></td></tr>`).join('');
+      next.disabled = page === pages.length - 1;
+    }
+    next.addEventListener('click', () => { if (page < pages.length - 1) { page += 1; render(); } });
+    render();
+  </script>
+</body>
+</html>

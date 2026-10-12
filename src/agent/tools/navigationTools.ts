@@ -12,7 +12,7 @@ export const browserNavigate: ToolFactory = (page: Page) =>
       try {
         return await withActivePage(page, async (activePage) => {
           // Navigate to the URL
-          await activePage.goto(url);
+          await activePage.goto(url, { waitUntil: "domcontentloaded", timeout: 10000 });
           
           // Get the tab ID and title after navigation
           try {
@@ -21,19 +21,19 @@ export const browserNavigate: ToolFactory = (page: Page) =>
             
             // Send a message to update the UI with the new tab title
             if (tabId) {
-              chrome.runtime.sendMessage({
+              void Promise.resolve(chrome.runtime.sendMessage({
                 action: 'tabTitleChanged',
                 tabId: tabId,
                 title: newTitle
-              });
+              })).catch(error => console.debug('Navigation UI notification was not delivered:', error));
               console.log(`Sent tabTitleChanged message for tab ${tabId} with title "${newTitle}" after navigation to ${url}`);
               
               // Also send a targetChanged message
-              chrome.runtime.sendMessage({
+              void Promise.resolve(chrome.runtime.sendMessage({
                 action: 'targetChanged',
                 tabId: tabId,
                 url: url
-              });
+              })).catch(error => console.debug('Navigation UI notification was not delivered:', error));
             }
           } catch (titleError) {
             console.error("Error updating UI after navigation:", titleError);

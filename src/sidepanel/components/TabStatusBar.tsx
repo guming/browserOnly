@@ -24,22 +24,13 @@ export const TabStatusBar: React.FC<TabStatusBarProps> = ({
       sendResponse: (response?: any) => void
     ) => {
       // Ignore messages from other extensions
-      if (sender.id !== chrome.runtime.id) {
-        return;
+      if (sender.id !== chrome.runtime.id || message.tabId !== tabId || message.action !== 'targetChanged' || !message.url) {
+        return false;
       }
-      
-      // Only process messages for our tab
-      if (message.tabId !== tabId) {
-        return;
-      }
-      
-      // Update URL based on message type
-      if (message.action === 'targetChanged' && message.url) {
-        setTabUrl(message.url);
-        sendResponse({ received: true });
-      }
-      
-      return true;
+
+      setTabUrl(message.url);
+      sendResponse({ received: true });
+      return false;
     };
     
     // Add the message listener

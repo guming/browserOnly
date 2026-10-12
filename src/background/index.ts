@@ -1,9 +1,8 @@
 import { MemoryService } from '../tracking/memoryService';
-import { setupMessageListeners, translateSelectionForTab } from './messageHandler';
+import { setupMessageListeners } from './messageHandler';
 import { putPendingAction } from '../actions';
 import { cleanupOnUnload, setupTabListeners } from './tabManager';
 import { logWithTimestamp } from './utils';
-import { ConfigManager } from './configManager';
 import { setupMonitoring } from '../monitoring/backgroundIntegration';
 
 /**
@@ -164,7 +163,8 @@ function setupEventListeners(): void {
     }
   });
 
-  chrome.runtime.onInstalled.addListener(() => {
+  chrome.runtime.onInstalled.addListener(async () => {
+    await chrome.contextMenus.removeAll();
     chrome.contextMenus.create({ id: 'browserOnlyRoot', title: 'BrowserOnly', contexts: ['page', 'selection'] });
     chrome.contextMenus.create({
       id: "copyToPrompt",
@@ -178,6 +178,8 @@ function setupEventListeners(): void {
     chrome.contextMenus.create({ id: 'extractPage', title: 'Extract structured data', contexts: ['page'], parentId: 'browserOnlyRoot' });
     chrome.contextMenus.create({ id: 'translateSelection', title: 'Translate selection', contexts: ['selection'], parentId: 'browserOnlyRoot' });
     chrome.contextMenus.create({ id: 'translatePage', title: 'Translate this page', contexts: ['page'], parentId: 'browserOnlyRoot' });
+    chrome.contextMenus.create({ id: 'runWorkflowSelection', title: 'Run workflow…', contexts: ['selection'], parentId: 'browserOnlyRoot' });
+    chrome.contextMenus.create({ id: 'runWorkflowPage', title: 'Run workflow…', contexts: ['page'], parentId: 'browserOnlyRoot' });
   });
 
   chrome.contextMenus.onClicked.addListener(async (info, tab) => {
@@ -194,26 +196,11 @@ function setupEventListeners(): void {
         chrome.sidePanel.open({ tabId: tab.id });
       }
     }
-    if (info.menuItemId === 'translateSelection' && tab?.id && info.selectionText) {
-      const settings = await ConfigManager.getInstance().getTranslationSettings();
-      await translateSelectionForTab(tab.id, {
-        action: 'translateSelection',
-        text: info.selectionText,
-        requestId: `${Date.now()}`,
-        targetLanguage: settings.targetLanguage,
-        engine: 'auto',
-        style: 'natural',
-      });
-    }
-    const actionMap: Record<string, string> = { summarizeSelection: 'summarize', extractSelection: 'extract', summarizePage: 'summarize', extractPage: 'extract' };
+    const actionMap: Record<string, string> = { summarizeSelection: 'summarize', extractSelection: 'extract', summarizePage: 'summarize', extractPage: 'extract', translateSelection: 'translate', translatePage: 'translate', runWorkflowSelection: 'workflow-picker', runWorkflowPage: 'workflow-picker' };
     const actionId = actionMap[String(info.menuItemId)];
     if (actionId && tab?.id !== undefined) {
-      putPendingAction({ actionId, source: 'context_menu', tabId: tab.id, windowId: tab.windowId, pageUrl: tab.url, pageTitle: tab.title, selectionText: info.selectionText });
+      await putPendingAction({ actionId, source: 'context_menu', tabId: tab.id, windowId: tab.windowId, pageUrl: tab.url, pageTitle: tab.title, selectionText: info.selectionText, createdAt: Date.now() });
       await chrome.sidePanel.open({ tabId: tab.id });
-    }
-    if (info.menuItemId === 'translatePage' && tab?.id) {
-      const settings = await ConfigManager.getInstance().getTranslationSettings();
-      await chrome.runtime.sendMessage({ action: 'translatePage', tabId: tab.id, windowId: tab.windowId, mode: settings.translationMode, translateTitle: settings.translateTitle });
     }
   });
 

@@ -1,14 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import TextareaAutosize from 'react-textarea-autosize';
 import { BookPicker } from './BookPicker';
 import { ExpertPicker } from './ExpertPicker';
 import { MultiTabSelector, type TabInfo } from './MultiTabSelector';
 import { availableBooks } from './askBooksData';
 import { getExpert, type ExpertId } from './expertData';
-import { ActionRegistry, type ActionDefinition } from '../../actions';
+import { ActionRegistry, ActionResolver, createWorkflowActions, type ActionDefinition } from '../../actions';
+import { WorkflowStore } from '../../workflows/WorkflowStore';
 import { SlashCommandMenu } from './actions/SlashCommandMenu';
 import { ActionChip } from './actions/ActionChip';
 import type { ActionInvocation } from '../../actions';
+import { ExtractionSetupView } from './extraction/ExtractionSetupView';
 
 interface PromptFormProps {
   onSubmit: (prompt: string, role: string, selectedTabIds?: number[], contextMode?: AskContextMode) => void;
@@ -16,7 +18,7 @@ interface PromptFormProps {
   isProcessing: boolean;
   tabStatus: 'attached' | 'detached' | 'unknown' | 'running' | 'idle' | 'error';
   initialAction?: ActionInvocation;
-  onRunDirectAction?: (actionId: string) => boolean;
+  onRunDirectAction?: (actionId: string, invocation?: ActionInvocation) => boolean;
 }
 
 type ModeType = 'operator' | 'ask';
@@ -61,9 +63,12 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
   const [selectedTabIds, setSelectedTabIds] = useState<number[]>([]);
   const [selectedAction, setSelectedAction] = useState<ActionDefinition>();
   const [actionIndex, setActionIndex] = useState(0);
-  const registry = useMemo(() => new ActionRegistry(), []);
+  const [registry, setRegistry] = useState(() => new ActionRegistry());
+  const [showSlashHint, setShowSlashHint] = useState(false);
+  const consumedInvocation = useRef('');
   const actionResults = useMemo(() => prompt.startsWith('/') ? registry.search(prompt, { hasPage: tabStatus !== 'detached', comparableTabCount: selectedTabIds.length }) : [], [prompt, registry, selectedTabIds.length, tabStatus]);
-  useEffect(() => { if (initialAction) { const action = registry.get(initialAction.actionId); if (action) setSelectedAction(action); } }, [initialAction, registry]);
+  useEffect(() => { if (initialAction) { const key = `${initialAction.source}:${initialAction.actionId}:${initialAction.windowId}:${initialAction.tabId}:${initialAction.createdAt ?? ''}:${initialAction.selectionText ?? ''}`; if (consumedInvocation.current === key) return; try { const resolution = new ActionResolver(registry).resolve(initialAction); consumedInvocation.current = key; if (resolution.type === 'direct' && onRunDirectAction?.(resolution.definition.id, initialAction)) { chrome.storage.local.set({ browserOnlySlashHint: { focusHintCount: 3, hasCompletedSlashAction: true } }); return; } setSelectedAction(resolution.definition); } catch (error) { console.warn('Unable to resolve action invocation', error); } } }, [initialAction, onRunDirectAction, registry]);
+  useEffect(() => { WorkflowStore.getInstance().listWorkflows().then(workflows => { const next = new ActionRegistry(); createWorkflowActions(workflows).forEach(action => next.register(action)); setRegistry(next); }).catch(() => undefined); }, []);
 
   const selectedBook = useMemo(
     () => availableBooks.find(book => book.id === selectedBookId) ?? availableBooks[0],
@@ -111,6 +116,7 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
     }
     setPrompt('');
     setSelectedAction(undefined);
+    if (selectedAction) chrome.storage.local.set({ browserOnlySlashHint: { focusHintCount: 3, hasCompletedSlashAction: true } });
   };
 
   const handleTabsSelected = (tabs: TabInfo[]) => {
@@ -321,7 +327,9 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
 
       <div className={mode === 'ask' ? 'mt-1' : 'mt-3'}>
         {tabStatus === 'detached' && <p className="mb-2 text-xs text-red-700" role="status">Tab connection lost. Refresh the tab to continue.</p>}
+        {(selectedAction?.id === 'extract' || selectedAction?.id === 'extract-table') && <div className="mb-3 rounded-lg border border-stone-200 p-3"><ExtractionSetupView onRun={request => { onSubmit(`${selectedAction.id === 'extract-table' ? 'Discover a repeated table or list, show the extraction plan, and then extract' : 'Extract structured data'} using this confirmed request:\n${JSON.stringify(request)}`, 'operator'); setSelectedAction(undefined); setPrompt(''); chrome.storage.local.set({ browserOnlySlashHint: { focusHintCount: 3, hasCompletedSlashAction: true } }); }} /></div>}
         <div className="relative rounded-[11px] border border-stone-300 bg-white transition-[border-color,box-shadow] duration-150 focus-within:border-[#315a78] focus-within:ring-2 focus-within:ring-[#315a78]/10">
+          {showSlashHint && !selectedAction && <p className="px-3 pt-2 text-xs text-stone-500">Tip: Type / to choose a quick action</p>}
           {selectedAction && <ActionChip label={selectedAction.name} onRemove={() => setSelectedAction(undefined)} />}
           <SlashCommandMenu actions={actionResults} activeIndex={actionIndex} onSelect={action => { setSelectedAction(action); setPrompt(''); setActionIndex(0); }} />
           <TextareaAutosize
@@ -332,6 +340,7 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
             maxRows={isAskExpanded ? 12 : 6}
             minRows={mode === 'ask' && isAskExpanded ? 6 : 1}
             onChange={event => setPrompt(event.target.value)}
+            onFocus={() => { chrome.storage.local.get({ browserOnlySlashHint: { focusHintCount: 0, hasCompletedSlashAction: false } }).then(result => { const state = result?.browserOnlySlashHint ?? { focusHintCount: 0, hasCompletedSlashAction: false }; if (state.hasCompletedSlashAction || state.focusHintCount >= 3) return setShowSlashHint(false); setShowSlashHint(true); chrome.storage.local.set({ browserOnlySlashHint: { ...state, focusHintCount: state.focusHintCount + 1 } }); }).catch(() => undefined); }}
             onKeyDown={event => {
               if (actionResults.length) {
                 if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setActionIndex(index => (index + (event.key === 'ArrowDown' ? 1 : -1) + actionResults.length) % actionResults.length); return; }
@@ -375,7 +384,7 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
                 Cancel
               </button>
             ) : (
-              <button className="min-h-8 rounded-md bg-[#315a78] px-3 text-xs font-semibold text-white transition-colors duration-150 hover:bg-[#274a64] active:scale-96 disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transform-none" disabled={(!prompt.trim() && role !== 'notebooklm') || tabStatus === 'detached'} type="submit">
+              <button className="min-h-8 rounded-md bg-[#315a78] px-3 text-xs font-semibold text-white transition-colors duration-150 hover:bg-[#274a64] active:scale-96 disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transform-none" disabled={(!prompt.trim() && !selectedAction && role !== 'notebooklm') || tabStatus === 'detached'} type="submit">
                 {role === 'notebooklm' ? 'Generate' : 'Send'}
               </button>
             )}
