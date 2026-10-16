@@ -32,6 +32,7 @@ export interface ExtractionPlan {
 }
 
 export interface ExtractionResult {
+  pagesRead?: number;
   fields: ExtractionField[];
   rows: Array<Record<string, unknown>>;
   sourceUrls: string[];

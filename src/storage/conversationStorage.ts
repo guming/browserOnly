@@ -3,15 +3,7 @@
  * Manages conversation history persistence based on tab URLs
  */
 
-interface Message {
-  type: 'system' | 'llm' | 'screenshot';
-  content: string;
-  imageData?: string;
-  mediaType?: string;
-  isComplete?: boolean;
-  segmentId?: number;
-  isStreaming?: boolean;
-}
+import type { Message } from '../sidepanel/types';
 
 interface StreamingSegment {
   id: number;

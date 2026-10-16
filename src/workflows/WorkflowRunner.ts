@@ -3,6 +3,7 @@ import type { BrowserTool } from '../agent/tools/types';
 import type { WorkflowAssertion, WorkflowRun, WorkflowStep, WorkflowStepRun, WorkflowVersion } from './types';
 import { WorkflowStore } from './WorkflowStore';
 import { requestApproval } from '../agent/approvalManager';
+import { resultSummaryFromStep } from './runPresentation';
 
 export interface WorkflowRunnerCallbacks {
   onStepStart?: (step: WorkflowStep) => void;
@@ -15,7 +16,7 @@ export interface WorkflowRunnerOptions {
   variables?: Record<string, unknown>;
   allowedDomains?: string[];
   callbacks?: WorkflowRunnerCallbacks;
-  context?: { tabId?: number; windowId?: number; ownerTabId?: number; runId?: string; cancelReason?: string };
+  context?: { tabId?: number; windowId?: number; ownerTabId?: number; runId?: string; cancelReason?: string; scheduled?: boolean };
   runner?: WorkflowRunner;
   pageRef?: { current: any };
   onPageHandoff?: (page: any, tabId?: number) => void;
@@ -38,6 +39,7 @@ export class WorkflowRunner {
       id: `run-${crypto.randomUUID()}`,
       workflowId,
       versionId: version.id,
+      source: options.context?.scheduled ? 'schedule' : 'manual',
       status: 'running',
       startedAt: Date.now(),
       llmCalls: 0,
@@ -95,6 +97,7 @@ export class WorkflowRunner {
           ? options.pageRef.current.context().pages()
           : undefined;
         if ((step.risk === 'write' || step.risk === 'irreversible') && options.context?.tabId) {
+          if (options.context.scheduled) throw new Error('APPROVAL_REQUIRED: Run this task manually to review and approve its actions.');
           const approved = await requestApproval(
             options.context.tabId,
             step.toolName,
@@ -120,10 +123,11 @@ export class WorkflowRunner {
           }
           const candidate = candidates[index % candidates.length];
           try {
-            const toolContext = step.toolName === 'browser_inspect_office_table' ? {
+            const toolContext = ['browser_inspect_office_table', 'browser_extract_structured'].includes(step.toolName!) ? {
               signal: this.abortController.signal,
               onProgress: async (output: string) => {
-                stepRun.officeReport = JSON.parse(output);
+                if (step.toolName === "browser_inspect_office_table") stepRun.officeReport = JSON.parse(output);
+                else stepRun.extractionResult = JSON.parse(output);
                 await this.store.saveStepRun(stepRun);
               },
             } : undefined;
@@ -197,6 +201,7 @@ export class WorkflowRunner {
         if (!result && lastError) throw lastError;
         if (/^error\b|^Action cancelled/i.test(result.trim())) throw new Error(result);
         if (this.cancelled) throw new Error('Workflow cancelled');
+        if (step.toolName === 'browser_extract_structured') stepRun.extractionResult = JSON.parse(result);
         if (step.toolName === 'browser_inspect_office_table') {
           stepRun.officeReport = JSON.parse(result);
           await this.store.saveStepRun(stepRun);
@@ -226,6 +231,7 @@ export class WorkflowRunner {
         stepRun.status = 'succeeded';
         stepRun.endedAt = Date.now();
         await this.store.saveStepRun(stepRun);
+        run.resultSummary = resultSummaryFromStep(stepRun) ?? run.resultSummary;
         options.callbacks?.onStepEnd?.(step, result);
         previousResult = result;
       }

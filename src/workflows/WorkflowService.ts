@@ -6,6 +6,7 @@ import { getAllTools } from '../agent/tools';
 import { WorkflowRunner, WorkflowRunnerOptions } from './WorkflowRunner';
 import type { WorkflowRun, WorkflowVersion } from './types';
 import { extractionRequestSchema, validateExtractionResult } from '../extraction/extractionSchema';
+import { extractPaginatedRecords } from '../extraction/paginatedExtractor';
 import { toCsv, toJson } from '../extraction/exporters';
 import { preferProvidedPageForTools, retryAfterNavigation } from '../agent/tools/utils';
 import { proposeQuerySelector } from './WorkflowQueryRepair';
@@ -13,6 +14,8 @@ import { WorkflowStore } from './WorkflowStore';
 import { ConfigManager } from '../background/configManager';
 import { createProvider } from '../models/providers/factory';
 import { createOfficeInspectionTool } from '../office/inspectionTool';
+import { discoverOfficeTables } from '../office/pageReader';
+import { autoRecordRequest } from '../extraction/autoRecordPlan';
 
 const WORKFLOW_MAX_RETURN_CHARS = 20_000;
 
@@ -139,8 +142,13 @@ export class WorkflowService {
     tools.push({
       name: 'browser_extract_structured',
       description: 'Extract user-confirmed fields from a table, semantic list, or repeated cards into standard JSON.',
-      func: async (input: string) => withStablePageRead(async currentPage => {
-        const request = extractionRequestSchema.parse(parseToolInput(input));
+      func: async (input: string, context) => withStablePageRead(async currentPage => {
+        const rawInput = parseToolInput(input);
+        const request = extractionRequestSchema.parse(rawInput && typeof rawInput === 'object' && !Array.isArray(rawInput) && (rawInput as { autoDiscover?: boolean }).autoDiscover === true
+          ? autoRecordRequest(await currentPage.evaluate(discoverOfficeTables))
+          : rawInput);
+        const readPage = async () => {
+        if (context?.signal?.aborted) throw new Error("Extraction cancelled.");
         const candidates = ['table tbody tr', 'table tr', '[role="grid"] [role="row"]', '[role="list"] > [role="listitem"]', 'ul > li', 'ol > li', 'main article', '[class*="card"]'];
         let selector = request.plan?.itemSelector ?? request.plan?.listSelector ?? '';
         if (selector && await currentPage.locator(selector).count() < 2) throw new Error('Saved extraction plan no longer matches at least two records; reconfigure the extraction');
@@ -150,9 +158,10 @@ export class WorkflowService {
         const locator = selector ? currentPage.locator(selector) : currentPage.locator('body');
         const count = Math.min(await locator.count(), request.maxRows);
         const values: Array<Record<string, unknown>> = [];
+        const recordUrls: Array<string | null> = [];
         for (let index = selector === 'table tr' ? 1 : 0; index < count; index += 1) {
           const item = locator.nth(index);
-          const cells = selector.startsWith('table') ? await item.locator('th,td').allInnerTexts() : [];
+          const cells = request.plan?.sourceKind === 'table' || selector.startsWith('table') ? await item.locator('th,td').allInnerTexts() : [];
           const text = (await item.innerText()).trim();
           const parts = cells.length ? cells : text.split(/\s{2,}|\t|\n/).map(value => value.trim()).filter(Boolean);
           const entries: Array<[string, unknown]> = [];
@@ -163,13 +172,64 @@ export class WorkflowService {
             if (planned?.selector) { const target = item.locator(planned.selector).first(); value = await target.count() ? (field.type === 'url' ? await target.getAttribute('href') : await target.innerText()) : null; }
             entries.push([field.key, value]);
           }
+          const urls = await item.evaluate((element: Element) => {
+            const anchors = [...element.querySelectorAll<HTMLAnchorElement>('a[href]')];
+            if (element.matches('a[href]')) anchors.unshift(element as HTMLAnchorElement);
+            return [...new Set(anchors.flatMap(link => {
+              try {
+                const url = new URL(link.getAttribute('href')!, document.baseURI);
+                const isDownload = /\.(pdf|csv|xlsx?|docx?|pptx?|zip|txt)$/i.test(url.pathname) || link.hasAttribute('download');
+                return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password && !isDownload ? [url.href] : [];
+              } catch { return []; }
+            }))];
+          });
+          const recordUrl = (urls as string[]).length === 1 ? (urls as string[])[0] : null;
+          recordUrls.push(recordUrl);
+          for (const entry of entries) {
+            if (request.fields.find(field => field.key === entry[0])?.type !== 'url') continue;
+            try {
+              const url = new URL(String(entry[1]), currentPage.url());
+              entry[1] = typeof entry[1] === 'string' && /^(https?:|\/|\.\.?\/)/.test(entry[1]) && /^https?:$/.test(url.protocol) ? url.href : recordUrl;
+            } catch { entry[1] = recordUrl; }
+          }
           values.push(Object.fromEntries(entries));
         }
         if ((await locator.count()) > request.maxRows) warnings.push(`Result limited to ${request.maxRows} rows`);
-        const unique = [...new Map(values.map(row => [JSON.stringify(row), row])).values()];
+        const hasUrlField = request.fields.some(field => field.type === 'url' || field.key === 'source_url');
+        const fields = !hasUrlField
+          ? [...request.fields, { key: 'source_url', label: 'URL', type: 'url' as const }]
+          : request.fields;
+        if (recordUrls.some(url => !url)) warnings.push('Some records have no unique detail link. Select a detail-link field or check the source page.');
+        const rowsWithUrls = values.map((row, index) => hasUrlField ? row : { ...row, ...(fields.length > request.fields.length ? { source_url: recordUrls[index] } : {}) });
+        const unique = [...new Map(rowsWithUrls.map(row => [JSON.stringify(row), row])).values()];
         if (unique.length < values.length) warnings.push(`${values.length - unique.length} duplicate records were removed`);
-        const result = validateExtractionResult({ fields: request.fields, rows: unique, sourceUrls: [currentPage.url()], warnings, generatedAt: new Date().toISOString(), plan: request.plan });
+        const result = validateExtractionResult({ fields, rows: unique, sourceUrls: [currentPage.url()], warnings, generatedAt: new Date().toISOString(), plan: request.plan });
         if (request.plan && (result.completeness ?? 0) < 0.8) throw new Error('Saved extraction plan field coverage fell below 80%; reconfigure the extraction');
+        return result;
+        };
+        const result = await extractPaginatedRecords(request.plan?.maxPages ?? 1, readPage, async () => {
+          if (context?.signal?.aborted) throw new Error("Extraction cancelled.");
+          const origin = new URL(currentPage.url()).origin;
+          const selector = request.plan?.nextSelector;
+          if (!selector) throw new Error('Choose a next-page control before collecting multiple pages.');
+          const next = currentPage.locator(selector);
+          if (await next.count() !== 1) throw new Error('Next-page control is missing or ambiguous.');
+          if (await next.getAttribute('aria-disabled') === 'true' || await next.getAttribute('disabled') !== null) return false;
+          const before = await currentPage.locator(request.plan!.itemSelector ?? request.plan!.listSelector).allInnerTexts();
+          const href = await next.getAttribute('href');
+          if (href && new URL(href, currentPage.url()).origin !== origin) throw new Error('Pagination must stay on the original site.');
+          await next.click();
+          let stable = '';
+          for (let poll = 0; poll < 20; poll++) {
+            if (context?.signal?.aborted) throw new Error("Extraction cancelled.");
+            await new Promise(resolve => setTimeout(resolve, 500));
+            if (new URL(currentPage.url()).origin !== origin) throw new Error('Pagination left the original site.');
+            const text = JSON.stringify(await currentPage.locator(request.plan!.itemSelector ?? request.plan!.listSelector).allInnerTexts());
+            if (text !== JSON.stringify(before) && text === stable) return true;
+            stable = text;
+          }
+          throw new Error('The next page did not load or the records did not change.');
+        }, request.maxRows);
         return JSON.stringify(result);
       }),
     });

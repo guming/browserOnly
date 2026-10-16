@@ -1,3 +1,4 @@
+import { WorkflowScheduleControl } from './WorkflowScheduleControl';
 import React, { useEffect, useState } from 'react';
 import { WorkflowStore, createBlankWorkflow } from '../../workflows';
 import type { Workflow } from '../../workflows';
@@ -10,7 +11,7 @@ import type { WorkflowVersion } from '../../workflows/types';
 
 interface RunTarget { workflow: Workflow; transientVersion?: WorkflowVersion }
 
-export function WorkflowListView({ onRunStarted }: { onRunStarted?: () => void } = {}) {
+export function WorkflowListView({ onRunStarted, initialWorkflowId, initialMode }: { onRunStarted?: () => void; initialWorkflowId?: string; initialMode?: 'run' } = {}) {
   const [officeMode, setOfficeMode] = useState<'inspection' | 'archive' | null>(null);
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [selectedWorkflow, setSelectedWorkflow] = useState<Workflow | null>(null);
@@ -26,6 +27,17 @@ export function WorkflowListView({ onRunStarted }: { onRunStarted?: () => void }
     setSelectedWorkflow(candidate.workflow);
   };
   useEffect(() => { WorkflowStore.getInstance().listWorkflows().then(setWorkflows).catch(() => setWorkflows([])); }, []);
+  useEffect(() => {
+    if (!initialWorkflowId) return;
+    let cancelled = false;
+    void WorkflowStore.getInstance().getWorkflow(initialWorkflowId).then(workflow => {
+      if (!cancelled && workflow) {
+        if (initialMode === 'run') setRunTarget({ workflow });
+        else setSelectedWorkflow(workflow);
+      }
+    }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [initialWorkflowId, initialMode]);
   const exportWorkflow = async (workflow: Workflow) => {
     const version = await WorkflowStore.getInstance().getVersion(workflow.activeVersionId);
     const blob = new Blob([JSON.stringify({ workflow, version }, null, 2)], { type: 'application/json' });
@@ -58,6 +70,7 @@ export function WorkflowListView({ onRunStarted }: { onRunStarted?: () => void }
       {visibleWorkflows.length === 0 ? <div className="rounded-xl border border-dashed border-stone-300 bg-stone-50 p-5"><p className="text-sm font-medium text-stone-800">No automations yet</p><p className="mt-1 text-xs leading-5 text-stone-500">Complete a task, then choose “Remember this task” to save it here.</p><button type="button" onClick={createWorkflow} className="mt-3 text-xs font-semibold text-[#315a78] hover:underline">Create a starter automation →</button></div> : visibleWorkflows.map(workflow => (
         <div key={workflow.id} className="rounded-xl border border-stone-200 bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-shadow hover:shadow-sm">
           <div className="flex items-start justify-between gap-3"><button type="button" onClick={() => setSelectedWorkflow(workflow)} className="min-w-0 flex-1 text-left"><div className="truncate text-sm font-semibold text-stone-900">{workflow.name}</div><div className="mt-1 truncate text-xs text-stone-500">{workflow.triggerDomains.join(', ') || 'Current webpage'} · {workflow.status === 'candidate' ? 'Candidate · expires in 24h' : workflow.status === 'draft' ? 'Needs review' : 'Ready to run'}</div></button>{workflow.status === 'candidate' ? <button type="button" onClick={() => setSelectedWorkflow(workflow)} className="shrink-0 rounded-md border border-[#315a78] px-2.5 py-1.5 text-xs font-semibold text-[#315a78]">Review</button> : <button type="button" onClick={() => setRunTarget({ workflow })} className="shrink-0 rounded-md bg-[#315a78] px-2.5 py-1.5 text-xs font-semibold text-white">Run</button>}</div>
+          <WorkflowScheduleControl workflow={workflow} onUpdated={updated => setWorkflows(current => current.map(item => item.id === updated.id ? updated : item))} />
           <div className="mt-3 flex items-center gap-3 border-t border-stone-100 pt-2 text-[11px] text-stone-500"><button type="button" onClick={() => setSelectedWorkflow(workflow)} className="hover:text-stone-900">Edit</button><button type="button" onClick={() => duplicateWorkflow(workflow)} className="hover:text-stone-900">Duplicate</button><button type="button" onClick={() => exportWorkflow(workflow)} className="hover:text-stone-900">Export</button><button type="button" onClick={() => archiveWorkflow(workflow)} className="ml-auto hover:text-red-600">Archive</button></div>
         </div>
       ))}
@@ -67,6 +80,12 @@ export function WorkflowListView({ onRunStarted }: { onRunStarted?: () => void }
 }
 
 function RunDialog({ workflow, transientVersion, onClose, onRunStarted }: { workflow: Workflow; transientVersion?: WorkflowVersion; onClose: () => void; onRunStarted?: () => void }) {
+  const [version, setVersion] = useState(transientVersion);
+  useEffect(() => {
+    let cancelled = false;
+    if (!transientVersion) void WorkflowStore.getInstance().getVersion(workflow.activeVersionId).then(value => { if (!cancelled) setVersion(value); }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [workflow.activeVersionId, transientVersion]);
   const run = async (runValues: Record<string, unknown>) => {
     const missing = workflow.variables.filter(variable => variable.required && !String(runValues[variable.key] ?? '').trim());
     if (missing.length) return;
@@ -79,5 +98,7 @@ function RunDialog({ workflow, transientVersion, onClose, onRunStarted }: { work
     });
   };
   const newTab = (workflow.executionMode ?? 'current_tab') === 'new_tab';
-  return <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/20 p-4"><div className="w-full max-w-sm rounded-xl border border-stone-200 bg-white p-4 shadow-xl"><div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold text-stone-900">Run {workflow.name}</h3><button type="button" onClick={onClose} className="text-stone-400">×</button></div><p className="mb-4 rounded-md bg-stone-50 px-3 py-2 text-xs text-stone-600">{newTab ? `This automation will open and operate in a new tab${workflow.startUrl ? `: ${workflow.startUrl}` : '.'}` : 'This automation will operate in the current tab.'}</p><RunSetupView workflow={workflow} onRun={nextValues => run(nextValues)} /></div></div>;
+  const entry = version?.entryContext;
+  const description = entry?.kind === 'standalone' ? 'This task starts independently in a new tab.' : entry?.kind === 'current_page' ? 'This task starts on the current webpage.' : newTab ? `This task opens a new tab${entry?.kind === 'url' || workflow.startUrl ? `: ${entry?.kind === 'url' ? entry.url : workflow.startUrl}` : '.'}` : 'This task runs in the current tab.';
+  return <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/20 p-4"><div className="w-full max-w-sm rounded-xl border border-stone-200 bg-white p-4 shadow-xl"><div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold text-stone-900">Run {workflow.name}</h3><button type="button" onClick={onClose} className="text-stone-400">×</button></div><p className="mb-4 rounded-md bg-stone-50 px-3 py-2 text-xs text-stone-600">{description}{version?.runStrategy === 'goal' && <span className="mt-1 block">The agent plans new steps from the saved goal.</span>}</p><RunSetupView workflow={workflow} onRun={nextValues => run(nextValues)} /></div></div>;
 }

@@ -6,12 +6,13 @@ interface Props { workflow: Workflow; onRun: (variables: Record<string, unknown>
 export function RunSetupView({ workflow, onRun }: Props) {
   const variables: WorkflowVariable[] = workflow.variables ?? [];
   const [values, setValues] = useState<Record<string, unknown>>(() => Object.fromEntries(variables.map(variable => [variable.key, variable.type === 'secret' ? '' : variable.defaultValue ?? ''])));
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
   const errors = useMemo(() => Object.fromEntries(variables.map(variable => [variable.key, validate(variable, values[variable.key])]).filter(([, error]) => error)), [variables, values]);
-  const set = (key: string, value: unknown) => setValues(current => ({ ...current, [key]: value }));
+  const set = (key: string, value: unknown) => { setValues(current => ({ ...current, [key]: value })); setTouched(current => ({ ...current, [key]: true })); };
   return <section aria-label="Run setup" className="space-y-3">
     <h2 className="text-sm font-semibold text-slate-900">Run workflow</h2>
     <div className="space-y-3">
-      {variables.map(variable => <div key={variable.key}><VariableField variable={variable} value={values[variable.key]} onChange={value => set(variable.key, value)} />{errors[variable.key] && <p role="alert" className="text-xs text-red-700">{errors[variable.key]}</p>}</div>)}
+      {variables.map(variable => <div key={variable.key}><VariableField variable={variable} value={values[variable.key]} onChange={value => set(variable.key, value)} />{variable.type === 'fields' && !touched[variable.key] && <p className="mt-1 text-xs text-stone-500">Enter the columns to extract, one per line. For example: Title, Author, Date.</p>}{touched[variable.key] && errors[variable.key] && <p role="alert" className="mt-1 text-xs text-red-700">{errors[variable.key]}</p>}</div>)}
     </div>
     <button
       type="button"

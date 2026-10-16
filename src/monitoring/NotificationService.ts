@@ -4,6 +4,17 @@ import type { Monitor, MonitorDiff } from './types';
 const truncate = (value: string, length = 100) => value.length > length ? `${value.slice(0, length - 1)}…` : value;
 
 export async function notifyMonitorChange(monitor: Monitor, diff: MonitorDiff): Promise<void> {
+  if (monitor.kind === 'page_text' && (diff.addedText?.length || diff.removedText?.length)) {
+    const changes = [
+      diff.removedText?.length ? `Removed: ${truncate(diff.removedText.join(' '))}` : '',
+      diff.addedText?.length ? `Added: ${truncate(diff.addedText.join(' '))}` : '',
+    ].filter(Boolean);
+    await chrome.notifications.create(`monitor-diff:${diff.id}`, {
+      type: 'basic', iconUrl: 'icons/icon128.png', title: `${monitor.name} changed`,
+      message: changes.join(' | '),
+    });
+    return;
+  }
   const before = truncate(valueText(diff.previousValue));
   const after = truncate(valueText(diff.currentValue));
   await chrome.notifications.create(`monitor-diff:${diff.id}`, {

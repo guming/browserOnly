@@ -16,6 +16,9 @@ const MAX_OUTPUT_TOKENS = 1024;  // max tokens for LLM response
  * Callback interface for execution
  */
 export interface ExecutionCallbacks {
+  executionContext?: { runId: string; workflowId: string; tabId: number; ownerTabId: number; windowId: number; scheduled?: boolean };
+  onExecutionEnd?: (status: 'completed' | 'cancelled' | 'failed', error?: string) => void;
+  onModelUsage?: (inputTokens: number, outputTokens: number) => void;
   onLlmChunk?: (s: string) => void;
   onLlmOutput: (s: string) => void;
   onToolOutput: (s: string) => void;
@@ -47,6 +50,9 @@ class CallbackAdapter {
       onLlmOutput: this.originalCallbacks.onLlmOutput,
       onToolOutput: this.originalCallbacks.onToolOutput,
       onComplete: this.handleComplete.bind(this),
+      executionContext: this.originalCallbacks.executionContext,
+      onExecutionEnd: this.originalCallbacks.onExecutionEnd,
+      onModelUsage: this.originalCallbacks.onModelUsage,
       onError: this.originalCallbacks.onError,
       onToolStart: this.originalCallbacks.onToolStart,
       onToolEnd: this.originalCallbacks.onToolEnd,
@@ -434,6 +440,7 @@ export class ExecutionEngine {
     accumulatedText = this.normalizeToolCallMarkup(accumulatedText);
     console.log("Decoded HTML entities in accumulated text");
 
+    adaptedCallbacks.onModelUsage?.(inputTokens, outputTokens);
     adaptedCallbacks.onLlmOutput(accumulatedText);
 
     return { accumulatedText, toolCallDetected };
@@ -658,16 +665,18 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
           };
 
           if (requiresApproval) {
+            if (adaptedCallbacks.executionContext?.scheduled) throw new Error('APPROVAL_REQUIRED: Run this task manually to review and approve its actions.');
             // Notify the user that approval is required
             adaptedCallbacks.onToolOutput(`⚠️ This action requires approval: ${reason}`);
 
             // Get the current tab ID from chrome.tabs API
-            const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-            const tabId = tabs[0]?.id || 0;
+            const scope = adaptedCallbacks.executionContext;
+            const tabId = scope?.tabId ?? (await chrome.tabs.query({ active: true, lastFocusedWindow: true }))[0]?.id ?? 0;
 
             try {
               // Request approval from the user
-              const approved = await requestApproval(tabId, toolName, toolInput, reason);
+              const approved = await requestApproval(tabId, toolName, toolInput, reason, scope?.windowId,
+                scope ? { runId: scope.runId, workflowId: scope.workflowId, executionTabId: scope.tabId, ownerTabId: scope.ownerTabId } : undefined);
 
               if (approved) {
                 // User approved, execute the tool
@@ -767,6 +776,7 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
           `Stopped: exceeded maximum of ${MAX_STEPS} steps.`
         );
       }
+      adaptedCallbacks.onExecutionEnd?.(this.errorHandler.isExecutionCancelled() ? 'cancelled' : step >= MAX_STEPS ? 'failed' : 'completed', step >= MAX_STEPS ? 'Maximum execution steps exceeded.' : undefined);
       adaptedCallbacks.onComplete();
     } catch (err: any) {
       // Check if this is a retryable error (rate limit or overloaded)
@@ -813,6 +823,7 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
           adaptedCallbacks.onLlmOutput(
             `Maximum retry attempts (${MAX_RETRY_ATTEMPTS}) exceeded. Please try again later.`
           );
+          adaptedCallbacks.onExecutionEnd?.('failed', 'Maximum retry attempts exceeded.');
           adaptedCallbacks.onComplete();
         } else {
           // In streaming mode, re-throw to trigger fallback
@@ -829,6 +840,7 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
           throw err;
         } else {
           // Only complete processing if we're not going to fallback
+          adaptedCallbacks.onExecutionEnd?.('failed', err instanceof Error ? err.message : String(err));
           adaptedCallbacks.onComplete();
         }
       }

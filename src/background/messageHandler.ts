@@ -1,21 +1,24 @@
+import { handleWorkflowSchedule } from '../workflows/schedulingIntegration';
 import { handleApprovalResponse } from '../agent/approvalManager';
 import { createProvider }  from '../models/providers/factory';
 import { consumePendingAction, putPendingAction } from '../actions';
 import { TokenTrackingService } from '../tracking/tokenTrackingService';
 import { executePrompt } from './agentController';
+import { getAgentStatus, setAgentStatus } from './agentController';
 import { cancelExecution } from './agentController';
 import { clearMessageHistory } from './agentController';
 import { initializeAgent } from './agentController';
 import { ConfigManager } from './configManager';
 import { triggerReflection } from './reflectionController';
 import { attachToTab, createWorkflowExecutionTab, getTabState, getWindowForTab, forceResetPlaywright } from './tabManager';
-import { BackgroundMessage, DownloadMarkdownMessage } from './types';
+import { AgentStatus, BackgroundMessage, DownloadMarkdownMessage } from './types';
 import { logWithTimestamp, handleError, sendUIMessage } from './utils';
 import { SimpleChatAgent } from '../agent/SimpleChatAgent';
 import { replayEntry } from '../workflows/WorkflowEntryResolver';
 import { WorkflowStore } from '../workflows/WorkflowStore';
 import { WorkflowService } from '../workflows/WorkflowService';
 import { WorkflowRunner } from '../workflows/WorkflowRunner';
+import { GoalWorkflowRunner } from '../workflows/GoalWorkflowRunner';
 import { translateBatch } from '../translation/translationService';
 import { TranslationQueue } from '../translation/translationQueue';
 import { createPageTranslationStartMessage, deliverTranslationBatchResult, sendToTranslationContentScript } from '../translation/translationContentScript';
@@ -26,8 +29,10 @@ import { handleOfficeRecord } from '../office/handledRecords';
 const translationQueue = new TranslationQueue((request, signal) => translateBatch(request, signal));
 const activeTranslationSessions = new Map<number, string>();
 
-const workflowRunners = new Map<string, { runner: WorkflowRunner; executionTabId?: number; ownerTabId: number; context?: { tabId?: number; windowId?: number; ownerTabId?: number; cancelReason?: string } }>();
-const workflowRunByExecutionTab = new Map<number, WorkflowRunner>();
+type TaskRunner = WorkflowRunner | GoalWorkflowRunner;
+const workflowRunners = new Map<string, { runner: TaskRunner; executionTabId?: number; ownerTabId: number; context?: { tabId?: number; windowId?: number; ownerTabId?: number; cancelReason?: string } }>();
+const workflowRunByExecutionTab = new Map<number, TaskRunner>();
+const runningWorkflowWindows = new Set<number>();
 /**
  * Handle messages from the UI
  * @param message The message to handle
@@ -41,6 +46,10 @@ export function handleMessage(
   sendResponse: (response?: any) => void
 ): boolean {
   try {
+    if (message.action === 'workflowSchedule') {
+      void handleWorkflowSchedule(message, sender).then(sendResponse).catch(error => sendResponse({ success: false, error: String(error) }));
+      return true;
+    }
     if (message.action === 'officeRecordHandled') {
       handleOfficeRecord(message).then(data => sendResponse({ success: true, data })).catch(error => sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) }));
       return true;
@@ -374,11 +383,13 @@ async function handleSelectionTranslation(
   }
 }
 
-async function handleRunWorkflow(
+export async function handleRunWorkflow(
   message: Extract<BackgroundMessage, { action: 'runWorkflow' }>,
-): Promise<void> {
+): Promise<import('../workflows/types').WorkflowRun | undefined> {
   let tabId = message.ownerTabId ?? message.tabId;
   let executionTabId: number | undefined;
+  let claimedWindowId: number | undefined;
+  let activeRunner: TaskRunner | undefined;
   try {
     tabId ??= (await chrome.tabs.query({ active: true, lastFocusedWindow: true }))[0]?.id;
     if (!tabId) throw new Error('No active tab');
@@ -390,8 +401,14 @@ async function handleRunWorkflow(
     const ownerTab = await chrome.tabs.get(tabId);
     const ownerWindowId = message.ownerWindowId ?? ownerTab.windowId ?? getWindowForTab(tabId);
     if (ownerWindowId === undefined) throw new Error('Workflow owner window is unavailable');
+    if (runningWorkflowWindows.has(ownerWindowId) || getAgentStatus(ownerWindowId).status === AgentStatus.RUNNING) throw new Error('A task is already running in this window.');
+    runningWorkflowWindows.add(ownerWindowId);
+    claimedWindowId = ownerWindowId;
+    setAgentStatus(ownerWindowId, AgentStatus.RUNNING);
+    void Promise.resolve(chrome.runtime.sendMessage({ action: 'agentStatusUpdate', status: 'running', lastHeartbeat: Date.now(), windowId: ownerWindowId })).catch(() => undefined);
     const entry = replayEntry(version);
-    const executionMode = entry?.kind === 'current_page' ? 'current_tab' : message.executionMode ?? workflow.executionMode ?? 'current_tab';
+    if (entry?.kind === 'standalone' && version.runStrategy !== 'goal') throw new Error('Replay rules requires a current or saved webpage. Use Explore by goal to start independently.');
+    const executionMode = entry?.kind === 'current_page' ? 'current_tab' : entry?.kind === 'standalone' ? 'new_tab' : message.executionMode ?? workflow.executionMode ?? 'current_tab';
     const startUrl = entry?.kind === 'standalone' ? 'about:blank' : entry?.kind === 'url' ? entry.url : resolveWorkflowStartUrl(workflow.startUrl, version.steps);
     let executionPage: any;
     let executionWindowId = ownerWindowId;
@@ -418,13 +435,32 @@ async function handleRunWorkflow(
         await executionPage.goto(entry.url, { waitUntil: 'domcontentloaded', timeout: 10000 });
       }
     }
-    sendUIMessage('updateOutput', { type: 'system', content: `▶ Running automation: ${workflow.name}` }, tabId, executionWindowId);
+    sendUIMessage('updateOutput', { type: 'workflow', workflowId: workflow.id, content: workflow.name }, tabId, executionWindowId, { workflowId: workflow.id, executionTabId });
+    if (version.runStrategy === 'goal') {
+      const runner = new GoalWorkflowRunner();
+      activeRunner = runner;
+      const context = { tabId: executionTabId, windowId: executionWindowId, ownerTabId: tabId, scheduled: message.scheduled };
+      workflowRunners.set(`pending:${executionTabId}`, { runner, executionTabId, ownerTabId: tabId });
+      workflowRunByExecutionTab.set(executionTabId, runner);
+      const runPromise = runner.run(workflow, version, executionPage, { variables: message.variables, context,
+        onOutput: (type, content, runId) => {
+          void sendUIMessage('updateOutput', { type, content }, tabId, executionWindowId, { runId, workflowId: workflow.id, executionTabId });
+        },
+      });
+      if (runner.currentRunId) workflowRunners.set(runner.currentRunId, { runner, executionTabId, ownerTabId: tabId });
+      const run = await runPromise;
+      const metadata = { runId: run.id, workflowId: workflow.id, executionTabId };
+      await sendUIMessage('updateOutput', { type: 'system', content: `Automation ${run.status}: ${workflow.name}${run.failureMessage ? `\n${run.failureMessage}` : ''}` }, tabId, executionWindowId, metadata);
+      await sendUIMessage('processingComplete', null, tabId, executionWindowId, metadata);
+      return run;
+    }
     // This message is initiated by the user pressing Run. Trigger domains are
     // for unattended/automatic runs and must not block an explicit manual run
     // against the current tab.
     let lastStepResult = '';
     const runner = new WorkflowRunner();
-    const runContext = { tabId: executionTabId, windowId: executionWindowId, ownerTabId: tabId };
+    activeRunner = runner;
+    const runContext = { tabId: executionTabId, windowId: executionWindowId, ownerTabId: tabId, scheduled: message.scheduled };
     const pageRef = { current: executionPage };
     workflowRunners.set(`pending:${executionTabId}`, { runner, executionTabId, ownerTabId: tabId });
     workflowRunByExecutionTab.set(executionTabId, runner);
@@ -454,6 +490,7 @@ async function handleRunWorkflow(
     }
     sendUIMessage('updateOutput', { type: 'system', content: `Automation ${run.status}: ${workflow.name}${run.failureMessage ? `\n${run.failureMessage}` : ''}` }, tabId, executionWindowId, { runId: run.id, workflowId: workflow.id, executionTabId: run.executionTabId });
     sendUIMessage('processingComplete', null, tabId, executionWindowId, { runId: run.id, workflowId: workflow.id, executionTabId: run.executionTabId });
+    return run;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error('[runWorkflow] failed', {
@@ -465,7 +502,14 @@ async function handleRunWorkflow(
     });
     if (tabId) {
       sendUIMessage('updateOutput', { type: 'system', content: `Automation failed: ${errorMessage}` }, tabId);
-      sendUIMessage('processingComplete', null, tabId);
+      if (claimedWindowId !== undefined) sendUIMessage('processingComplete', null, tabId, claimedWindowId);
+    }
+    if (message.scheduled) throw error;
+  } finally {
+    if (claimedWindowId !== undefined) { runningWorkflowWindows.delete(claimedWindowId); setAgentStatus(claimedWindowId, AgentStatus.IDLE); }
+    if (activeRunner) {
+      if (activeRunner.currentRunId) workflowRunners.delete(activeRunner.currentRunId);
+      if (executionTabId !== undefined) { workflowRunners.delete(`pending:${executionTabId}`); workflowRunByExecutionTab.delete(executionTabId); }
     }
   }
 }
@@ -497,13 +541,18 @@ function handleExecutePrompt(
   message: Extract<BackgroundMessage, { action: 'executePrompt' }>,
   sendResponse: (response?: any) => void
 ): void {
+  const windowId = message.windowId ?? (message.tabId ? getWindowForTab(message.tabId) : undefined);
+  if (windowId !== undefined && runningWorkflowWindows.has(windowId)) {
+    sendResponse({ success: false, error: 'An automation is already running in this window.' });
+    return;
+  }
   // Use the tabId from the message if available
   if (message.tabId) {
     // Check if this is a multitab analysis request
     if ((message as any).multiTabAnalysis && (message as any).selectedTabIds) {
-      executePrompt(message.prompt, message.tabId, false, message.role, (message as any).selectedTabIds, message.contextMode);
+      executePrompt(message.prompt, message.tabId, false, message.role, (message as any).selectedTabIds, message.contextMode, message.taskMode);
     } else {
-      executePrompt(message.prompt, message.tabId, false, message.role, undefined, message.contextMode);
+      executePrompt(message.prompt, message.tabId, false, message.role, undefined, message.contextMode, message.taskMode);
     }
   } else {
     executePrompt(message.prompt);
@@ -520,6 +569,8 @@ function handleCancelExecution(
   message: Extract<BackgroundMessage, { action: 'cancelExecution' }>,
   sendResponse: (response?: any) => void
 ): void {
+  const running = [...workflowRunners.values()].find(item => item.ownerTabId === message.tabId || item.executionTabId === message.tabId);
+  if (running) { running.runner.cancel(); sendResponse({ success: true }); return; }
   cancelExecution(message.tabId);
   sendResponse({ success: true });
 }

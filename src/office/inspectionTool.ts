@@ -1,7 +1,7 @@
 import type { BrowserTool, ToolExecutionContext } from '../agent/tools/types';
 import { WorkflowStore } from '../workflows/WorkflowStore';
 import { officeConfigSchema, type OfficeConfig, type OfficePage, type OfficeReport } from './types';
-import { readOfficeTable, officeNextPage } from './pageReader';
+import { readOfficeRecords, officeNextPage } from './pageReader';
 import { applyHandledRecords } from './handledRecords';
 import { addArchiveFiles, compareOfficeReports, matchesOfficeRule, sortOfficeRows } from './report';
 
@@ -78,14 +78,14 @@ export async function inspectOfficeTable(config: OfficeConfig, access: Inspectio
 }
 
 export function createOfficeInspectionTool(getTabId: () => number | undefined, workflowId: string): BrowserTool {
-  return { name: 'browser_inspect_office_table', description: 'Inspect a configured table, filter rows, compare runs, and list downloadable documents.',
+  return { name: 'browser_inspect_office_table', description: 'Inspect a configured table, semantic list, or repeated card collection; filter records, compare runs, and list downloadable documents.',
     func: async (input, context) => {
       const config = officeConfigSchema.parse(JSON.parse(input));
       const tabId = getTabId();
       if (tabId === undefined) throw new Error('No workflow tab');
       const report = await inspectOfficeTable(config, {
         read: async () => {
-          const results = await chrome.scripting.executeScript({ target: { tabId }, func: readOfficeTable, args: [{ selector: config.tableSelector, limit: config.maxRows, detailLinkColumn: config.detailLinkColumn }] });
+          const results = await chrome.scripting.executeScript({ target: { tabId }, func: readOfficeRecords, args: [{ selector: config.tableSelector, sourceKind: config.sourceKind, limit: config.maxRows, detailLinkColumn: config.detailLinkColumn }] });
           if (!results[0]?.result) throw new Error('Unable to read table. Check login and page access.');
           return results[0].result;
         },

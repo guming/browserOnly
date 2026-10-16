@@ -10,7 +10,7 @@ export const WORKFLOW_CANDIDATE_TTL_MS = 24 * 60 * 60 * 1000;
 const workflowToolName = (toolName: string) =>
   toolName === 'browser_read_main' ? 'browser_read_main_for_workflow' : toolName;
 
-export function compileTrace(trace: ToolTraceEvent[], domain: string, name = 'Recorded workflow', startUrl?: string, taskInstruction?: string): { workflow: Workflow; version: WorkflowVersion } {
+export function compileTrace(trace: ToolTraceEvent[], domain: string, name = 'Recorded workflow', startUrl?: string, taskInstruction?: string, contextMode?: 'current-tab' | 'standalone'): { workflow: Workflow; version: WorkflowVersion } {
   const createdAt = now();
   const recordedSteps: WorkflowStep[] = taskInstruction !== undefined ? compileReplaySteps(trace) : trace
     .filter(event => event.result?.ok !== false)
@@ -28,8 +28,8 @@ export function compileTrace(trace: ToolTraceEvent[], domain: string, name = 'Re
       locator: /click|type|keyboard|drag/i.test(event.toolName) ? buildStableLocator(typeof event.input === 'string' ? event.input.split('|', 1)[0] : (event.input as { selector?: string } | undefined)?.selector) : undefined,
       risk: /type|click|keyboard|drag/i.test(event.toolName) ? 'write' : 'read'
     }));
-  const entryContext = taskInstruction !== undefined ? resolveRecordedEntry(trace, startUrl) : undefined;
-  const normalizedStartUrl = entryContext?.kind === 'url' ? entryContext.url : normalizeHttpUrl(startUrl);
+  const entryContext = taskInstruction !== undefined ? resolveRecordedEntry(trace, startUrl, contextMode) : undefined;
+  const normalizedStartUrl = entryContext?.kind === 'url' ? entryContext.url : entryContext ? undefined : normalizeHttpUrl(startUrl);
   const firstRecordedUrl = recordedSteps[0]?.toolName === 'browser_navigate'
     ? normalizeHttpUrl(typeof recordedSteps[0].input === 'string' ? recordedSteps[0].input : undefined)
     : undefined;
@@ -50,12 +50,12 @@ export function compileTrace(trace: ToolTraceEvent[], domain: string, name = 'Re
 
   const version: WorkflowVersion = {
     id: id('version'), workflowId: id('workflow'), version: 1,
-    source: 'recording', taskInstruction: taskInstruction === undefined ? undefined : String(redactValue(taskInstruction)), replayFormat: taskInstruction !== undefined ? 'steps-v2' : undefined, entryContext, steps, finalAssertions: [], createdAt
+    source: 'recording', runStrategy: contextMode === 'standalone' ? 'goal' : 'steps', taskInstruction: taskInstruction === undefined ? undefined : String(redactValue(taskInstruction)), replayFormat: taskInstruction !== undefined ? 'steps-v2' : undefined, entryContext, steps, finalAssertions: [], createdAt
   };
   const workflow: Workflow = {
     id: version.workflowId, name, description: `Recorded on ${domain}`,
     schemaVersion: 1, status: 'candidate', triggerDomains: [domain], variables: [],
-    executionMode: 'new_tab', startUrl: normalizedStartUrl,
+    executionMode: entryContext?.kind === 'current_page' ? 'current_tab' : 'new_tab', startUrl: normalizedStartUrl,
     activeVersionId: version.id, expiresAt: createdAt + WORKFLOW_CANDIDATE_TTL_MS,
     createdAt, updatedAt: createdAt
   };

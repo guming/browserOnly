@@ -29,3 +29,16 @@ describe('recorded workflow candidates', () => {
     });
   });
 });
+
+it('preserves standalone goals instead of pinning the recording URL', () => {
+  const result = compileTrace([], 'source.test', 'Research', 'https://source.test/', 'Find new features', 'standalone');
+  expect(result.version).toMatchObject({ runStrategy: 'goal', taskInstruction: 'Find new features', entryContext: { kind: 'standalone' } });
+  expect(result.workflow.startUrl).toBeUndefined();
+  expect(result.workflow.executionMode).toBe('new_tab');
+});
+it('preserves current-page tasks for reuse on a different active page', () => {
+  const result = compileTrace([], 'source.test', 'Read', 'https://source.test/', 'Read this page', 'current-tab');
+  expect(result.version).toMatchObject({ runStrategy: 'steps', entryContext: { kind: 'current_page' } });
+  expect(result.workflow.executionMode).toBe('current_tab');
+  expect(result.workflow.startUrl).toBeUndefined();
+});

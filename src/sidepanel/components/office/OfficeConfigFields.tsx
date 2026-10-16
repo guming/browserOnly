@@ -25,7 +25,7 @@ export function OfficeConfigFields({ config, onChange }: { config: OfficeConfig;
       {config.rule.operator === 'older_than_days' && <p className="text-[11px] leading-5 text-stone-500">Use the last-response date column, in YYYY-MM-DD or ISO date-time format. Unreadable dates are reported rather than guessed.</p>}
     </>}
     <label className="block text-xs">Record link column<select className={inputClass} value={config.detailLinkColumn ?? ''} onChange={e => patch({ detailLinkColumn: e.target.value === '' ? undefined : Number(e.target.value) })}><option value="">Link back to the list</option>{columns}</select></label>
-    <p className="text-[11px] leading-5 text-stone-500">Choose a column containing one link to each record. If no unique link is found, the result opens the list instead.</p>
+    <p className="text-[11px] leading-5 text-stone-500">A row with exactly one safe web link opens that record automatically. Choose a column when a row contains several links; otherwise the result opens the list.</p>
     <label className="block text-xs">Sort matching rows by<select className={inputClass} value={config.sort?.column ?? ''} onChange={e => patch({ sort: e.target.value === '' ? undefined : { column: Number(e.target.value), direction: config.sort?.direction ?? 'ascending', priority: config.sort?.priority } })}><option value="">Keep page order</option>{columns}</select></label>
     {config.sort && <>
       <label className="block text-xs">Sort order<select className={inputClass} value={config.sort.direction} onChange={e => patch({ sort: { ...config.sort!, direction: e.target.value as 'ascending' | 'descending' } })}><option value="ascending">Ascending</option><option value="descending">Descending</option></select></label>

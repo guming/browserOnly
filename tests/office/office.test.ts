@@ -1,6 +1,6 @@
 import { inspectOfficeTable } from '../../src/office/inspectionTool';
 import { matchesOfficeRule, compareOfficeReports, reportCsv, safePathPart, sortOfficeRows } from '../../src/office/report';
-import { readOfficeTable } from '../../src/office/pageReader';
+import { discoverOfficeTables, readOfficeRecords, readOfficeTable } from '../../src/office/pageReader';
 import { officeConfigSchema, OfficePage } from '../../src/office/types';
 import { handleOfficeArchive } from '../../src/office/archive';
 import { WorkflowStore } from '../../src/workflows/WorkflowStore';
@@ -57,9 +57,26 @@ test('record links come only from the selected column and ambiguous links fall b
   document.body.innerHTML = '<table id="records"><tr><th>ID</th><th>Files</th></tr><tr><td><a href="https://example.com/ticket/1">1</a></td><td><a href="https://example.com/file.pdf">PDF</a></td></tr></table>';
   const result = readOfficeTable({ selector: '#records', limit: 10, detailLinkColumn: 0 });
   expect(result.rows[0].detailUrl).toBe('https://example.com/ticket/1');
+  expect(readOfficeTable({ selector: '#records', limit: 10 }).rows[0].detailUrl).toBe('https://example.com/ticket/1');
   expect(result.rows[0].links).toEqual([{ url: 'https://example.com/file.pdf', name: 'file.pdf' }]);
   document.querySelector('td')!.insertAdjacentHTML('beforeend', '<a href="https://example.com/ticket/2">2</a>');
   expect(readOfficeTable({ selector: '#records', limit: 10, detailLinkColumn: 0 }).rows[0].detailUrl).toBeUndefined();
+  jest.restoreAllMocks();
+});
+
+test('discovers and reads semantic lists and repeated cards alongside HTML tables', () => {
+  jest.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({ width: 100, height: 20 } as DOMRect);
+  (global as any).CSS ??= { escape: (value: string) => value };
+  document.body.innerHTML = `<main id="content"><ul id="tickets"><li>Ticket 1</li><li>Ticket 2</li></ul><section id="results"><article class="card">Alpha <a href="/a">Open</a></article><article class="card">Beta <a href="/b">Open</a></article></section></main>`;
+  const candidates = discoverOfficeTables();
+  expect(candidates).toEqual(expect.arrayContaining([
+    expect.objectContaining({ sourceKind: 'list', recordCount: 2 }),
+    expect.objectContaining({ sourceKind: 'repeated-block', recordCount: 2 }),
+  ]));
+  const list = candidates.find(candidate => candidate.sourceKind === 'list')!;
+  const cards = candidates.find(candidate => candidate.sourceKind === 'repeated-block')!;
+  expect(readOfficeRecords({ selector: list.selector, sourceKind: list.sourceKind, limit: 10 }).rows.map(row => row.cells[0])).toEqual(['Ticket 1', 'Ticket 2']);
+  expect(readOfficeRecords({ selector: cards.selector, sourceKind: cards.sourceKind, limit: 10, detailLinkColumn: 0 }).rows.map(row => row.detailUrl)).toEqual(['http://localhost/a', 'http://localhost/b']);
   jest.restoreAllMocks();
 });
 
@@ -68,4 +85,12 @@ test('completed inspection applies saved priority order and config edits reset c
   const result = await inspectOfficeTable(sortedConfig, { read: async () => ({ ...page('1'), rows: [page('1', 'Standard').rows[0], page('2', 'VIP').rows[0]] }), next: async () => false, wait: async () => {} });
   expect(result.rows.map(row => row.key)).toEqual(['2', '1']);
   expect(compareOfficeReports(result, { ...result, config: { ...sortedConfig, sort: undefined } })).toBeUndefined();
+});
+
+test('preserves detail URLs when repeated records are anchors themselves', () => {
+  jest.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({ width: 100, height: 20 } as DOMRect);
+  document.body.innerHTML = '<section id="jobs"><a class="card" href="https://example.com/job/1">Engineer</a><a class="card" href="https://example.com/job/2">Designer</a></section>';
+  const result = readOfficeRecords({ selector: '#jobs > a', sourceKind: 'repeated-block', limit: 10 });
+  expect(result.rows.map(row => row.detailUrl)).toEqual(['https://example.com/job/1', 'https://example.com/job/2']);
+  jest.restoreAllMocks();
 });

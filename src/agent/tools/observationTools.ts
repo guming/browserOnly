@@ -343,7 +343,7 @@ export const browserReadText: ToolFactory = (page: Page) =>
   new DynamicTool({
     name: "browser_read_text",
     description:
-      "Return all visible text on the page, concatenated in DOM order.",
+      "Return visible text with actual HTTP(S) link URLs. Preserve item links in extracted tables as Markdown links; never invent URLs.",
     func: async () => {
       try {
         return await withActivePage(page, async (activePage) => retryAfterNavigation(activePage, async () => {
@@ -361,8 +361,19 @@ export const browserReadText: ToolFactory = (page: Page) =>
               }
             );
             const out: string[] = [];
-            while (walker.nextNode())
-              out.push((walker.currentNode as Text).textContent!.trim());
+            while (walker.nextNode()) {
+              const node = walker.currentNode as Text;
+              const text = node.textContent!.trim();
+              const anchor = node.parentElement?.closest('a[href]') as HTMLAnchorElement | null;
+              let href: string | undefined;
+              try {
+                if (anchor) {
+                  const url = new URL(anchor.getAttribute('href')!, document.baseURI);
+                  if (/^https?:$/.test(url.protocol) && !url.username && !url.password) href = url.href;
+                }
+              } catch { /* Invalid links remain plain text. */ }
+              out.push(href ? `${text} [URL: ${href}]` : text);
+            }
             return out.join("\n");
           });
           return truncate(text as string);

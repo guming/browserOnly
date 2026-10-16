@@ -31,6 +31,7 @@ export const extractionRequestSchema = z.object({
 });
 
 export const extractionResultSchema = z.object({
+  pagesRead: z.number().int().positive().optional(),
   fields: z.array(extractionFieldSchema),
   rows: z.array(z.record(z.string(), z.unknown())),
   sourceUrls: z.array(z.string()),
@@ -54,7 +55,7 @@ export function validateExtractionResult(value: unknown): ExtractionResult {
   const total = rows.length * required.length;
   const complete = total ? rows.reduce((count, row) => count + required.filter(field => row[field.key] !== null).length, 0) / total : rows.length ? 1 : 0;
   if (!rows.length) warnings.push('No matching records were found');
-  return { ...parsed, rows, warnings: [...new Set(warnings)], completeness: complete, partial: rows.length > 0 && complete < 1 };
+  return { ...parsed, rows, warnings: [...new Set(warnings)], completeness: complete, partial: parsed.partial || rows.length > 0 && complete < 1 };
 }
 
 function normalizeFieldValue(value: unknown, type: string): string | number | boolean | null {

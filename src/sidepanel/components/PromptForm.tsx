@@ -10,10 +10,11 @@ import { WorkflowStore } from '../../workflows/WorkflowStore';
 import { SlashCommandMenu } from './actions/SlashCommandMenu';
 import { ActionChip } from './actions/ActionChip';
 import type { ActionInvocation } from '../../actions';
+import { createExtractionWorkflow } from '../../extraction/extractionWorkflow';
 import { ExtractionSetupView } from './extraction/ExtractionSetupView';
 
 interface PromptFormProps {
-  onSubmit: (prompt: string, role: string, selectedTabIds?: number[], contextMode?: AskContextMode) => void;
+  onSubmit: (prompt: string, role: string, selectedTabIds?: number[], contextMode?: AskContextMode, taskMode?: ModeType) => void;
   onCancel: () => void;
   isProcessing: boolean;
   tabStatus: 'attached' | 'detached' | 'unknown' | 'running' | 'idle' | 'error';
@@ -107,12 +108,12 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
           : role;
     const tabIds = (role === 'researcher' || role === 'notebooklm') && selectedTabIds.length > 0 ? selectedTabIds : undefined;
     if (mode === 'ask') {
-      onSubmit(actionPrompt(selectedAction, prompt), finalRole, tabIds, askTarget === 'books' ? 'standalone' : askContextMode);
+      onSubmit(actionPrompt(selectedAction, prompt), finalRole, tabIds, askTarget === 'books' ? 'standalone' : askContextMode, 'ask');
     } else {
       const instruction = role === 'notebooklm'
         ? `#${selectedNotebookLMOption}${prompt.trim() ? `\n\nUser focus: ${prompt.trim()}` : ''}`
         : actionPrompt(selectedAction, prompt);
-      onSubmit(instruction, finalRole, tabIds);
+      onSubmit(instruction, finalRole, tabIds, undefined, 'operator');
     }
     setPrompt('');
     setSelectedAction(undefined);
@@ -327,7 +328,7 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
 
       <div className={mode === 'ask' ? 'mt-1' : 'mt-3'}>
         {tabStatus === 'detached' && <p className="mb-2 text-xs text-red-700" role="status">Tab connection lost. Refresh the tab to continue.</p>}
-        {(selectedAction?.id === 'extract' || selectedAction?.id === 'extract-table') && <div className="mb-3 rounded-lg border border-stone-200 p-3"><ExtractionSetupView onRun={request => { onSubmit(`${selectedAction.id === 'extract-table' ? 'Discover a repeated table or list, show the extraction plan, and then extract' : 'Extract structured data'} using this confirmed request:\n${JSON.stringify(request)}`, 'operator'); setSelectedAction(undefined); setPrompt(''); chrome.storage.local.set({ browserOnlySlashHint: { focusHintCount: 3, hasCompletedSlashAction: true } }); }} /></div>}
+        {selectedAction?.id === 'extract' && <div className="mb-3 rounded-lg border border-stone-200 p-3"><ExtractionSetupView onRun={request => { if (request.plan) { const candidate = createExtractionWorkflow(request); chrome.tabs.query({ active: true, lastFocusedWindow: true }).then(([tab]) => { if (tab?.id) chrome.runtime.sendMessage({ action: 'runWorkflow', workflowId: candidate.workflow.id, versionId: candidate.version.id, transientWorkflow: candidate.workflow, transientVersion: candidate.version, ownerTabId: tab.id, ownerWindowId: tab.windowId, executionMode: 'current_tab' }); }); } else { onSubmit(`Extract structured data using this confirmed request:\n${JSON.stringify(request)}`, 'operator'); } setSelectedAction(undefined); setPrompt(''); chrome.storage.local.set({ browserOnlySlashHint: { focusHintCount: 3, hasCompletedSlashAction: true } }); }} /></div>}
         <div className="relative rounded-[11px] border border-stone-300 bg-white transition-[border-color,box-shadow] duration-150 focus-within:border-[#315a78] focus-within:ring-2 focus-within:ring-[#315a78]/10">
           {showSlashHint && !selectedAction && <p className="px-3 pt-2 text-xs text-stone-500">Tip: Type / to choose a quick action</p>}
           {selectedAction && <ActionChip label={selectedAction.name} onRemove={() => setSelectedAction(undefined)} />}
@@ -354,6 +355,8 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
             }}
             placeholder={tabStatus === 'detached'
               ? 'Refresh the tab to continue'
+              : selectedAction?.id === 'extract-table'
+                ? '例如：提取前 5 页的职位名称、地点、职位 ID 和详情链接'
               : mode === 'ask'
                 ? askTarget === 'books'
                   ? `Share your situation and goals for ${selectedBook.title}`
@@ -415,7 +418,17 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
 };
 
 function actionPrompt(action: ActionDefinition | undefined, instruction: string): string {
-  if (!action) return instruction;
+  if (!action) {
+    const match = instruction.match(/^\/extract(?:[ -]table)(?:\s+|$)([\s\S]*)/i);
+    return match ? extractionTablePrompt(match[1]) : instruction;
+  }
+  if (action.id === 'extract-table') return extractionTablePrompt(instruction);
   const base = action.id === 'summarize' ? 'Summarize the current page.' : action.id === 'translate' ? 'Translate the current page.' : action.id === 'extract' ? 'Extract structured data from the current page.' : action.id === 'compare' ? 'Compare the selected tabs.' : action.name;
   return instruction.trim() ? `${base}\n\nAdditional instructions: ${instruction.trim()}` : base;
+}
+
+function extractionTablePrompt(instruction: string): string {
+  return `Extract repeated records from the current page using the user's natural-language request below. Infer the requested fields, page count, and output format; do not ask the user to fill a configuration form. Default to the current page if no page count is specified. Preserve current filters. Use actual page controls for pagination, stop at the requested page limit, deduplicate records, and report incomplete results honestly.
+For every record, obtain its actual detail URL from the record itself, its descendants, or explicit page data. If necessary, open the record to observe the actual destination and return to the list without submitting or changing data. Keep the record ID as data; never invent a URL from the displayed ID. Render record titles or IDs as clickable Markdown links and include a detail URL column. If a URL cannot be verified, mark it unavailable rather than omit the column. Return a readable table by default.
+User request: ${instruction.trim() || 'Extract the visible records with their key fields and verified detail links.'}`;
 }

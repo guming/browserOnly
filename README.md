@@ -182,6 +182,10 @@ Use BrowserOnly whenever a task involves both understanding a webpage and taking
 
 Open **Monitors** in the side panel to select an element or monitor the page's main text. BrowserOnly checks it on a best-effort schedule, records structured changes locally, and notifies you when the configured condition becomes true. Routine checks do not call an LLM, but Chrome and the computer must remain running. Login expiry and CAPTCHA challenges pause reliable monitoring rather than being bypassed.
 
+### Saved Workflows
+
+Task cards in chat and **Automations** share the same saved workflow. Choose **Replay rules** to repeat recorded steps, or **Explore by goal** to have the agent plan new steps from the saved task instruction each time. Tasks can start on the **Current page**, a **Saved webpage**, or **Start independently** in a new tab. New recordings preserve the chat's Current tab or Standalone context. Goal runs keep separate conversation history, run records, cancellation, and action approvals; finishing an agent run does not independently verify that its goal was achieved.
+
 ## 🛫 Roadmap
 
 Please refer to [ROADMAP.md](ROADMAP.md) for an up to date list of features we're aiming to add to BrowserOnly. 
@@ -258,3 +262,5 @@ BrowserOnly is built using these amazing open source projects:
 ## 📜 License
 
 [Apache 2.0](LICENSE)
+
+Saved workflows support hourly, daily, and weekly local schedules from their chat card or Automations. Daily and weekly times follow the computer’s local timezone. Pause and resume preserve frequency settings; resume binds the task to the currently selected tab. Chrome and the computer must remain running. Missed executions merge into one catch-up run. A busy window defers execution; a failure or required approval pauses scheduling with a browser notification. Run manually to review actions, then resume scheduling. Current-page tasks require the bound tab to remain open in its original window.

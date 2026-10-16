@@ -1,6 +1,7 @@
 export type WorkflowStatus = 'candidate' | 'draft' | 'active' | 'archived';
 export type WorkflowRunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled' | 'repairing';
 export type WorkflowExecutionMode = 'new_tab' | 'current_tab';
+export type WorkflowRunStrategy = 'steps' | 'goal';
 
 export type WorkflowVariableType = 'string' | 'number' | 'date' | 'boolean' | 'secret' | 'enum' | 'url' | 'tab' | 'tabs' | 'fields';
 
@@ -56,6 +57,7 @@ export interface WorkflowStep {
 }
 
 export interface Workflow {
+  schedule?: WorkflowSchedule;
   id: string;
   name: string;
   description: string;
@@ -72,12 +74,26 @@ export interface Workflow {
   updatedAt: number;
 }
 
+export interface WorkflowSchedule {
+  frequency: 'hourly' | 'daily' | 'weekly';
+  time: string;
+  weekday: number;
+  status: 'active' | 'paused' | 'needs_attention';
+  nextRunAt?: number;
+  ownerTabId: number;
+  ownerWindowId: number;
+  lastError?: string;
+  lastRunAt?: number;
+  missedRuns?: number;
+}
+
 export type WorkflowEntryContext =
   | { kind: 'current_page' }
   | { kind: 'url'; url: string }
   | { kind: 'standalone' };
 
 export interface WorkflowVersion {
+  runStrategy?: WorkflowRunStrategy;
   replayFormat?: 'steps-v2';
   taskInstruction?: string;
   entryContext?: WorkflowEntryContext;
@@ -94,6 +110,8 @@ export interface WorkflowVersion {
 }
 
 export interface WorkflowRun {
+  resultSummary?: { kind: 'extraction' | 'office'; count: number; partial?: boolean };
+  source?: 'manual' | 'schedule';
   id: string;
   workflowId: string;
   versionId: string;
@@ -115,6 +133,7 @@ export interface WorkflowRun {
 }
 
 export interface WorkflowStepRun {
+  extractionResult?: import("../extraction/types").ExtractionResult;
   officeReport?: import('../office/types').OfficeReport;
   id: string;
   runId: string;

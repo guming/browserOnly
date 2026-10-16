@@ -5,9 +5,9 @@ import { ExtractionSetupView } from '../../src/sidepanel/components/extraction/E
 describe('extraction setup', () => {
   it('requires a field before running', () => {
     const onRun = jest.fn(); render(<ExtractionSetupView onRun={onRun} />);
-    expect(screen.getByRole('button', { name: /run extraction/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /confirm & extract/i })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: /add field/i }));
-    fireEvent.click(screen.getByRole('button', { name: /run extraction/i }));
+    fireEvent.click(screen.getByRole('button', { name: /confirm & extract/i }));
     expect(onRun).toHaveBeenCalled();
   });
 });

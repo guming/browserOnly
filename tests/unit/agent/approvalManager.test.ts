@@ -29,7 +29,7 @@ Object.defineProperty(global, 'chrome', {
 });
 
 // Import after mocking
-import { requestApproval, handleApprovalResponse } from '../../../src/agent/approvalManager';
+import { requestApproval, handleApprovalResponse, cancelRunApprovals } from '../../../src/agent/approvalManager';
 import { getWindowForTab } from '../../../src/background/tabManager';
 
 // Type the mocked function
@@ -871,4 +871,16 @@ describe('approvalManager', () => {
       expect(duration).toBeLessThan(1000);
     });
   });
+});
+
+
+test('cancelling one goal run rejects only its pending approvals', async () => {
+  mockChrome.runtime.sendMessage.mockImplementation(() => true);
+  const first = requestApproval(1, 'browser_click', 'Submit', 'Submit', 3, { runId: 'goal-a' });
+  const second = requestApproval(1, 'browser_click', 'Submit', 'Submit', 3, { runId: 'goal-b' });
+  const secondMessage = mockChrome.runtime.sendMessage.mock.calls.at(-1)![0] as any;
+  cancelRunApprovals('goal-a');
+  await expect(first).resolves.toBe(false);
+  expect(handleApprovalResponse(secondMessage.requestId, true, 'goal-b')).toBe(true);
+  await expect(second).resolves.toBe(true);
 });

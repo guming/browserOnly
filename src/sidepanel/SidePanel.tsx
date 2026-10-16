@@ -25,6 +25,8 @@ import { MonitorListView } from './components/monitors/MonitorListView';
 export function SidePanel() {
   const [activeView, setActiveView] = useState<WorkspaceView>('tasks');
   const [workflowCount, setWorkflowCount] = useState(0);
+  const [chatWorkflowId, setChatWorkflowId] = useState<string>();
+  const [chatWorkflowMode, setChatWorkflowMode] = useState<'run'>();
   const [failedRunCount, setFailedRunCount] = useState(0);
   const [monitorCount, setMonitorCount] = useState(0);
   const [pendingAction, setPendingAction] = useState<ActionInvocation>();
@@ -356,7 +358,7 @@ export function SidePanel() {
   });
 
   // Handle form submission
-  const handleSubmit = async (prompt: string, role: string, selectedTabIds?: number[], contextMode?: AskContextMode) => {
+  const handleSubmit = async (prompt: string, role: string, selectedTabIds?: number[], contextMode?: AskContextMode, taskMode?: 'operator' | 'ask') => {
     setIsProcessing(true);
     setTabStatus('running');
 
@@ -367,7 +369,7 @@ export function SidePanel() {
     }
 
     try {
-      await executePrompt(prompt, role, selectedTabIds, contextMode);
+      await executePrompt(prompt, role, selectedTabIds, contextMode, taskMode);
     } catch (error) {
       console.error('Error:', error);
       addSystemMessage('Error: ' + (error instanceof Error ? error.message : String(error)));
@@ -534,8 +536,8 @@ export function SidePanel() {
               style={isOutputExpanded ? { height: 'calc(100vh - 200px)' } : undefined}
             >
               {activeView === 'tasks' ? (
-                <MessageDisplay messages={messages} streamingSegments={streamingSegments} isStreaming={isStreaming} />
-              ) : activeView === 'workflows' ? <WorkflowListView onRunStarted={() => { setActiveView('tasks'); setIsProcessing(true); setTabStatus('running'); addSystemMessage('▶ Automation started. Running the saved steps…'); }} /> : activeView === 'monitors' ? <MonitorListView tabId={currentSelectedTabId ?? tabId ?? undefined} /> : <RunListView />}
+                <MessageDisplay messages={messages} streamingSegments={streamingSegments} isStreaming={isStreaming} onOpenWorkflow={(id, mode) => { setChatWorkflowId(id); setChatWorkflowMode(mode); setActiveView('workflows'); }} />
+              ) : activeView === 'workflows' ? <WorkflowListView initialWorkflowId={chatWorkflowId} initialMode={chatWorkflowMode} onRunStarted={() => { setActiveView('tasks'); setIsProcessing(true); setTabStatus('running'); addSystemMessage('▶ Automation started. Running the saved steps…'); }} /> : activeView === 'monitors' ? <MonitorListView tabId={currentSelectedTabId ?? tabId ?? undefined} /> : <RunListView />}
             </div>
           </div>
 

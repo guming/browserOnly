@@ -21,6 +21,8 @@ export class MonitorRunner {
       tabId = tab.id;
       if (tabId === undefined) throw coded('TAB_CLOSED', 'Browser did not create an execution tab');
       await waitForTab(tabId, 30_000);
+      const loadedTab = await chrome.tabs.get(tabId);
+      if (loadedTab.url?.startsWith('chrome-error://')) throw coded('NAVIGATION_FAILED', 'The monitored page did not load. Check the site and try again.');
       await delay(1_000);
       if (monitor.readiness.waitForText) await waitForText(tabId, monitor.readiness.waitForText, 15_000);
       const injection = monitor.kind === 'page_text'
@@ -50,7 +52,7 @@ export class MonitorRunner {
       await store.cleanupMonitor(monitorId);
       if (trigger.shouldNotify && diff) await notifyMonitorChange(updated, diff);
     } catch (error) {
-      const parsed = parseError(error);
+      const parsed = classifyMonitorError(error);
       run.status = 'failed'; run.endedAt = Date.now(); run.errorCode = parsed.code; run.errorMessage = parsed.message;
       const failures = monitor.consecutiveFailures + 1;
       const updated: Monitor = { ...monitor, lastCheckedAt: run.endedAt, consecutiveFailures: failures, status: failures >= 3 ? 'needs_attention' : monitor.status, nextRunAt: run.endedAt + monitor.scheduleMinutes * 60_000, updatedAt: run.endedAt };
@@ -97,8 +99,10 @@ async function waitForText(tabId: number, text: string, timeoutMs: number): Prom
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 function coded(code: MonitorErrorCode, message: string): Error { const error = new Error(message); error.name = code; return error; }
-function parseError(error: unknown): { code: MonitorErrorCode; message: string } {
+export function classifyMonitorError(error: unknown): { code: MonitorErrorCode; message: string } {
   const message = error instanceof Error ? error.message : String(error);
+  if (/Frame with ID \d+ is showing error page|chrome-error:\/\/|Cannot access a chrome:\/\/ URL/i.test(message))
+    return { code: 'NAVIGATION_FAILED', message: 'The monitored page did not load. Check the site and try again.' };
   const named = error instanceof Error ? error.name : '';
   const known: MonitorErrorCode[] = ['NAVIGATION_FAILED', 'PAGE_TIMEOUT', 'LOCATOR_NOT_FOUND', 'MULTIPLE_MATCHES', 'PARSE_FAILED', 'AUTH_REQUIRED', 'CAPTCHA_DETECTED', 'TAB_CLOSED', 'UNKNOWN'];
   const embedded = known.find(code => named === code || message.includes(code));

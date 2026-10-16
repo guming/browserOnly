@@ -2,6 +2,7 @@ import { createDiff } from '../../src/monitoring/DiffEngine';
 import { evaluateTrigger } from '../../src/monitoring/TriggerEvaluator';
 import { hashText, normalizePrice, normalizeStock, normalizeText, valueText } from '../../src/monitoring/normalizers';
 import type { MonitorSnapshot } from '../../src/monitoring/types';
+import { classifyMonitorError } from '../../src/monitoring/MonitorRunner';
 
 beforeAll(() => {
   if (!global.crypto.randomUUID) Object.defineProperty(global.crypto, 'randomUUID', { value: () => 'test-uuid' });
@@ -17,6 +18,9 @@ function typedSnapshot(id: string, value: MonitorSnapshot['normalizedValue']): M
 }
 
 describe('monitoring text core', () => {
+  test('classifies Chrome error-page injection failures as navigation failures', () => {
+    expect(classifyMonitorError(new Error('Frame with ID 0 is showing error page'))).toEqual({ code: 'NAVIGATION_FAILED', message: 'The monitored page did not load. Check the site and try again.' });
+  });
   test('normalizes visible-equivalent text deterministically', () => {
     expect(normalizeText('  Cafe\u0301\u00a0\u200b  price  ').text).toBe('Café price');
     expect(normalizeText('x'.repeat(20_001)).text).toHaveLength(20_000);

@@ -102,6 +102,25 @@ describe('ExecutionEngine', () => {
       };
     });
 
+    it('scopes goal-run approvals to the owner tab even when another tab is active', async () => {
+      mockCallbacks.executionContext = { runId: 'run-1', workflowId: 'w1', tabId: 2, ownerTabId: 1, windowId: 3 };
+      mockCallbacks.onExecutionEnd = jest.fn();
+      mockProvider.createMessage.mockReturnValueOnce((async function* () {
+        yield { type: 'text', text: '<tool>browser_click</tool><input>button</input><requires_approval>true</requires_approval>' };
+      })()).mockReturnValueOnce((async function* () { yield { type: 'text', text: 'Done' }; })());
+      (global as any).chrome.tabs.query.mockResolvedValue([{ id: 999 }]);
+      await executionEngine.executePrompt('Submit', mockCallbacks, [], false, 'operator');
+      expect(jest.requireMock('../../../src/agent/approvalManager').requestApproval).toHaveBeenCalledWith(2, 'browser_click', 'button', expect.any(String), 3, { runId: 'run-1', workflowId: 'w1', executionTabId: 2, ownerTabId: 1 });
+      expect(mockCallbacks.onExecutionEnd).toHaveBeenCalledWith('completed', undefined);
+    });
+
+    it('reports non-retryable provider failures as failed outcomes', async () => {
+      mockCallbacks.onExecutionEnd = jest.fn();
+      mockProvider.createMessage.mockReturnValue((async function* () { throw new Error('Provider unavailable'); yield; })());
+      await executionEngine.executePrompt('Research', mockCallbacks, [], false, 'operator');
+      expect(mockCallbacks.onExecutionEnd).toHaveBeenCalledWith('failed', 'Provider unavailable');
+    });
+
     it('should execute a simple prompt without tools', async () => {
       // Mock provider to return simple text response
       const mockStream = (async function* () {

@@ -125,7 +125,7 @@ describe('PromptForm operator roles', () => {
     selectRole(selectedRole);
     submitPrompt('Test prompt');
 
-    expect(onSubmit).toHaveBeenCalledWith('Test prompt', expectedRole, undefined);
+    expect(onSubmit).toHaveBeenCalledWith('Test prompt', expectedRole, undefined, undefined, 'operator');
   });
 
   it('submits the selected NotebookLM sub-role', () => {
@@ -134,7 +134,7 @@ describe('PromptForm operator roles', () => {
     selectRole('notebooklm');
     submitPrompt('Summarize this page');
 
-    expect(onSubmit).toHaveBeenCalledWith('#summary\n\nUser focus: Summarize this page', 'notebooklm-summary', undefined);
+    expect(onSubmit).toHaveBeenCalledWith('#summary\n\nUser focus: Summarize this page', 'notebooklm-summary', undefined, undefined, 'operator');
   });
 
   it('selects NotebookLM output before generating from selected tabs', () => {
@@ -148,7 +148,7 @@ describe('PromptForm operator roles', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirm mock tabs' }));
     fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
 
-    expect(onSubmit).toHaveBeenCalledWith('#study-guide', 'notebooklm-study-guide', [11, 12]);
+    expect(onSubmit).toHaveBeenCalledWith('#study-guide', 'notebooklm-study-guide', [11, 12], undefined, 'operator');
   });
 
   it('keeps research multi-tab selection and passes selected tab IDs', () => {
@@ -164,6 +164,8 @@ describe('PromptForm operator roles', () => {
       expect.stringContaining('https://example.com/one'),
       'researcher',
       [11, 12],
+      undefined,
+      'operator',
     );
   });
 
@@ -239,6 +241,7 @@ describe('PromptForm Ask The Books mode', () => {
       'books-happinessBook',
       undefined,
       'standalone',
+      'ask',
     );
   });
 
@@ -278,7 +281,7 @@ describe('PromptForm Ask The Books mode', () => {
 
     submitPrompt('Should I change direction?');
 
-    expect(onSubmit).toHaveBeenCalledWith('Should I change direction?', 'munger', undefined, 'current-tab');
+    expect(onSubmit).toHaveBeenCalledWith('Should I change direction?', 'munger', undefined, 'current-tab', 'ask');
   });
 
   it('lets expert conversations ignore the current tab', () => {
@@ -289,7 +292,7 @@ describe('PromptForm Ask The Books mode', () => {
 
     submitPrompt('Talk through this idea with me');
 
-    expect(onSubmit).toHaveBeenCalledWith('Talk through this idea with me', 'munger', undefined, 'standalone');
+    expect(onSubmit).toHaveBeenCalledWith('Talk through this idea with me', 'munger', undefined, 'standalone', 'ask');
   });
 
   it('keeps book conversations standalone', () => {
@@ -300,7 +303,7 @@ describe('PromptForm Ask The Books mode', () => {
     expect(screen.queryByRole('group', { name: 'Expert context' })).not.toBeInTheDocument();
     submitPrompt('Apply this book to my situation');
 
-    expect(onSubmit).toHaveBeenCalledWith('Apply this book to my situation', 'books-happinessBook', undefined, 'standalone');
+    expect(onSubmit).toHaveBeenCalledWith('Apply this book to my situation', 'books-happinessBook', undefined, 'standalone', 'ask');
   });
 
   it.each([
@@ -320,7 +323,7 @@ describe('PromptForm Ask The Books mode', () => {
     expect(screen.getByText(new RegExp(guideText))).toBeInTheDocument();
     submitPrompt('Please examine this situation');
 
-    expect(onSubmit).toHaveBeenCalledWith('Please examine this situation', expectedRole, undefined, 'current-tab');
+    expect(onSubmit).toHaveBeenCalledWith('Please examine this situation', expectedRole, undefined, 'current-tab', 'ask');
   });
 
   it('keeps draft text when changing experts', () => {
@@ -333,4 +336,22 @@ describe('PromptForm Ask The Books mode', () => {
 
     expect(screen.getByRole('textbox')).toHaveValue('Keep this draft');
   });
+});
+
+it('accepts extract table requests without a configuration form', () => {
+  const { onSubmit } = renderPromptForm();
+  const textbox = screen.getByRole('textbox', { name: 'Prompt' });
+  fireEvent.change(textbox, { target: { value: '/extract-table' } });
+  fireEvent.keyDown(textbox, { key: 'Enter' });
+  expect(screen.queryByRole('region', { name: 'Structured extraction setup' })).not.toBeInTheDocument();
+  fireEvent.change(textbox, { target: { value: '提取前5页职位和详情链接' } });
+  fireEvent.submit(textbox.closest('form')!);
+  expect(onSubmit.mock.calls[0][0]).toContain('提取前5页职位和详情链接');
+  expect(onSubmit.mock.calls[0][0]).toContain('never invent a URL');
+});
+
+it('routes a typed extract table command with its natural-language request', () => {
+  const { onSubmit } = renderPromptForm();
+  submitPrompt('/extract table 前5页职位');
+  expect(onSubmit.mock.calls[0][0]).toContain('User request: 前5页职位');
 });

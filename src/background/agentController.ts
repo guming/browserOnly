@@ -2,6 +2,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createBrowserAgent, executePromptWithFallback, needsReinitialization } from "../agent/AgentCore";
 import { ExecutionCallbacks } from "../agent/ExecutionEngine";
+import { shouldOfferRecordedWorkflow } from '../workflows/candidateEligibility';
 import { compileTrace, TraceRecorder, WorkflowStore } from "../workflows";
 import { setCurrentPage } from "../agent/PageContextManager"
 import { contextTokenCount } from "../agent/TokenManager";
@@ -500,6 +501,7 @@ export async function executePrompt(
   role:string = 'operator',
   selectedTabIds?: number[],
   contextMode?: 'current-tab' | 'standalone',
+  taskMode?: 'operator' | 'ask',
 ): Promise<void> {
   const originalTaskInstruction = prompt;
   try {
@@ -906,6 +908,8 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
       });
     }
     
+    // Keep the execution outcome separate from the UI completion notification.
+    let executionStatus: 'completed' | 'cancelled' | 'failed' | undefined;
     // Create callbacks for the agent
     const traceRecorder = new TraceRecorder();
     traceRecorder.start();
@@ -1079,6 +1083,7 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
       onToolEvent: (event) => {
         traceRecorder.record({ ...event, tabId: targetTabId, windowId: updatedTabState.windowId });
       },
+      onExecutionEnd: (status) => { executionStatus = status; },
       onComplete: () => {
         // Get the window ID for this tab
         const windowId = getWindowForTab(targetTabId);
@@ -1109,9 +1114,10 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
         }
 
         const trace = traceRecorder.finish();
-        if (trace.length > 0 && !isReflectionPrompt && !isMultiTabAnalysis) {
+        if (shouldOfferRecordedWorkflow({ taskMode, executionStatus, recordedEventCount: trace.length, isReflectionPrompt, isMultiTabAnalysis: !!isMultiTabAnalysis })) {
           const domain = currentDomain;
-          const candidate = compileTrace(trace, domain, prompt.slice(0, 60) || 'Recorded workflow', currentUrl, originalTaskInstruction);
+          const candidate = compileTrace(trace, domain, prompt.slice(0, 60) || 'Recorded workflow', currentUrl, originalTaskInstruction, contextMode);
+          if (candidate.version.steps.some(step => step.enabled && !!step.toolName)) {
           candidate.version.sourceRunId = `recording-${candidate.version.id}`;
           void Promise.all(trace.map((event, sequence) => WorkflowStore.getInstance().saveTraceEvent({
             id: `${candidate.version.sourceRunId}-${sequence}`, runId: candidate.version.sourceRunId!, sequence,
@@ -1120,8 +1126,9 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
             timestamp: event.startedAt,
           }))).then(() => WorkflowStore.getInstance().saveVersion(candidate.version))
             .then(() => WorkflowStore.getInstance().saveWorkflow(candidate.workflow))
-            .then(() => sendUIMessage('updateOutput', { type: 'system', content: `Automation candidate available for 24 hours: ${candidate.workflow.name}` }, targetTabId))
+            .then(() => sendUIMessage('updateOutput', { type: 'workflow', workflowId: candidate.workflow.id, content: candidate.workflow.name }, targetTabId, windowId))
             .catch(error => logWithTimestamp(`Could not save workflow draft: ${String(error)}`, 'warn'));
+          }
         }
         
         sendUIMessage('processingComplete', null, targetTabId, windowId);

@@ -2,17 +2,20 @@ import React from 'react';
 import { Message } from '../types';
 import { LlmContent } from './LlmContent';
 import { ScreenshotMessage } from './ScreenshotMessage';
+import { WorkflowChatCard } from './WorkflowChatCard';
 
 interface MessageDisplayProps {
   messages: Message[];
   streamingSegments: Record<number, string>;
   isStreaming: boolean;
+  onOpenWorkflow?: (workflowId: string, mode?: 'run') => void;
 }
 
 export const MessageDisplay: React.FC<MessageDisplayProps> = ({
   messages,
   streamingSegments,
-  isStreaming
+  isStreaming,
+  onOpenWorkflow
 }) => {
   // Always show all messages
   const filteredMessages = messages;
@@ -26,7 +29,9 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({
       {/* Render completed messages in their original order */}
       {filteredMessages.map((msg, index) => (
         <div key={`msg-${index}`} className="mb-2">
-          {msg.type === 'system' ? (
+          {msg.type === 'workflow' && msg.workflowId ? (
+            <WorkflowChatCard workflowId={msg.workflowId} fallbackName={msg.content} onOpenWorkflow={onOpenWorkflow} />
+          ) : msg.type === 'system' ? (
             <div className="bg-base-200 px-3 py-1 rounded text-gray-500 text-sm">
               {msg.content}
             </div>

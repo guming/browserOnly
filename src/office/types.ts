@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const officeConfigSchema = z.object({
   mode: z.enum(['inspection', 'archive']),
   name: z.string().trim().min(1).max(100),
+  sourceKind: z.enum(['table', 'list', 'repeated-block']).default('table'),
   tableSelector: z.string().trim().min(1).max(1000),
   headers: z.array(z.string().max(300)).min(1).max(50),
   keyColumn: z.number().int().min(0).optional(),
@@ -38,7 +39,16 @@ export const officeConfigSchema = z.object({
 export type OfficeConfig = z.infer<typeof officeConfigSchema>;
 export interface OfficeLink { url: string; name: string; }
 export interface OfficeRow { key: string; cells: string[]; sourceUrl: string; detailUrl?: string; links: OfficeLink[]; }
-export interface OfficeTable { selector: string; headers: string[]; sample: string[][]; }
+/** A repeated collection found on the page. `tableSelector` is retained in saved
+ * configurations for backwards compatibility; for lists and cards it selects
+ * the individual records instead of a table element. */
+export interface OfficeTable {
+  selector: string;
+  headers: string[];
+  sample: string[][];
+  sourceKind: OfficeConfig['sourceKind'];
+  recordCount: number;
+}
 export interface OfficePage { headers: string[]; rows: Omit<OfficeRow, 'key'>[]; url: string; truncated: boolean; }
 export interface ArchiveFile extends OfficeLink {
   id: string;

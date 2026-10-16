@@ -31,6 +31,7 @@ export interface ExecutePromptMessage {
   windowId?: number;
   role?: string;
   contextMode?: 'current-tab' | 'standalone';
+  taskMode?: 'operator' | 'ask';
 }
 
 export interface CancelExecutionMessage {
@@ -90,6 +91,7 @@ export interface ReflectAndLearnMessage {
 }
 
 export interface RunWorkflowMessage {
+  scheduled?: boolean;
   action: 'runWorkflow';
   workflowId: string;
   versionId: string;
@@ -109,7 +111,8 @@ export interface GetPendingActionMessage { action: 'getPendingAction'; tabId: nu
 export interface UpdateOutputMessage {
   action: 'updateOutput';
   content: {
-    type: 'system' | 'llm' | 'screenshot';
+    type: 'system' | 'llm' | 'screenshot' | 'workflow';
+    workflowId?: string;
     content: string;
     imageData?: string;
     mediaType?: string;

@@ -1,3 +1,4 @@
+import { setupWorkflowScheduling } from '../workflows/schedulingIntegration';
 import { MemoryService } from '../tracking/memoryService';
 import { setupMessageListeners } from './messageHandler';
 import { putPendingAction } from '../actions';
@@ -24,6 +25,7 @@ function initializeExtension(): void {
   setupCommandListeners();
 
   setupMonitoring();
+  setupWorkflowScheduling();
 }
 
 /**

@@ -82,6 +82,12 @@ export function handleApprovalResponse(requestId: string, approved: boolean, run
   }
 }
 
+export function cancelRunApprovals(runId: string): void {
+  for (const [id, pending] of pendingApprovals) {
+    if (pending.runId === runId) { pending.resolve(false); pendingApprovals.delete(id); }
+  }
+}
+
 /**
  * Generates a unique ID for approval requests
  * @returns A unique ID string

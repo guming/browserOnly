@@ -8,7 +8,7 @@ export function createExtractionWorkflow(request: ExtractionRequest, name = 'Str
   const version: WorkflowVersion = {
     id: versionId, workflowId, version: 1, source: 'manual_edit', createdAt: now,
     steps: [
-      { id: 'extract', type: 'ai_step', label: 'Extract structured data', enabled: true, timeoutMs: 30_000, retryPolicy: { maxAttempts: 1, delayMs: 250 }, onFailure: 'stop', toolName: 'browser_extract_structured', input: request, risk: 'read' },
+      { id: 'extract', type: 'ai_step', label: 'Extract structured data', enabled: true, timeoutMs: Math.max(30_000, (request.plan?.maxPages ?? 1) * 20_000), retryPolicy: { maxAttempts: 1, delayMs: 250 }, onFailure: 'stop', toolName: 'browser_extract_structured', input: request, risk: 'read' },
       ...(request.outputFormat === 'csv' || request.outputFormat === 'json' ? [{ id: 'export', type: 'action' as const, label: `Download ${request.outputFormat.toUpperCase()}`, enabled: true, timeoutMs: 15_000, retryPolicy: { maxAttempts: 1, delayMs: 250 }, onFailure: 'stop' as const, toolName: 'browser_export_data', input: { format: request.outputFormat, previousResult: true }, risk: 'write' as const }] : []),
     ],
     finalAssertions: request.outputFormat === 'csv' || request.outputFormat === 'json' ? [{ type: 'download_exists', expected: true, timeoutMs: 1_000 }] : [{ type: 'row_count', expected: { min: 1 }, timeoutMs: 1_000 }],

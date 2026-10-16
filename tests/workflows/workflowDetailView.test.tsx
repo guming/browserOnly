@@ -96,3 +96,16 @@ test('new replay instruction edit preserves steps and activates atomically', asy
   await waitFor(() => expect(activate).toHaveBeenCalled());
   expect(activate.mock.calls[0][1]).toMatchObject({ taskInstruction: 'Search 肽敏舒', steps: [], replayFormat: 'steps-v2' });
 });
+
+test('saves independent goal tasks without requiring a starting URL', async () => {
+  const store = WorkflowStore.getInstance();
+  const goal: WorkflowVersion = { ...version, runStrategy: 'goal', taskInstruction: 'Find new features', entryContext: { kind: 'standalone' }, replayFormat: 'steps-v2' };
+  jest.spyOn(store, 'getVersion').mockResolvedValue(goal);
+  jest.spyOn(store, 'listVersions').mockResolvedValue([goal]);
+  const activate = jest.spyOn(store, 'activateVersion').mockResolvedValue();
+  render(<WorkflowDetailView workflow={{ ...workflow, startUrl: undefined }} onBack={jest.fn()} onSaved={jest.fn()} />);
+  await screen.findByLabelText('Task instruction');
+  expect(screen.queryByLabelText('Start URL')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Save version' }));
+  await waitFor(() => expect(activate).toHaveBeenCalledWith(expect.objectContaining({ executionMode: 'new_tab' }), expect.objectContaining({ runStrategy: 'goal', entryContext: { kind: 'standalone' }, taskInstruction: 'Find new features' })));
+});
