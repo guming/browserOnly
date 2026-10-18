@@ -21,12 +21,14 @@ import { WorkflowPicker } from './components/actions/WorkflowPicker';
 import { instantiateTemplate } from '../templates';
 import type { ActionInvocation } from '../actions';
 import { MonitorListView } from './components/monitors/MonitorListView';
+import { TestsListView } from '../testing/TestsListView';
 
 export function SidePanel() {
   const [activeView, setActiveView] = useState<WorkspaceView>('tasks');
   const [workflowCount, setWorkflowCount] = useState(0);
   const [chatWorkflowId, setChatWorkflowId] = useState<string>();
   const [chatWorkflowMode, setChatWorkflowMode] = useState<'run'>();
+  const [templateRun, setTemplateRun] = useState<ReturnType<typeof instantiateTemplate>>();
   const [failedRunCount, setFailedRunCount] = useState(0);
   const [monitorCount, setMonitorCount] = useState(0);
   const [pendingAction, setPendingAction] = useState<ActionInvocation>();
@@ -51,6 +53,7 @@ export function SidePanel() {
   const [approvalRequests, setApprovalRequests] = useState<Array<{
     requestId: string;
     runId?: string;
+    executionTabId?: number;
     toolName: string;
     toolInput: string;
     reason: string;
@@ -255,7 +258,7 @@ export function SidePanel() {
   // Handlers for approval requests
   const handleApprove = async (requestId: string) => {
     const request = approvalRequests.find(item => item.requestId === requestId);
-    if (await approveRequest(requestId, request?.runId)) {
+    if (await approveRequest(requestId, request?.runId, request?.executionTabId)) {
       setApprovalRequests(prev => prev.filter(req => req.requestId !== requestId));
       addSystemMessage(`✅ Approved action: ${requestId}`);
     } else {
@@ -265,7 +268,7 @@ export function SidePanel() {
 
   const handleReject = async (requestId: string) => {
     const request = approvalRequests.find(item => item.requestId === requestId);
-    if (await rejectRequest(requestId, request?.runId)) {
+    if (await rejectRequest(requestId, request?.runId, request?.executionTabId)) {
       setApprovalRequests(prev => prev.filter(req => req.requestId !== requestId));
       addSystemMessage(`❌ Rejected action: ${requestId}`);
     } else {
@@ -469,7 +472,7 @@ export function SidePanel() {
       </header>
     )}
 
-    {hasConfiguredProviders || activeView === 'monitors' ? (
+    {hasConfiguredProviders || activeView === 'monitors' || activeView === 'tests' ? (
       <>
         {/* Main Content Area - 优化动画性能 */}
         <div className={`flex-grow flex flex-col gap-3 ${isOutputExpanded ? 'fixed inset-4 z-50 overflow-hidden rounded-xl border border-slate-200 bg-[#fafbfc] p-4' : 'min-h-0 overflow-hidden z-20'}`}>
@@ -537,7 +540,7 @@ export function SidePanel() {
             >
               {activeView === 'tasks' ? (
                 <MessageDisplay messages={messages} streamingSegments={streamingSegments} isStreaming={isStreaming} onOpenWorkflow={(id, mode) => { setChatWorkflowId(id); setChatWorkflowMode(mode); setActiveView('workflows'); }} />
-              ) : activeView === 'workflows' ? <WorkflowListView initialWorkflowId={chatWorkflowId} initialMode={chatWorkflowMode} onRunStarted={() => { setActiveView('tasks'); setIsProcessing(true); setTabStatus('running'); addSystemMessage('▶ Automation started. Running the saved steps…'); }} /> : activeView === 'monitors' ? <MonitorListView tabId={currentSelectedTabId ?? tabId ?? undefined} /> : <RunListView />}
+              ) : activeView === 'workflows' ? <WorkflowListView initialWorkflowId={chatWorkflowId} initialMode={chatWorkflowMode} initialTemplateRun={templateRun} onInitialTemplateRunConsumed={() => setTemplateRun(undefined)} onRunStarted={() => { setActiveView('tasks'); setIsProcessing(true); setTabStatus('running'); addSystemMessage('▶ Automation started. Running the saved steps…'); }} /> : activeView === 'monitors' ? <MonitorListView tabId={currentSelectedTabId ?? tabId ?? undefined} /> : activeView === 'tests' ? <TestsListView /> : <RunListView />}
             </div>
           </div>
 
@@ -568,7 +571,7 @@ export function SidePanel() {
               onExtract={() => { if (typeof tabId === 'number' && typeof windowId === 'number') setPendingAction({ actionId: 'extract', source: 'page_actions', tabId, windowId, pageUrl: currentTabUrl, pageTitle: tabTitle, createdAt: Date.now() }); }}
               onWorkflows={() => setShowWorkflowPicker(true)}
             />}
-            {activeView === 'tasks' && showWorkflowPicker && <WorkflowPicker pageUrl={currentTabUrl} onClose={() => setShowWorkflowPicker(false)} onWorkflow={workflow => { setShowWorkflowPicker(false); if (workflow.variables.length) return setActiveView('workflows'); const targetTabId = currentSelectedTabId ?? tabId; if (typeof targetTabId === 'number') chrome.runtime.sendMessage({ action: 'runWorkflow', workflowId: workflow.id, versionId: workflow.activeVersionId, ownerTabId: targetTabId, ownerWindowId: windowId, executionMode: workflow.executionMode }); }} onTemplate={template => { setShowWorkflowPicker(false); const candidate = instantiateTemplate(template); const targetTabId = currentSelectedTabId ?? tabId; if (candidate.workflow.variables.length) return setActiveView('workflows'); if (typeof targetTabId === 'number') chrome.runtime.sendMessage({ action: 'runWorkflow', workflowId: candidate.workflow.id, versionId: candidate.version.id, transientWorkflow: candidate.workflow, transientVersion: candidate.version, ownerTabId: targetTabId, ownerWindowId: windowId, executionMode: candidate.workflow.executionMode }); }} />}
+            {activeView === 'tasks' && showWorkflowPicker && <WorkflowPicker pageUrl={currentTabUrl} onClose={() => setShowWorkflowPicker(false)} onWorkflow={workflow => { setShowWorkflowPicker(false); if (workflow.variables.length) { setActiveView('workflows'); setChatWorkflowId(workflow.id); setChatWorkflowMode('run'); return; } const targetTabId = currentSelectedTabId ?? tabId; if (typeof targetTabId === 'number') chrome.runtime.sendMessage({ action: 'runWorkflow', workflowId: workflow.id, versionId: workflow.activeVersionId, ownerTabId: targetTabId, ownerWindowId: windowId, executionMode: workflow.executionMode }); }} onTemplate={template => { setShowWorkflowPicker(false); const candidate = instantiateTemplate(template); const targetTabId = currentSelectedTabId ?? tabId; if (candidate.workflow.variables.length) { setTemplateRun(candidate); setActiveView('workflows'); return; } if (typeof targetTabId === 'number') chrome.runtime.sendMessage({ action: 'runWorkflow', workflowId: candidate.workflow.id, versionId: candidate.version.id, transientWorkflow: candidate.workflow, transientVersion: candidate.version, ownerTabId: targetTabId, ownerWindowId: windowId, executionMode: candidate.workflow.executionMode }); }} />}
             {activeView === 'tasks' && <PromptForm
               onSubmit={handleSubmit}
               onCancel={handleCancel}

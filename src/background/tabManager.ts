@@ -521,6 +521,20 @@ export async function createWorkflowExecutionTab(windowId: number, startUrl: str
   return createTabPage(windowId, startUrl, true);
 }
 
+/** Create an attached test page without changing the user's active tab. */
+export async function createTestExecutionTab(windowId: number, startUrl: string): Promise<WorkflowExecutionTab> {
+  const parsed = new URL(startUrl);
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error('Test start URL must use http or https');
+  const app = await getCrxApp(windowId);
+  const page = await app.newPage({ windowId, url: startUrl, active: false });
+  const tabId = await getTabIdFromPage(page, windowId);
+  if (tabId === undefined) { await page.close().catch(() => undefined); throw new Error('Could not determine tab ID for test page'); }
+  storeWindowForTab(tabId, windowId);
+  setTabState(tabId, { page, windowId, title: await page.title().catch(() => 'Test page') });
+  addAttachedTab(tabId);
+  return { page, tabId, windowId };
+}
+
 async function createTabPage(windowId: number, url: string | undefined, active: boolean): Promise<WorkflowExecutionTab> {
   try {
     logWithTimestamp(`Creating new tab in window ${windowId}${url ? ` with URL ${url}` : ''}`);

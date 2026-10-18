@@ -15,7 +15,7 @@ interface UseChromeMessagingProps {
   onFallbackStarted: (message: string) => void;
   onUpdateScreenshot: (content: any) => void;
   onProcessingComplete: () => void;
-  onRequestApproval?: (request: { requestId: string, runId?: string, toolName: string, toolInput: string, reason: string }) => void;
+  onRequestApproval?: (request: { requestId: string, runId?: string, executionTabId?: number, toolName: string, toolInput: string, reason: string }) => void;
   setTabTitle: (title: string) => void;
   onTabStatusChanged?: (status: 'attached' | 'detached' | 'running' | 'idle' | 'error', tabId: number) => void;
   onTargetCreated?: (tabId: number, targetInfo: any) => void;
@@ -61,7 +61,7 @@ export const useChromeMessaging = ({
       // If the message has a tabId, check if it matches this tab's ID
       // If the message has a windowId, check if it matches this window's ID
       // If the message doesn't have a tabId or windowId, process it (for backward compatibility)
-      const workflowMessage = Boolean(message.runId || message.workflowId);
+      const workflowMessage = Boolean(message.runId || message.workflowId || message.action === 'requestApproval' && typeof message.executionTabId === 'number');
       if ((!workflowMessage && message.tabId && message.tabId !== tabId) ||
           (message.windowId && windowId && message.windowId !== windowId)) {
         return false; // Skip messages for other tabs or windows
@@ -124,6 +124,7 @@ export const useChromeMessaging = ({
             onRequestApproval({
               requestId: message.requestId,
               runId: message.runId,
+              executionTabId: message.executionTabId,
               toolName: message.toolName,
               toolInput: message.toolInput,
               reason: message.reason || 'This action requires approval.'
@@ -285,12 +286,13 @@ export const useChromeMessaging = ({
     });
   };
 
-  const respondToApproval = (requestId: string, approved: boolean, runId?: string): Promise<boolean> =>
+  const respondToApproval = (requestId: string, approved: boolean, runId?: string, executionTabId?: number): Promise<boolean> =>
     new Promise(resolve => {
       chrome.runtime.sendMessage({
         action: 'approvalResponse',
         requestId,
         runId,
+        executionTabId,
         approved,
         tabId,
         windowId
@@ -304,9 +306,9 @@ export const useChromeMessaging = ({
       });
     });
 
-  const approveRequest = (requestId: string, runId?: string) => respondToApproval(requestId, true, runId);
+  const approveRequest = (requestId: string, runId?: string, executionTabId?: number) => respondToApproval(requestId, true, runId, executionTabId);
 
-  const rejectRequest = (requestId: string, runId?: string) => respondToApproval(requestId, false, runId);
+  const rejectRequest = (requestId: string, runId?: string, executionTabId?: number) => respondToApproval(requestId, false, runId, executionTabId);
 
   return {
     executePrompt,

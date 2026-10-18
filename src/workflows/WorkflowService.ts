@@ -16,6 +16,7 @@ import { createProvider } from '../models/providers/factory';
 import { createOfficeInspectionTool } from '../office/inspectionTool';
 import { discoverOfficeTables } from '../office/pageReader';
 import { autoRecordRequest } from '../extraction/autoRecordPlan';
+import { compareSelectedTabs } from './selectedTabComparison';
 
 const WORKFLOW_MAX_RETURN_CHARS = 20_000;
 
@@ -126,6 +127,7 @@ export class WorkflowService {
     });
 
     tools.push({ name: 'browser_read_main_for_workflow', description: 'Workflow-only main content.', func: readMain });
+    tools.push({ name: 'browser_compare_selected_tabs', description: 'Compare the selected web tabs.', func: input => compareSelectedTabs(parseToolInput(input), options.context?.windowId) });
     tools.push({ name: 'browser_get_overview', description: 'Workflow-safe page overview.', func: getOverview });
 
     for (const name of ['browser_read_text', 'browser_read_text_ast', 'browser_read_text_enhanced']) {
@@ -144,7 +146,9 @@ export class WorkflowService {
       description: 'Extract user-confirmed fields from a table, semantic list, or repeated cards into standard JSON.',
       func: async (input: string, context) => withStablePageRead(async currentPage => {
         const rawInput = parseToolInput(input);
-        const request = extractionRequestSchema.parse(rawInput && typeof rawInput === 'object' && !Array.isArray(rawInput) && (rawInput as { autoDiscover?: boolean }).autoDiscover === true
+        const automatic = rawInput && typeof rawInput === 'object' && !Array.isArray(rawInput) && (rawInput as { autoDiscover?: boolean }).autoDiscover === true;
+        const suppliedFields = automatic ? (rawInput as { fields?: unknown }).fields : undefined;
+        const request = extractionRequestSchema.parse(automatic && (!Array.isArray(suppliedFields) || suppliedFields.length === 0)
           ? autoRecordRequest(await currentPage.evaluate(discoverOfficeTables))
           : rawInput);
         const readPage = async () => {

@@ -10,7 +10,7 @@ import { clearMessageHistory } from './agentController';
 import { initializeAgent } from './agentController';
 import { ConfigManager } from './configManager';
 import { triggerReflection } from './reflectionController';
-import { attachToTab, createWorkflowExecutionTab, getTabState, getWindowForTab, forceResetPlaywright } from './tabManager';
+import { attachToTab, createWorkflowExecutionTab, createTestExecutionTab, getTabState, getWindowForTab, forceResetPlaywright } from './tabManager';
 import { AgentStatus, BackgroundMessage, DownloadMarkdownMessage } from './types';
 import { logWithTimestamp, handleError, sendUIMessage } from './utils';
 import { SimpleChatAgent } from '../agent/SimpleChatAgent';
@@ -26,13 +26,39 @@ import { dispatchTranslationBatch } from '../translation/translationBatchDispatc
 import { handleMonitorMessage, isMonitorMessage } from '../monitoring/backgroundIntegration';
 import { handleOfficeArchive } from '../office/archive';
 import { handleOfficeRecord } from '../office/handledRecords';
+import { acquireWindowTaskLease, isWindowTaskLeased, releaseWindowTaskLease } from './windowTaskLease';
+import { TestSuiteCoordinator } from '../testing/TestSuiteCoordinator';
+import { validateTestSuite, stringifyTestSuite } from '../testing/protocol';
+import { TestStore } from '../testing/TestStore';
+import { generateObservedCases } from '../testing/AgentTestGenerator';
 const translationQueue = new TranslationQueue((request, signal) => translateBatch(request, signal));
 const activeTranslationSessions = new Map<number, string>();
+
+async function generateTestCaseDraft(suiteId: string, goal: string, windowId: number): Promise<{ yaml: string }> {
+  const store = TestStore.getInstance();
+  const suite = await store.getSuite(suiteId);
+  if (!suite) throw new Error('Test suite not found');
+  const cleanGoal = goal.trim();
+  if (cleanGoal.length < 8 || cleanGoal.length > 5000) throw new Error('Describe the test goal in 8–5000 characters.');
+  const existingCases = await store.listCases(suiteId);
+  if (existingCases.length >= 50) throw new Error('This suite already has the maximum of 50 cases.');
+  const configured = await ConfigManager.getInstance().getProviderConfig();
+  if (!configured.apiKey && configured.provider !== 'ollama') throw new Error('Configure an AI provider first.');
+  const provider = await createProvider(configured.provider, { apiKey: configured.apiKey || 'ollama', apiModelId: configured.apiModelId, baseUrl: configured.baseUrl, thinkingBudgetTokens: configured.thinkingBudgetTokens, openaiCompatibleModels: configured.openaiCompatibleModels, windowId } as any);
+  const execution = await createTestExecutionTab(windowId, suite.site);
+  try {
+    const definitions = await generateObservedCases(execution.page, execution.tabId, provider, suite, cleanGoal);
+    if (existingCases.length + definitions.length > 50) throw new Error('This suite already has the maximum of 50 cases.');
+    const versions = await Promise.all(existingCases.map(item => store.getVersion(item.activeVersionId)));
+    return { yaml: stringifyTestSuite({ schemaVersion: 1, suiteId: suite.suiteId, name: suite.name, site: suite.site, allowedDomains: suite.allowedDomains, cases: [...versions.flatMap(item => item ? [item.definition] : []), ...definitions] }) };
+  } finally {
+    await execution.page.close().catch(() => undefined);
+  }
+}
 
 type TaskRunner = WorkflowRunner | GoalWorkflowRunner;
 const workflowRunners = new Map<string, { runner: TaskRunner; executionTabId?: number; ownerTabId: number; context?: { tabId?: number; windowId?: number; ownerTabId?: number; cancelReason?: string } }>();
 const workflowRunByExecutionTab = new Map<number, TaskRunner>();
-const runningWorkflowWindows = new Set<number>();
 /**
  * Handle messages from the UI
  * @param message The message to handle
@@ -81,6 +107,26 @@ export function handleMessage(
         void handleRunWorkflow(message).catch(error => console.error('[runWorkflow] unexpected failure', error));
         sendResponse({ success: true, started: true });
         return false;
+      case 'testSuiteStart':
+        void TestSuiteCoordinator.start(message.suiteId, message.ownerWindowId, message.caseIds, message.concurrency)
+          .then(run => sendResponse({ success: true, runId: run.id }))
+          .catch(error => sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) }));
+        return true;
+      case 'testSuiteCancel':
+        void TestSuiteCoordinator.cancel(message.runId).then(cancelled => sendResponse({ success: cancelled, error: cancelled ? undefined : 'Test run is no longer active.' }));
+        return true;
+      case 'testSuiteCancelCase':
+        void TestSuiteCoordinator.cancelCase(message.runId, message.caseRunId).then(cancelled => sendResponse({ success: cancelled, error: cancelled ? undefined : 'Test case is no longer active.' }));
+        return true;
+      case 'testCaseGenerate':
+        void generateTestCaseDraft(message.suiteId, message.goal, message.ownerWindowId).then(result => sendResponse({ success: true, ...result }))
+          .catch(error => sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) }));
+        return true;
+      case 'testCaseTrialRun':
+        void TestSuiteCoordinator.trialRun(message.suiteId, message.ownerWindowId, message.definition)
+          .then(run => sendResponse({ success: true, runId: run.id }))
+          .catch(error => sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) }));
+        return true;
       case 'invokeAction':
         putPendingAction(message.invocation).then(() => sendResponse({ success: true })).catch(error => sendResponse({ success: false, error: String(error) }));
         return true;
@@ -138,7 +184,7 @@ export function handleMessage(
         return true;
         
       case 'approvalResponse':
-        if (handleApprovalResponse(message.requestId, message.approved, message.runId)) {
+        if (handleApprovalResponse(message.requestId, message.approved, message.runId, message.executionTabId)) {
           sendResponse({ success: true });
         } else {
           sendResponse({ success: false, error: 'No matching pending approval was found.' });
@@ -298,6 +344,11 @@ function isBackgroundMessage(message: any): message is BackgroundMessage {
     (
       message.action === 'executePrompt' ||
       message.action === 'runWorkflow' ||
+      message.action === 'testSuiteStart' ||
+      message.action === 'testSuiteCancel' ||
+      message.action === 'testSuiteCancelCase' ||
+      message.action === 'testCaseGenerate' ||
+      message.action === 'testCaseTrialRun' ||
       message.action === 'invokeAction' ||
       message.action === 'getPendingAction' ||
       message.action === 'cancelExecution' ||
@@ -401,8 +452,8 @@ export async function handleRunWorkflow(
     const ownerTab = await chrome.tabs.get(tabId);
     const ownerWindowId = message.ownerWindowId ?? ownerTab.windowId ?? getWindowForTab(tabId);
     if (ownerWindowId === undefined) throw new Error('Workflow owner window is unavailable');
-    if (runningWorkflowWindows.has(ownerWindowId) || getAgentStatus(ownerWindowId).status === AgentStatus.RUNNING) throw new Error('A task is already running in this window.');
-    runningWorkflowWindows.add(ownerWindowId);
+    if (!acquireWindowTaskLease(ownerWindowId)) throw new Error('A task is already running in this window.');
+    if (getAgentStatus(ownerWindowId).status === AgentStatus.RUNNING) { releaseWindowTaskLease(ownerWindowId); throw new Error('A task is already running in this window.'); }
     claimedWindowId = ownerWindowId;
     setAgentStatus(ownerWindowId, AgentStatus.RUNNING);
     void Promise.resolve(chrome.runtime.sendMessage({ action: 'agentStatusUpdate', status: 'running', lastHeartbeat: Date.now(), windowId: ownerWindowId })).catch(() => undefined);
@@ -506,7 +557,7 @@ export async function handleRunWorkflow(
     }
     if (message.scheduled) throw error;
   } finally {
-    if (claimedWindowId !== undefined) { runningWorkflowWindows.delete(claimedWindowId); setAgentStatus(claimedWindowId, AgentStatus.IDLE); }
+    if (claimedWindowId !== undefined) { releaseWindowTaskLease(claimedWindowId); setAgentStatus(claimedWindowId, AgentStatus.IDLE); }
     if (activeRunner) {
       if (activeRunner.currentRunId) workflowRunners.delete(activeRunner.currentRunId);
       if (executionTabId !== undefined) { workflowRunners.delete(`pending:${executionTabId}`); workflowRunByExecutionTab.delete(executionTabId); }
@@ -518,6 +569,7 @@ if (typeof chrome !== 'undefined' && chrome.tabs?.onRemoved) {
   chrome.tabs.onRemoved.addListener((removedTabId) => {
     const runner = workflowRunByExecutionTab.get(removedTabId);
     if (runner) runner.cancel();
+    void TestSuiteCoordinator.handleTabClosed(removedTabId).catch(error => console.error('[test-suite] tab close handling failed', error));
   });
 }
 
@@ -542,7 +594,7 @@ function handleExecutePrompt(
   sendResponse: (response?: any) => void
 ): void {
   const windowId = message.windowId ?? (message.tabId ? getWindowForTab(message.tabId) : undefined);
-  if (windowId !== undefined && runningWorkflowWindows.has(windowId)) {
+  if (windowId !== undefined && isWindowTaskLeased(windowId)) {
     sendResponse({ success: false, error: 'An automation is already running in this window.' });
     return;
   }
@@ -1078,5 +1130,6 @@ async function handlePdfAiChat(
  * Set up message listeners
  */
 export function setupMessageListeners(): void {
+  void TestSuiteCoordinator.recoverInterrupted().catch(error => console.error('[test-suite] recovery failed', error));
   chrome.runtime.onMessage.addListener(handleMessage);
 }

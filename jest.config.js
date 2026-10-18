@@ -5,6 +5,7 @@ export default {
   extensionsToTreatAsEsm: ['.ts', '.tsx'],
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
+    '^yaml$': '<rootDir>/node_modules/yaml/dist/index.js',
   },
   transform: {
     '^.+\\.(ts|tsx)$': ['ts-jest', {

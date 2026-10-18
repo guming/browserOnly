@@ -82,6 +82,7 @@ export interface ApprovalResponseMessage {
   tabId?: number;
   windowId?: number;
   runId?: string;
+  executionTabId?: number;
 }
 
 export interface ReflectAndLearnMessage {
@@ -104,6 +105,11 @@ export interface RunWorkflowMessage {
   /** @deprecated Use ownerTabId/ownerWindowId. Kept for message compatibility during migration. */
   tabId?: number;
 }
+export interface TestSuiteStartMessage { action: 'testSuiteStart'; suiteId: string; caseIds?: string[]; concurrency?: number; ownerWindowId: number; }
+export interface TestSuiteCancelMessage { action: 'testSuiteCancel'; runId: string; }
+export interface TestSuiteCancelCaseMessage { action: 'testSuiteCancelCase'; runId: string; caseRunId: string; }
+export interface TestCaseGenerateMessage { action: 'testCaseGenerate'; suiteId: string; goal: string; ownerWindowId: number; }
+export interface TestCaseTrialRunMessage { action: 'testCaseTrialRun'; suiteId: string; ownerWindowId: number; definition: import('../testing/types').TestCaseDefinition; }
 export interface InvokeActionMessage { action: 'invokeAction'; invocation: ActionInvocation; }
 export interface GetPendingActionMessage { action: 'getPendingAction'; tabId: number; windowId: number; }
 
@@ -298,6 +304,11 @@ export type BackgroundMessage =
   | ApprovalResponseMessage
   | ReflectAndLearnMessage
   | RunWorkflowMessage
+  | TestSuiteStartMessage
+  | TestSuiteCancelMessage
+  | TestSuiteCancelCaseMessage
+  | TestCaseGenerateMessage
+  | TestCaseTrialRunMessage
   | InvokeActionMessage
   | GetPendingActionMessage
   | TokenUsageUpdatedMessage

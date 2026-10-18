@@ -11,7 +11,7 @@ import type { WorkflowVersion } from '../../workflows/types';
 
 interface RunTarget { workflow: Workflow; transientVersion?: WorkflowVersion }
 
-export function WorkflowListView({ onRunStarted, initialWorkflowId, initialMode }: { onRunStarted?: () => void; initialWorkflowId?: string; initialMode?: 'run' } = {}) {
+export function WorkflowListView({ onRunStarted, initialWorkflowId, initialMode, initialTemplateRun, onInitialTemplateRunConsumed }: { onRunStarted?: () => void; initialWorkflowId?: string; initialMode?: 'run'; initialTemplateRun?: { workflow: Workflow; version: WorkflowVersion }; onInitialTemplateRunConsumed?: () => void } = {}) {
   const [officeMode, setOfficeMode] = useState<'inspection' | 'archive' | null>(null);
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [selectedWorkflow, setSelectedWorkflow] = useState<Workflow | null>(null);
@@ -38,6 +38,11 @@ export function WorkflowListView({ onRunStarted, initialWorkflowId, initialMode 
     }).catch(() => undefined);
     return () => { cancelled = true; };
   }, [initialWorkflowId, initialMode]);
+  useEffect(() => {
+    if (!initialTemplateRun) return;
+    setRunTarget({ workflow: initialTemplateRun.workflow, transientVersion: initialTemplateRun.version });
+    onInitialTemplateRunConsumed?.();
+  }, [initialTemplateRun, onInitialTemplateRunConsumed]);
   const exportWorkflow = async (workflow: Workflow) => {
     const version = await WorkflowStore.getInstance().getVersion(workflow.activeVersionId);
     const blob = new Blob([JSON.stringify({ workflow, version }, null, 2)], { type: 'application/json' });

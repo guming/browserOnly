@@ -23,6 +23,7 @@ export default defineConfig({
       input: {
         'background': path.resolve(__dirname, 'src/background.ts'),
         'sidepanel': path.resolve(__dirname, 'src/sidepanel/index.tsx'),
+        'test-editor': path.resolve(__dirname, 'test-editor.html'),
         'options': path.resolve(__dirname, 'src/options/index.tsx'),
         'pdfInterceptor': path.resolve(__dirname, 'src/content/pdfInterceptor.ts'),
         'pageTranslation': path.resolve(__dirname, 'src/content/pageTranslation.ts'),

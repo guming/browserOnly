@@ -2,10 +2,10 @@ import { autoRecordRequest } from '../../src/extraction/autoRecordPlan';
 import { extractionRequestSchema } from '../../src/extraction/extractionSchema';
 import { TemplateCatalog } from '../../src/templates/TemplateCatalog';
 
-it('runs the repeated-list template without asking for fields', () => {
+it('runs the page-data template with optional columns', () => {
   const template = new TemplateCatalog().get('extract-list')!;
-  expect(template.variables).toEqual([]);
-  expect(template.version.steps[0].input).toMatchObject({ autoDiscover: true, source: 'page' });
+  expect(template.variables[0]).toMatchObject({ key: 'fields', required: false });
+  expect(template.version.steps[0].input).toMatchObject({ autoDiscover: true, source: 'page', fields: '{{fields}}' });
 });
 
 it('derives table columns and a bounded row selector from current page discovery', () => {

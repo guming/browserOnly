@@ -6,6 +6,7 @@ const pendingApprovals = new Map<string, {
   toolName: string,
   toolInput: string,
   reason: string,
+  executionTabId?: number,
   runId?: string
 }>();
 
@@ -28,7 +29,7 @@ export async function requestApproval(
 ): Promise<boolean> {
   return new Promise((resolve) => {
     const requestId = generateUniqueId();
-    pendingApprovals.set(requestId, { resolve, toolName, toolInput, reason, runId: metadata?.runId });
+    pendingApprovals.set(requestId, { resolve, toolName, toolInput, reason, runId: metadata?.runId, executionTabId: metadata?.executionTabId });
     
     // Get the window ID if not provided
     if (!windowId) {
@@ -70,9 +71,9 @@ export async function requestApproval(
  * @param requestId The ID of the approval request
  * @param approved Whether the request was approved
  */
-export function handleApprovalResponse(requestId: string, approved: boolean, runId?: string): boolean {
+export function handleApprovalResponse(requestId: string, approved: boolean, runId?: string, executionTabId?: number): boolean {
   const pendingApproval = pendingApprovals.get(requestId);
-  if (pendingApproval && (!pendingApproval.runId || pendingApproval.runId === runId)) {
+  if (pendingApproval && (!pendingApproval.runId || pendingApproval.runId === runId) && (pendingApproval.executionTabId === undefined || pendingApproval.executionTabId === executionTabId)) {
     pendingApproval.resolve(approved);
     pendingApprovals.delete(requestId);
     return true;
