@@ -20,6 +20,7 @@ export const bookCategories: BookCategory[] = [
   { id: 'learning', name: 'Learning & Research' },
   { id: 'systems', name: 'Systems Thinking' },
   { id: 'finance', name: 'Money & Finance' },
+  { id: 'communication', name: 'Communication & Negotiation' },
 ];
 
 export const availableBooks: BookGuide[] = [
@@ -197,6 +198,28 @@ export const availableBooks: BookGuide[] = [
     guideQuestions: [
       'The money decision or behavior you want to understand',
       'Your goal, time horizon, and worries about downside risk',
+    ],
+  },
+  {
+    id: 'difficultConversations',
+    title: 'Difficult Conversations',
+    author: 'Douglas Stone, Bruce Patton & Sheila Heen',
+    category: 'communication',
+    guideIntro: 'Ready to prepare for a difficult conversation? Share:',
+    guideQuestions: [
+      'What happened, what each person seems to believe, and what remains uncertain',
+      'What you want to understand or change through the conversation',
+    ],
+  },
+  {
+    id: 'valuePropositionDesign',
+    title: 'Value Proposition Design',
+    author: 'Alexander Osterwalder, Yves Pigneur, Greg Bernarda & Alan Smith',
+    category: 'business',
+    guideIntro: 'Ready to examine a value proposition? Share:',
+    guideQuestions: [
+      'The customer segment and the job they are trying to get done',
+      'Your offer and the evidence you have about customer pains and gains',
     ],
   },
 ];

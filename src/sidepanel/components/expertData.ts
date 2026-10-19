@@ -1,4 +1,4 @@
-export type ExpertId = 'munger' | 'marks' | 'kovach' | 'kotler' | 'tukey';
+export type ExpertId = 'munger' | 'marks' | 'kovach' | 'kotler' | 'tukey' | 'fisher' | 'meadows';
 
 export interface ExpertGuide {
   id: ExpertId;
@@ -70,6 +70,30 @@ export const availableExperts: ExpertGuide[] = [
       'The data, metrics, or observations you currently have',
     ],
     placeholder: 'Describe the data and the question you want answered',
+  },
+  {
+    id: 'fisher',
+    initials: 'RF',
+    name: 'Roger Fisher',
+    field: 'Negotiation & conflict',
+    guideIntro: 'To examine a negotiation, share:',
+    guideQuestions: [
+      'What each person is asking for and what matters underneath those positions',
+      'Your desired outcome, alternatives, and constraints',
+    ],
+    placeholder: 'Describe the disagreement or negotiation',
+  },
+  {
+    id: 'meadows',
+    initials: 'DM',
+    name: 'Donella Meadows',
+    field: 'Systems & recurring problems',
+    guideIntro: 'To understand a recurring problem, share:',
+    guideQuestions: [
+      'The pattern you keep seeing and what happens after you intervene',
+      'The people, incentives, feedback, and delays involved',
+    ],
+    placeholder: 'Describe the recurring pattern or system',
   },
 ];
 

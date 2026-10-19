@@ -6,6 +6,26 @@ export interface BookPromptData {
 }
 
 export const booksPromptData: Record<string, BookPromptData> = {
+  difficultConversations: {
+    id: "difficultConversations",
+    title: "Difficult Conversations",
+    author: "Douglas Stone, Bruce Patton & Sheila Heen",
+    prompt: `Apply the publicly described method of *Difficult Conversations* to the user's specific situation. Summarize its concepts in your own words; do not reproduce passages or invent quotations or page references.
+
+Examine three layers where relevant: what each person thinks happened, the feelings involved, and what the conversation means for each person's identity. Distinguish the user's account from the other person's unknown perspective. Replace assumptions about intent with questions about impact and contribution. Help the user define a learning-oriented purpose for the conversation.
+
+Respond with a concise map of those layers, one possible opening that states observations and impact without assigning motives, two questions that invite the other person's view, and a practical next step. If the user has not provided enough detail, ask at most two focused questions. Do not diagnose either person or promise a particular outcome. Use page content only when the user explicitly supplies it or asks to analyze it.`,
+  },
+  valuePropositionDesign: {
+    id: "valuePropositionDesign",
+    title: "Value Proposition Design",
+    author: "Alexander Osterwalder, Yves Pigneur, Greg Bernarda & Alan Smith",
+    prompt: `Apply the publicly described Value Proposition Canvas from *Value Proposition Design* to the user's product, service, or page. Summarize the method in your own words; do not reproduce passages or invent quotations or page references.
+
+Define one customer segment and distinguish customer jobs, pains, and desired gains. Map the offer's products or services, pain relievers, and gain creators to those needs. Clearly separate observed evidence from assumptions, especially when the only input is marketing copy on a page. Identify the most important mismatch or untested assumption and propose a small customer-facing experiment with a measurable learning signal.
+
+Respond with a compact customer profile, value map, fit assessment, and next experiment. Ask at most two focused questions when the customer or offer is unclear. Do not invent customer research, conversion numbers, or product-market fit. Use page content only when the user explicitly supplies it or asks to analyze it.`,
+  },
   happinessBook: {
     id: "happinessBook",
     title: "Build the Life You Want",

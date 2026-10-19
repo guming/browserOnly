@@ -153,6 +153,9 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
 
       {mode === 'ask' ? (
         <>
+          <p className="mb-2 text-xs leading-5 text-stone-600">
+            Choose an expert&apos;s thinking framework or a book&apos;s method. Describe your situation and what you want help with.
+          </p>
           <div className="mb-2 flex min-w-0 items-center gap-1.5">
             <span aria-hidden="true" className="text-sm text-[#315a78]">✦</span>
             <nav aria-label="Ask type" className="flex shrink-0 rounded-md bg-stone-100 p-0.5">
@@ -246,8 +249,12 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
             <aside className="mb-2 rounded-r-md border-l-2 border-[#91aabd] bg-stone-100 px-3 py-2 text-xs leading-5 text-stone-600">
               <strong className="font-semibold text-stone-800">
                 {askTarget === 'books' ? selectedBook.guideIntro : selectedExpert.guideIntro}
-              </strong>{' '}
-              {(askTarget === 'books' ? selectedBook.guideQuestions : selectedExpert.guideQuestions).join(' ')}
+              </strong>
+              <ul className="mt-1 list-disc pl-4">
+                {(askTarget === 'books' ? selectedBook.guideQuestions : selectedExpert.guideQuestions).map(question => (
+                  <li key={question}>{question}</li>
+                ))}
+              </ul>
             </aside>
           )}
         </>
