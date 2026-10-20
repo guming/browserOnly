@@ -664,7 +664,9 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
             startedAt: Date.now()
           };
 
-          if (requiresApproval) {
+          if (toolName === 'browser_extract_links' && !/(?:\/url\b|(?:extract|list|collect|find|gather|提取|列出|收集|获取|抓取|整理)[^\n。.!?]{0,35}(?:urls?|links?|链接|网址)|(?:urls?|links?|链接|网址)[^\n。.!?]{0,35}(?:extract|list|collect|find|gather|提取|列出|收集|获取|抓取|整理))/i.test(prompt)) {
+            result = 'The current request does not ask for a page-wide URL list. Skip this tool and continue the original task with focused page observations.';
+          } else if (requiresApproval) {
             if (adaptedCallbacks.executionContext?.scheduled) throw new Error('APPROVAL_REQUIRED: Run this task manually to review and approve its actions.');
             // Notify the user that approval is required
             adaptedCallbacks.onToolOutput(`⚠️ This action requires approval: ${reason}`);

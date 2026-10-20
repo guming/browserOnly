@@ -318,6 +318,58 @@ export const browserQuery: ToolFactory = (page: Page) =>
     },
   });
 
+export const browserExtractLinks: ToolFactory = (page: Page) =>
+  new DynamicTool({
+    name: "browser_extract_links",
+    description:
+      "Extract and deduplicate HTTP(S) links from the current page in one call. Reads both HTML anchor hrefs and raw URLs in visible text/Markdown (including plain-text files such as llms.txt). Input options: internal, external, all (default all); limit=<number> (default 200, max 500). Use directly for page URL extraction; no DOM query is needed.",
+    func: async (input: string) => {
+      try {
+        return await withActivePage(page, async (activePage) => {
+          const options = input.toLowerCase();
+          const scope = /\binternal\b/.test(options) ? 'internal' : /\bexternal\b/.test(options) ? 'external' : 'all';
+          const limitMatch = options.match(/\blimit\s*=\s*(\d+)/);
+          const limit = Math.min(500, Math.max(1, Number(limitMatch?.[1] ?? 200)));
+          const data = await activePage.evaluate(({ scope, limit }: { scope: string; limit: number }) => {
+            const pageUrl = new URL(location.href);
+            const seen = new Set<string>();
+            const links: Array<{ text: string; url: string }> = [];
+            const add = (candidate: string, text: string) => {
+              try {
+                const url = new URL(candidate, document.baseURI);
+                if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return;
+                const internal = url.origin === pageUrl.origin;
+                if (scope === 'internal' && !internal || scope === 'external' && internal || seen.has(url.href)) return;
+                seen.add(url.href);
+                links.push({ text, url: url.href });
+              } catch { /* Ignore malformed or non-web links. */ }
+            };
+            for (const anchor of Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href]'))) {
+              add(anchor.getAttribute('href')!, (anchor.innerText || anchor.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim());
+              if (links.length >= limit) break;
+            }
+            if (links.length < limit) {
+              const bodyText = document.body?.innerText || document.documentElement?.innerText || '';
+              const rawUrls = bodyText.match(/https?:\/\/[^\s<>"'`]+/g) ?? [];
+              for (const raw of rawUrls) {
+                const cleaned = raw.replace(/[.,;:!?)}\]]+$/, '');
+                add(cleaned, 'URL from page text');
+                if (links.length >= limit) break;
+              }
+            }
+            return { links, totalInDom: document.querySelectorAll('a[href]').length };
+          }, { scope, limit }) as { links: Array<{ text: string; url: string }>; totalInDom: number };
+          if (!data.links.length) return `No ${scope === 'all' ? '' : `${scope} `}HTTP(S) links found on this page.`;
+          const rows = data.links.map((link, index) => `${index + 1}. ${link.text || '(no link text)'}\n   ${link.url}`);
+          const suffix = data.links.length === limit ? `\n\nShowing first ${limit} unique links; page has ${data.totalInDom} anchor elements.` : `\n\n${data.links.length} unique links.`;
+          return `${rows.join('\n')}\n${suffix}`;
+        });
+      } catch (error) {
+        return `Error extracting page links: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
+  });
+
 
 export const browserAccessibleTree: ToolFactory = (page: Page) =>
   new DynamicTool({

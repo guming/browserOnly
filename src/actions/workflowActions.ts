@@ -1,12 +1,14 @@
 import type { Workflow } from '../workflows/types';
 import type { ActionDefinition } from './types';
+import { builtInActions } from './builtInActions';
 
 export function createWorkflowActions(workflows: readonly Workflow[]): ActionDefinition[] {
   const used = new Set<string>();
+  const reserved = new Set(builtInActions.map(action => action.slashCommand.slice(1).toLowerCase()));
   return workflows.filter(workflow => workflow.status !== 'archived').slice().sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id)).map(workflow => {
     const base = slug(workflow.name) || 'workflow';
     let alias = base;
-    if (used.has(alias)) alias = `${base}-${workflow.id.replace(/[^a-z0-9]/gi, '').slice(-4).toLowerCase()}`;
+    if (used.has(alias) || reserved.has(alias)) alias = `${base}-${workflow.id.replace(/[^a-z0-9]/gi, '').slice(-4).toLowerCase()}`;
     used.add(alias);
     return {
       id: `workflow:${workflow.id}`,

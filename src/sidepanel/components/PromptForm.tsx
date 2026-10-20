@@ -10,8 +10,6 @@ import { WorkflowStore } from '../../workflows/WorkflowStore';
 import { SlashCommandMenu } from './actions/SlashCommandMenu';
 import { ActionChip } from './actions/ActionChip';
 import type { ActionInvocation } from '../../actions';
-import { createExtractionWorkflow } from '../../extraction/extractionWorkflow';
-import { ExtractionSetupView } from './extraction/ExtractionSetupView';
 
 interface PromptFormProps {
   onSubmit: (prompt: string, role: string, selectedTabIds?: number[], contextMode?: AskContextMode, taskMode?: ModeType) => void;
@@ -335,7 +333,6 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
 
       <div className={mode === 'ask' ? 'mt-1' : 'mt-3'}>
         {tabStatus === 'detached' && <p className="mb-2 text-xs text-red-700" role="status">Tab connection lost. Refresh the tab to continue.</p>}
-        {selectedAction?.id === 'extract' && <div className="mb-3 rounded-lg border border-stone-200 p-3"><ExtractionSetupView onRun={request => { if (request.plan) { const candidate = createExtractionWorkflow(request); chrome.tabs.query({ active: true, lastFocusedWindow: true }).then(([tab]) => { if (tab?.id) chrome.runtime.sendMessage({ action: 'runWorkflow', workflowId: candidate.workflow.id, versionId: candidate.version.id, transientWorkflow: candidate.workflow, transientVersion: candidate.version, ownerTabId: tab.id, ownerWindowId: tab.windowId, executionMode: 'current_tab' }); }); } else { onSubmit(`Extract structured data using this confirmed request:\n${JSON.stringify(request)}`, 'operator'); } setSelectedAction(undefined); setPrompt(''); chrome.storage.local.set({ browserOnlySlashHint: { focusHintCount: 3, hasCompletedSlashAction: true } }); }} /></div>}
         <div className="relative rounded-[11px] border border-stone-300 bg-white transition-[border-color,box-shadow] duration-150 focus-within:border-[#315a78] focus-within:ring-2 focus-within:ring-[#315a78]/10">
           {showSlashHint && !selectedAction && <p className="px-3 pt-2 text-xs text-stone-500">Tip: Type / to choose a quick action</p>}
           {selectedAction && <ActionChip label={selectedAction.name} onRemove={() => setSelectedAction(undefined)} />}
@@ -362,6 +359,8 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
             }}
             placeholder={tabStatus === 'detached'
               ? 'Refresh the tab to continue'
+              : selectedAction?.id === 'extract'
+                ? 'What should I extract? Leave blank to convert the whole page to Markdown.'
               : selectedAction?.id === 'extract-table'
                 ? '例如：提取前 5 页的职位名称、地点、职位 ID 和详情链接'
               : mode === 'ask'
@@ -430,7 +429,10 @@ function actionPrompt(action: ActionDefinition | undefined, instruction: string)
     return match ? extractionTablePrompt(match[1]) : instruction;
   }
   if (action.id === 'extract-table') return extractionTablePrompt(instruction);
-  const base = action.id === 'summarize' ? 'Summarize the current page.' : action.id === 'translate' ? 'Translate the current page.' : action.id === 'extract' ? 'Extract structured data from the current page.' : action.id === 'compare' ? 'Compare the selected tabs.' : action.name;
+  if (action.id === 'extract') return instruction.trim()
+    ? `Extract the information requested below from the current page. Return the result in the clearest structured format for the request. Do not open links or explore unrelated page structure.\n\nUser request: ${instruction.trim()}`
+    : 'Extract the entire current webpage and return it as clean Markdown. Preserve the page title, headings, paragraphs, lists, tables, and actual HTTP(S) links. Do not summarize or omit relevant page content.';
+  const base = action.id === 'summarize' ? 'Summarize the current page.' : action.id === 'translate' ? 'Translate the current page.' : action.id === 'compare' ? 'Compare the selected tabs.' : action.name;
   return instruction.trim() ? `${base}\n\nAdditional instructions: ${instruction.trim()}` : base;
 }
 

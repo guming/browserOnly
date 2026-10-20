@@ -2,7 +2,7 @@ import { MonitorRunner } from './MonitorRunner';
 import { MonitorScheduler, MONITOR_ALARM_NAME } from './MonitorScheduler';
 import { MonitorStore } from './MonitorStore';
 import { installElementPicker, toElementSelection } from './elementPicker';
-import { MONITOR_DEFAULT_SCHEDULE_MINUTES, MONITOR_MAX_SCHEDULE_MINUTES, MONITOR_MIN_SCHEDULE_MINUTES, type Monitor, type MonitorResponse } from './types';
+import { MONITOR_DEFAULT_SCHEDULE_MINUTES, type Monitor, type MonitorResponse } from './types';
 
 const scheduler = new MonitorScheduler();
 const store = MonitorStore.getInstance();
@@ -39,15 +39,10 @@ export async function handleMonitorMessage(message: any): Promise<MonitorRespons
         return raw ? ok(toElementSelection(raw)) : fail('INVALID_REQUEST', 'Element selection cancelled');
       }
       case 'monitorCreate': {
-        const scheduleMinutes = Number(message.monitor?.scheduleMinutes ?? MONITOR_DEFAULT_SCHEDULE_MINUTES);
-        if (scheduleMinutes < MONITOR_MIN_SCHEDULE_MINUTES || scheduleMinutes > MONITOR_MAX_SCHEDULE_MINUTES) return fail('INVALID_REQUEST', 'Schedule must be between 1 and 43,200 minutes');
         const now = Date.now();
-        const kind = ['text', 'price', 'stock', 'page_text'].includes(message.monitor?.kind) ? message.monitor.kind : 'text';
-        const monitor: Monitor = { ...message.monitor, id: `monitor-${crypto.randomUUID()}`, kind, status: 'active', scheduleMinutes, normalization: message.monitor?.normalization ?? {}, readiness: message.monitor?.readiness ?? {}, consecutiveFailures: 0, triggerActive: false, createdAt: now, updatedAt: now, nextRunAt: now };
-        if (!monitor.name?.trim() || !monitor.url || (monitor.kind !== 'page_text' && !monitor.locator)) return fail('INVALID_REQUEST', 'Name, URL, and selected element are required');
+        const monitor: Monitor = { ...message.monitor, id: `monitor-${crypto.randomUUID()}`, kind: 'page_text', status: 'active', scheduleMinutes: MONITOR_DEFAULT_SCHEDULE_MINUTES, trigger: { type: 'changed' }, normalization: {}, readiness: {}, consecutiveFailures: 0, triggerActive: false, createdAt: now, updatedAt: now, nextRunAt: now };
+        if (!monitor.name?.trim() || !monitor.url || !monitor.instruction?.trim()) return fail('INVALID_REQUEST', 'Name, URL, and monitoring instruction are required');
         try { const url = new URL(monitor.url); if (!['http:', 'https:'].includes(url.protocol)) throw new Error(); } catch { return fail('INVALID_REQUEST', 'Monitor URL must use HTTP or HTTPS'); }
-        if (!validTrigger(monitor)) return fail('INVALID_REQUEST', `Trigger ${monitor.trigger.type} is not valid for ${monitor.kind}`);
-        if (monitor.kind === 'stock' && !monitor.normalization.stockIndicatorMeans) return fail('INVALID_REQUEST', 'Stock indicator meaning is required');
         await store.saveMonitor(monitor);
         const run = await new MonitorRunner().run(monitor.id, 'creation');
         if (run.status === 'failed') { await store.deleteMonitor(monitor.id); return fail(run.errorCode ?? 'UNKNOWN', run.errorMessage ?? 'Baseline failed'); }
@@ -72,12 +67,3 @@ async function updateStatus(id: string, status: Monitor['status']): Promise<Moni
 const ok = <T>(data: T): MonitorResponse<T> => ({ success: true, data });
 const fail = (code: any, message: string): MonitorResponse => ({ success: false, error: { code, message } });
 
-function validTrigger(monitor: Monitor): boolean {
-  const allowed: Record<Monitor['kind'], string[]> = {
-    text: ['changed', 'text_appears', 'text_disappears'],
-    page_text: ['changed', 'text_appears', 'text_disappears'],
-    price: ['changed', 'price_decreases', 'price_increases', 'price_below', 'price_above'],
-    stock: ['changed', 'back_in_stock', 'out_of_stock'],
-  };
-  return allowed[monitor.kind].includes(monitor.trigger.type);
-}

@@ -1114,10 +1114,13 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
         }
 
         const trace = traceRecorder.finish();
-        if (shouldOfferRecordedWorkflow({ taskMode, executionStatus, recordedEventCount: trace.length, isReflectionPrompt, isMultiTabAnalysis: !!isMultiTabAnalysis })) {
+        const isUrlExtractionCommand = trace.some(event => event.toolName === 'browser_extract_links');
+        let hasWorkflowOffer = false;
+        if (!isUrlExtractionCommand && shouldOfferRecordedWorkflow({ taskMode, executionStatus, recordedEventCount: trace.length, isReflectionPrompt, isMultiTabAnalysis: !!isMultiTabAnalysis })) {
           const domain = currentDomain;
           const candidate = compileTrace(trace, domain, prompt.slice(0, 60) || 'Recorded workflow', currentUrl, originalTaskInstruction, contextMode);
           if (candidate.version.steps.some(step => step.enabled && !!step.toolName)) {
+          hasWorkflowOffer = true;
           candidate.version.sourceRunId = `recording-${candidate.version.id}`;
           void Promise.all(trace.map((event, sequence) => WorkflowStore.getInstance().saveTraceEvent({
             id: `${candidate.version.sourceRunId}-${sequence}`, runId: candidate.version.sourceRunId!, sequence,
@@ -1126,9 +1129,12 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
             timestamp: event.startedAt,
           }))).then(() => WorkflowStore.getInstance().saveVersion(candidate.version))
             .then(() => WorkflowStore.getInstance().saveWorkflow(candidate.workflow))
-            .then(() => sendUIMessage('updateOutput', { type: 'workflow', workflowId: candidate.workflow.id, content: candidate.workflow.name }, targetTabId, windowId))
+            .then(() => sendUIMessage('updateOutput', { type: 'workflow_offer', workflowOfferId: candidate.workflow.id, content: candidate.workflow.name }, targetTabId, windowId))
             .catch(error => logWithTimestamp(`Could not save workflow draft: ${String(error)}`, 'warn'));
           }
+        }
+        if (executionStatus === 'completed' && taskMode === 'operator' && !hasWorkflowOffer && !isReflectionPrompt) {
+          sendUIMessage('updateOutput', { type: 'task_complete', content: 'Task completed' }, targetTabId, windowId);
         }
         
         sendUIMessage('processingComplete', null, targetTabId, windowId);

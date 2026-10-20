@@ -502,6 +502,9 @@ export async function handleRunWorkflow(
       const run = await runPromise;
       const metadata = { runId: run.id, workflowId: workflow.id, executionTabId };
       await sendUIMessage('updateOutput', { type: 'system', content: `Automation ${run.status}: ${workflow.name}${run.failureMessage ? `\n${run.failureMessage}` : ''}` }, tabId, executionWindowId, metadata);
+      if (run.status === 'succeeded' && !message.scheduled) {
+        await sendUIMessage('updateOutput', { type: 'workflow_offer', workflowOfferId: workflow.id, content: workflow.name }, tabId, executionWindowId, metadata);
+      }
       await sendUIMessage('processingComplete', null, tabId, executionWindowId, metadata);
       return run;
     }
@@ -540,6 +543,9 @@ export async function handleRunWorkflow(
       sendUIMessage('updateOutput', { type: 'llm', content: lastStepResult }, tabId, executionWindowId, { runId: run.id, workflowId: workflow.id, executionTabId: run.executionTabId });
     }
     sendUIMessage('updateOutput', { type: 'system', content: `Automation ${run.status}: ${workflow.name}${run.failureMessage ? `\n${run.failureMessage}` : ''}` }, tabId, executionWindowId, { runId: run.id, workflowId: workflow.id, executionTabId: run.executionTabId });
+    if (run.status === 'succeeded' && !message.scheduled) {
+      sendUIMessage('updateOutput', { type: 'workflow_offer', workflowOfferId: workflow.id, content: workflow.name }, tabId, executionWindowId, { runId: run.id, workflowId: workflow.id, executionTabId: run.executionTabId });
+    }
     sendUIMessage('processingComplete', null, tabId, executionWindowId, { runId: run.id, workflowId: workflow.id, executionTabId: run.executionTabId });
     return run;
   } catch (error) {

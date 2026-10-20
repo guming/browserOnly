@@ -67,7 +67,7 @@ export class WorkflowService {
       'browser_navigate', 'browser_wait_for_navigation', 'browser_navigate_back',
       'browser_navigate_forward', 'browser_click', 'browser_type',
       'browser_handle_dialog', 'browser_press_key', 'browser_keyboard_type',
-      'browser_query', 'browser_get_title', 'browser_read_text',
+      'browser_query', 'browser_extract_links', 'browser_get_title', 'browser_read_text',
       'browser_screenshot', 'browser_snapshot_dom', 'browser_accessible_tree',
       'browser_get_active_tab', 'browser_read_text_ast', 'browser_get_overview',
       'browser_get_section', 'browser_get_summary', 'browser_get_summary_ast',

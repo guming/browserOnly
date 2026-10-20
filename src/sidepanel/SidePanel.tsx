@@ -112,7 +112,7 @@ export function SidePanel() {
 
   const [currentSelectedTabId, setCurrentSelectedTabId] = useState<number | null>(tabId);
   useEffect(() => {
-    if (tabId && tabId !== currentSelectedTabId) {
+    if (tabId !== null && tabId !== currentSelectedTabId) {
       console.log('new tabId:',tabId)
       setCurrentSelectedTabId(tabId);
     }
@@ -464,7 +464,7 @@ export function SidePanel() {
           </div>
           <div className="relative z-50">
             <MultiTabStatusBar 
-                  selectedTabId={currentSelectedTabId || tabId}
+                  selectedTabId={currentSelectedTabId ?? tabId}
                   onTabSelect={handleTabSelect}
                 />
           </div>
@@ -579,6 +579,11 @@ export function SidePanel() {
               tabStatus={tabStatus}
               initialAction={pendingAction}
               onRunDirectAction={(actionId, invocation) => {
+                if (actionId === 'extract-urls') {
+                  setIsProcessing(true); setTabStatus('running'); addSystemMessage('Extracting links from the current page…');
+                  void executePrompt('Use browser_extract_links once to list all unique HTTP(S) links on the current page. Do not inspect the DOM with other tools. Return the links grouped concisely and stop.', 'operator', undefined, undefined, 'ask').catch(error => { addSystemMessage(`Error: ${error instanceof Error ? error.message : String(error)}`); setIsProcessing(false); setTabStatus('error'); });
+                  return true;
+                }
                 if (actionId === 'translate') {
                   if (invocation?.selectionText && typeof invocation.tabId === 'number') void chrome.runtime.sendMessage({ action: 'translateSelection', tabId: invocation.tabId, windowId: invocation.windowId, text: invocation.selectionText, requestId: `${Date.now()}`, engine: 'auto', style: 'natural' });
                   else void startPageTranslation();

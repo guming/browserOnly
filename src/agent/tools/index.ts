@@ -79,6 +79,7 @@ import {
   browserQuery, 
   browserAccessibleTree, 
   browserReadText, 
+  browserExtractLinks,
   browserScreenshot 
 } from "./observationTools";
 import {
@@ -234,6 +235,7 @@ export function getAllTools(page: Page) {
     browserSnapshotDom(page),
     browserQuery(page),
     browserAccessibleTree(page),
+    browserExtractLinks(page),
     browserReadText(page),
     browserScreenshot(page),
     

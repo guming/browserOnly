@@ -1,37 +1,55 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export const useTabManagement = () => {
   const [tabId, setTabId] = useState<number | null>(null);
   const [windowId, setWindowId] = useState<number | null>(null);
   const [tabTitle, setTabTitle] = useState<string>('');
+  const currentTabIdRef = useRef<number | null>(null);
+  currentTabIdRef.current = tabId;
 
-  // Get the current tab ID and title when the component mounts
+  // Keep the side panel attached to the browser's active tab. The initial
+  // query can race with tab activation when the panel reopens, so listen for
+  // activation immediately and recover after the selected tab closes.
   useEffect(() => {
+    let disposed = false;
+    let activationObserved = false;
+    let activeWindowId: number | null = null;
+
+    const syncActiveTab = (tab: chrome.tabs.Tab | undefined) => {
+      if (disposed || !tab || typeof tab.id !== 'number') return;
+      setTabId(tab.id);
+      currentTabIdRef.current = tab.id;
+      if (typeof tab.windowId === 'number') {
+        activeWindowId = tab.windowId;
+        setWindowId(tab.windowId);
+      }
+      setTabTitle(tab.title || 'Unknown Tab');
+    };
+
     const getCurrentTab = async () => {
       try {
-        // Try to get the tab ID from the last focused window
-        const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-        if (tabs && tabs[0] && tabs[0].id) {
-          const activeTabId = tabs[0].id;
-          const windowId = tabs[0].windowId;
-          const activeTabTitle = tabs[0].title || 'Unknown Tab';
-
-          setTabId(activeTabId);
-          setWindowId(windowId);
-          setTabTitle(activeTabTitle);
-          console.log(`Using tab ID ${activeTabId} in window ${windowId} from last focused window`);
-          console.log(`Tab title: ${activeTabTitle}`);
+        let tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+        if (activationObserved) {
+          tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+        }
+        const activeTab = tabs?.[0];
+        if (activeTab && typeof activeTab.id === 'number') {
+          syncActiveTab(activeTab);
+          const activeTabId = activeTab.id;
+          const activeWindowId = activeTab.windowId;
+          console.log(`Using tab ID ${activeTabId} in window ${activeWindowId} from last focused window`);
+          console.log(`Tab title: ${activeTab.title || 'Unknown Tab'}`);
 
           // Initialize tab attachment early, including the window ID
           chrome.runtime.sendMessage({
             action: 'initializeTab',
             tabId: activeTabId,
-            windowId: windowId
+            windowId: activeWindowId
           }, (response) => {
             if (chrome.runtime.lastError) {
               console.error('Error initializing tab:', chrome.runtime.lastError);
             } else if (response && response.success) {
-              console.log(`Tab ${activeTabId} in window ${windowId} initialized successfully`);
+              console.log(`Tab ${activeTabId} in window ${activeWindowId} initialized successfully`);
             }
           });
         }
@@ -40,12 +58,35 @@ export const useTabManagement = () => {
       }
     };
 
+    const handleTabActivated = (activeInfo: chrome.tabs.TabActiveInfo) => {
+      if (activeWindowId !== null && activeInfo.windowId !== activeWindowId) return;
+      activationObserved = true;
+      chrome.tabs.get(activeInfo.tabId, syncActiveTab);
+    };
+
+    const handleTabRemoved = (removedTabId: number) => {
+      if (currentTabIdRef.current !== removedTabId) return;
+      currentTabIdRef.current = null;
+      setTabId(null);
+      chrome.tabs.query({ active: true, lastFocusedWindow: true }, tabs => {
+        if (!chrome.runtime.lastError) syncActiveTab(tabs?.[0]);
+      });
+    };
+
+    chrome.tabs.onActivated.addListener(handleTabActivated);
+    chrome.tabs.onRemoved.addListener(handleTabRemoved);
     getCurrentTab();
+
+    return () => {
+      disposed = true;
+      chrome.tabs.onActivated.removeListener(handleTabActivated);
+      chrome.tabs.onRemoved.removeListener(handleTabRemoved);
+    };
   }, []);
 
   // Listen for tab updates to update the tab title in real-time
   useEffect(() => {
-    if (!tabId) return;
+    if (tabId === null) return;
 
     const handleTabUpdated = (updatedTabId: number, changeInfo: chrome.tabs.TabChangeInfo, _tab: chrome.tabs.Tab) => {
       // Only update if this is our tab and the title has changed
@@ -66,7 +107,7 @@ export const useTabManagement = () => {
 
   // Listen for tab replacement and active tab change events
   useEffect(() => {
-    if (!tabId) return;
+    if (tabId === null) return;
 
     const messageListener = (
       message: any,

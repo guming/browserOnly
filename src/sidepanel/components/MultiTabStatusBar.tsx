@@ -46,7 +46,7 @@ export const MultiTabStatusBar: React.FC<MultiTabStatusBarProps> = ({
         });
 
         const tabInfos: TabInfo[] = tabs
-          .filter(tab => tab.id && tab.url)
+          .filter(tab => typeof tab.id === 'number')
           .map(tab => ({
             id: tab.id!,
             title: tab.title || 'Untitled',
@@ -65,7 +65,7 @@ export const MultiTabStatusBar: React.FC<MultiTabStatusBarProps> = ({
 
   // 监听消息更新tab状态
   useEffect(() => {
-    if(!selectedTabId) return;
+    if (selectedTabId === null) return;
     const statusListener = (
       message: any,
       sender: chrome.runtime.MessageSender,

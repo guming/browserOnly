@@ -1,6 +1,6 @@
 import { WorkflowScheduleControl } from './WorkflowScheduleControl';
 import React, { useEffect, useState } from 'react';
-import { WorkflowStore, createBlankWorkflow } from '../../workflows';
+import { WorkflowStore } from '../../workflows';
 import type { Workflow } from '../../workflows';
 import { WorkflowDetailView } from './WorkflowDetailView';
 import { TemplateLibraryView } from './templates/TemplateLibraryView';
@@ -8,6 +8,7 @@ import { OfficeCreateView } from './office/OfficeCreateView';
 import { RunSetupView } from './templates/RunSetupView';
 import { instantiateTemplate } from '../../templates';
 import type { WorkflowVersion } from '../../workflows/types';
+import { WorkflowCreateView } from './WorkflowCreateView';
 
 interface RunTarget { workflow: Workflow; transientVersion?: WorkflowVersion }
 
@@ -16,16 +17,9 @@ export function WorkflowListView({ onRunStarted, initialWorkflowId, initialMode,
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [selectedWorkflow, setSelectedWorkflow] = useState<Workflow | null>(null);
   const [runTarget, setRunTarget] = useState<RunTarget | null>(null);
-  const [showCreateMenu, setShowCreateMenu] = useState(false);
+  const [creatingWorkflow, setCreatingWorkflow] = useState(false);
   const [query, setQuery] = useState('');
   const [section, setSection] = useState<'workflows' | 'templates'>('workflows');
-  const createWorkflow = async () => {
-    const candidate = createBlankWorkflow();
-    await WorkflowStore.getInstance().saveVersion(candidate.version);
-    await WorkflowStore.getInstance().saveWorkflow(candidate.workflow);
-    setWorkflows(current => [...current, candidate.workflow]);
-    setSelectedWorkflow(candidate.workflow);
-  };
   useEffect(() => { WorkflowStore.getInstance().listWorkflows().then(setWorkflows).catch(() => setWorkflows([])); }, []);
   useEffect(() => {
     if (!initialWorkflowId) return;
@@ -63,16 +57,23 @@ export function WorkflowListView({ onRunStarted, initialWorkflowId, initialMode,
     setWorkflows(current => current.map(item => item.id === workflow.id ? { ...item, status: 'archived' } : item));
   };
   if (officeMode) return <OfficeCreateView mode={officeMode} onBack={() => setOfficeMode(null)} onCreated={workflow => { setWorkflows(current => [...current, workflow]); setOfficeMode(null); setRunTarget({ workflow }); }} />;
+  if (creatingWorkflow) return <WorkflowCreateView onCancel={() => setCreatingWorkflow(false)} onCreated={async candidate => {
+    await WorkflowStore.getInstance().saveVersion(candidate.version);
+    await WorkflowStore.getInstance().saveWorkflow(candidate.workflow);
+    setWorkflows(current => [...current, candidate.workflow]);
+    setCreatingWorkflow(false);
+    setSelectedWorkflow(candidate.workflow);
+  }} />;
   if (selectedWorkflow) return <WorkflowDetailView workflow={selectedWorkflow} onBack={() => setSelectedWorkflow(null)} onSaved={updated => { setWorkflows(current => current.map(item => item.id === updated.id ? updated : item)); setSelectedWorkflow(updated); }} />;
   if (section === 'templates') return <div className="space-y-3"><div className="flex items-center justify-between"><h2 className="text-base font-semibold text-stone-900">Automations</h2><button type="button" onClick={() => setSection('workflows')} className="text-xs font-semibold text-[#315a78]">My workflows</button></div><TemplateLibraryView onWorkflowCreated={async id => { const created = await WorkflowStore.getInstance().getWorkflow(id); if (created) { setWorkflows(current => [...current, created]); setSelectedWorkflow(created); } }} onRun={async template => { const candidate = instantiateTemplate(template); setRunTarget({ workflow: candidate.workflow, transientVersion: candidate.version }); setSection('workflows'); }} /></div>;
   const visibleWorkflows = workflows.filter(workflow => workflow.status !== 'archived' && (!query.trim() || `${workflow.name} ${workflow.description}`.toLowerCase().includes(query.trim().toLowerCase())));
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3"><div><h2 className="text-base font-semibold text-stone-900">Automations</h2><p className="mt-1 text-xs text-stone-500">Save a successful task and run it again anytime.</p></div><div className="relative"><button type="button" onClick={() => setShowCreateMenu(current => !current)} className="rounded-md bg-[#315a78] px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#274a64]">+ New</button>{showCreateMenu && <div className="absolute right-0 top-10 z-50 w-52 rounded-lg border border-stone-200 bg-white p-1.5 shadow-lg"><button type="button" onClick={() => { setShowCreateMenu(false); createWorkflow(); }} className="w-full rounded-md px-3 py-2 text-left text-xs text-stone-700 hover:bg-stone-50"><span className="block font-semibold text-stone-900">From a task</span><span className="mt-0.5 block text-[11px] text-stone-500">Start with an editable automation</span></button><button type="button" onClick={() => { setShowCreateMenu(false); createWorkflow(); }} className="w-full rounded-md px-3 py-2 text-left text-xs text-stone-700 hover:bg-stone-50"><span className="block font-semibold text-stone-900">Describe what to do</span><span className="mt-0.5 block text-[11px] text-stone-500">Let BrowserOnly draft the steps</span></button></div>}</div></div>
+      <div className="flex items-start justify-between gap-3"><div><h2 className="text-base font-semibold text-stone-900">Automations</h2><p className="mt-1 text-xs text-stone-500">Save a successful task and run it again anytime.</p></div><button type="button" onClick={() => setCreatingWorkflow(true)} className="rounded-md bg-[#315a78] px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#274a64]">+ New</button></div>
       <input aria-label="Search workflows and templates" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search workflows and templates..." className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm" />
       <div className="flex rounded-md bg-stone-100 p-0.5"><button type="button" className="flex-1 rounded bg-white px-2 py-1.5 text-xs font-semibold shadow-sm">My workflows</button><button type="button" onClick={() => setSection('templates')} className="flex-1 px-2 py-1.5 text-xs font-semibold text-stone-500">Templates</button></div>
       <div className="flex flex-wrap gap-2"><button type="button" onClick={() => setOfficeMode('inspection')} className="rounded-md border border-stone-300 px-3 py-2 text-xs font-semibold text-[#315a78]">Inspection & summary</button><button type="button" onClick={() => setOfficeMode('archive')} className="rounded-md border border-stone-300 px-3 py-2 text-xs font-semibold text-[#315a78]">Download & archive</button></div>
-      {visibleWorkflows.length === 0 ? <div className="rounded-xl border border-dashed border-stone-300 bg-stone-50 p-5"><p className="text-sm font-medium text-stone-800">No automations yet</p><p className="mt-1 text-xs leading-5 text-stone-500">Complete a task, then choose “Remember this task” to save it here.</p><button type="button" onClick={createWorkflow} className="mt-3 text-xs font-semibold text-[#315a78] hover:underline">Create a starter automation →</button></div> : visibleWorkflows.map(workflow => (
+      {visibleWorkflows.length === 0 ? <div className="rounded-xl border border-dashed border-stone-300 bg-stone-50 p-5"><p className="text-sm font-medium text-stone-800">No automations yet</p><p className="mt-1 text-xs leading-5 text-stone-500">Complete a task, then choose “Remember this task” to save it here.</p><button type="button" onClick={() => setCreatingWorkflow(true)} className="mt-3 text-xs font-semibold text-[#315a78] hover:underline">Create a workflow →</button></div> : visibleWorkflows.map(workflow => (
         <div key={workflow.id} className="rounded-xl border border-stone-200 bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-shadow hover:shadow-sm">
           <div className="flex items-start justify-between gap-3"><button type="button" onClick={() => setSelectedWorkflow(workflow)} className="min-w-0 flex-1 text-left"><div className="truncate text-sm font-semibold text-stone-900">{workflow.name}</div><div className="mt-1 truncate text-xs text-stone-500">{workflow.triggerDomains.join(', ') || 'Current webpage'} · {workflow.status === 'candidate' ? 'Candidate · expires in 24h' : workflow.status === 'draft' ? 'Needs review' : 'Ready to run'}</div></button>{workflow.status === 'candidate' ? <button type="button" onClick={() => setSelectedWorkflow(workflow)} className="shrink-0 rounded-md border border-[#315a78] px-2.5 py-1.5 text-xs font-semibold text-[#315a78]">Review</button> : <button type="button" onClick={() => setRunTarget({ workflow })} className="shrink-0 rounded-md bg-[#315a78] px-2.5 py-1.5 text-xs font-semibold text-white">Run</button>}</div>
           <WorkflowScheduleControl workflow={workflow} onUpdated={updated => setWorkflows(current => current.map(item => item.id === updated.id ? updated : item))} />

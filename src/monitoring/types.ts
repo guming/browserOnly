@@ -30,6 +30,8 @@ export interface Monitor {
   id: string;
   name: string;
   url: string;
+  /** Natural-language instruction describing what page content to monitor and when to notify. */
+  instruction?: string;
   kind: MonitorKind;
   status: MonitorStatus;
   locator?: StableLocator;

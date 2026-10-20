@@ -1,5 +1,5 @@
 // Define message types
-export type MessageType = 'system' | 'llm' | 'screenshot' | 'workflow';
+export type MessageType = 'system' | 'llm' | 'screenshot' | 'workflow' | 'workflow_offer' | 'task_complete';
 
 export interface Message {
   type: MessageType;
@@ -10,6 +10,7 @@ export interface Message {
   imageData?: string;
   mediaType?: string;
   workflowId?: string;
+  workflowOfferId?: string;
 }
 
 // Chrome message types
