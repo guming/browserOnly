@@ -14,6 +14,7 @@ export class MonitorRunner {
     if (!monitor) throw new Error('Monitor not found');
     const run: MonitorRun = { id: `monitor-run-${crypto.randomUUID()}`, monitorId, source, status: 'running', startedAt: Date.now() };
     await store.saveRun(run);
+    chrome.runtime.sendMessage({ action: 'monitorRunUpdated', monitorId }).catch(() => undefined);
     let tabId: number | undefined;
     try {
       if (monitor.kind !== 'page_text' && !monitor.locator) throw coded('LOCATOR_NOT_FOUND', 'Monitor has no element locator');

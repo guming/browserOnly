@@ -14,9 +14,10 @@ export function setupMonitoring(): void {
   chrome.runtime.onStartup.addListener(() => { scheduler.initialize().catch(() => undefined); });
   chrome.notifications.onClicked.addListener(id => {
     if (!id.startsWith('monitor-')) return;
-    chrome.storage.local.set({ pendingMonitorNotification: id }).catch(() => undefined);
     const diffId = id.startsWith('monitor-diff:') ? id.slice('monitor-diff:'.length) : undefined;
-    if (diffId) store.getDiff(diffId).then(diff => diff && store.getMonitor(diff.monitorId)).then(monitor => { if (monitor) chrome.tabs.create({ url: monitor.url, active: true }); }).catch(() => undefined);
+    if (diffId) store.getDiff(diffId).then(diff => {
+      if (diff) chrome.tabs.create({ url: chrome.runtime.getURL(`monitor-compare.html?monitorId=${encodeURIComponent(diff.monitorId)}&diffId=${encodeURIComponent(diff.id)}`), active: true });
+    }).catch(() => undefined);
   });
 }
 
@@ -27,11 +28,35 @@ export function isMonitorMessage(message: unknown): boolean {
 export async function handleMonitorMessage(message: any): Promise<MonitorResponse> {
   try {
     switch (message.action) {
-      case 'monitorList': return ok(await store.listMonitors());
+      case 'monitorList': {
+        const monitors = await store.listMonitors();
+        const runs = await Promise.all(monitors.map(monitor => store.listRuns(monitor.id)));
+        return ok(monitors.map((monitor, index) => ({
+          ...monitor,
+          isRunning: runs[index].some(run => run.status === 'running'),
+        })));
+      }
       case 'monitorGet': {
         const monitor = await store.getMonitor(message.monitorId);
         if (!monitor) return fail('INVALID_REQUEST', 'Monitor not found');
         return ok({ monitor, runs: (await store.listRuns(monitor.id)).sort((a, b) => b.startedAt - a.startedAt), snapshots: (await store.listSnapshots(monitor.id)).sort((a, b) => b.observedAt - a.observedAt), diffs: (await store.listDiffs(monitor.id)).sort((a, b) => b.createdAt - a.createdAt), screenshots: await store.listScreenshots(monitor.id) });
+      }
+      case 'monitorCompareGet': {
+        const monitorId = String(message.monitorId ?? '');
+        const diffId = String(message.diffId ?? '');
+        if (!monitorId || !diffId) return fail('INVALID_REQUEST', 'Monitor and change IDs are required');
+        const [monitor, diff] = await Promise.all([store.getMonitor(monitorId), store.getDiff(diffId)]);
+        if (!monitor || !diff || diff.monitorId !== monitor.id) return fail('INVALID_REQUEST', 'This change is no longer available');
+        const [before, after] = await Promise.all([store.getSnapshot(diff.previousSnapshotId), store.getSnapshot(diff.currentSnapshotId)]);
+        if (!before || !after || before.monitorId !== monitor.id || after.monitorId !== monitor.id) return fail('INVALID_REQUEST', 'The snapshots for this change are no longer available');
+        const [beforeScreenshot, afterScreenshot] = await Promise.all([
+          before.screenshotId ? store.getScreenshot(before.screenshotId) : undefined,
+          after.screenshotId ? store.getScreenshot(after.screenshotId) : undefined,
+        ]);
+        return ok({ monitor, diff, before, after,
+          beforeScreenshot: beforeScreenshot?.monitorId === monitor.id && beforeScreenshot.snapshotId === before.id && typeof beforeScreenshot.data === 'string' ? beforeScreenshot.data : undefined,
+          afterScreenshot: afterScreenshot?.monitorId === monitor.id && afterScreenshot.snapshotId === after.id && typeof afterScreenshot.data === 'string' ? afterScreenshot.data : undefined,
+        });
       }
       case 'monitorPickElement': {
         const result = await chrome.scripting.executeScript({ target: { tabId: Number(message.tabId) }, func: installElementPicker });

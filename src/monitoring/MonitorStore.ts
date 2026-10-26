@@ -41,6 +41,7 @@ export class MonitorStore {
   async saveScreenshot(value: MonitorScreenshot): Promise<void> { return this.put('screenshots', value); }
   async getSnapshot(id: string): Promise<MonitorSnapshot | undefined> { return this.get('snapshots', id); }
   async getDiff(id: string): Promise<MonitorDiff | undefined> { return this.get('diffs', id); }
+  async getScreenshot(id: string): Promise<MonitorScreenshot | undefined> { return this.get('screenshots', id); }
   async listRuns(monitorId: string): Promise<MonitorRun[]> { return this.byIndex('runs', 'monitorId', monitorId); }
   async listSnapshots(monitorId: string): Promise<MonitorSnapshot[]> { return this.byIndex('snapshots', 'monitorId', monitorId); }
   async listDiffs(monitorId: string): Promise<MonitorDiff[]> { return this.byIndex('diffs', 'monitorId', monitorId); }

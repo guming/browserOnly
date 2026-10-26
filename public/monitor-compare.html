@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>监控对比 · BrowserOnly</title>
+  <link rel="stylesheet" href="monitor-compare.css">
+  <script src="monitor-compare.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#comparison">跳到对比内容</a>
+  <header class="topbar">
+    <div class="brand"><img src="icons/icon32.png" width="24" height="24" alt=""><strong>BrowserOnly</strong><span class="divider"></span><span>监控对比</span></div>
+    <span class="local-note">本地监控记录</span>
+  </header>
+  <main id="comparison" class="reader">
+    <div id="loading" class="state" role="status">正在读取变化记录…</div>
+    <div id="error" class="state" role="alert" hidden><h1>无法显示这次变化</h1><p id="error-message"></p></div>
+    <div id="content" hidden>
+      <div class="context"><span>监控</span><span>/</span><span id="context-name"></span><span>/</span><time id="context-time"></time></div>
+      <section class="intro" aria-labelledby="title">
+        <div>
+          <h1 id="title"></h1>
+          <p id="summary"></p>
+          <a id="source" target="_blank" rel="noopener noreferrer"></a>
+        </div>
+        <div id="change-count" class="change-count" aria-label="变化数量"></div>
+      </section>
+      <section class="comparison" aria-labelledby="compare-title">
+        <div class="comparison-heading"><h2 id="compare-title">变化内容</h2><span id="time-range"></span></div>
+        <div class="columns">
+          <article class="version" aria-labelledby="before-heading">
+            <div class="version-heading"><span class="version-dot before-dot"></span><h3 id="before-heading">变化前</h3><time id="before-time"></time></div>
+            <div id="before-content" class="document"></div>
+          </article>
+          <article class="version" aria-labelledby="after-heading">
+            <div class="version-heading"><span class="version-dot after-dot"></span><h3 id="after-heading">变化后</h3><time id="after-time"></time></div>
+            <div id="after-content" class="document"></div>
+          </article>
+        </div>
+      </section>
+      <p id="truncation-note" class="truncation-note" hidden>页面内容较长，这里只展示快照开头的一部分。</p>
+      <details id="evidence" class="evidence" hidden>
+        <summary>查看页面截图 <span>用于核对网页当时的外观</span></summary>
+        <div class="evidence-grid"><figure><figcaption>变化前</figcaption><div id="before-image"></div></figure><figure><figcaption>变化后</figcaption><div id="after-image"></div></figure></div>
+      </details>
+    </div>
+  </main>
+</body>
+</html>
