@@ -35,6 +35,8 @@ export interface Monitor {
   kind: MonitorKind;
   status: MonitorStatus;
   locator?: StableLocator;
+  /** A new target starts a fresh comparison baseline without deleting earlier history. */
+  targetChangedAt?: number;
   scheduleMinutes: number;
   trigger: MonitorTrigger;
   normalization: MonitorNormalization;

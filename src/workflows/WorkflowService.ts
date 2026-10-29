@@ -69,13 +69,13 @@ export class WorkflowService {
       'browser_handle_dialog', 'browser_press_key', 'browser_keyboard_type',
       'browser_query', 'browser_extract_links', 'browser_get_title', 'browser_read_text',
       'browser_screenshot', 'browser_snapshot_dom', 'browser_accessible_tree',
-      'browser_get_active_tab', 'browser_read_text_ast', 'browser_get_overview',
-      'browser_get_section', 'browser_get_summary', 'browser_get_summary_ast',
+      'browser_get_active_tab', 'browser_get_overview',
+      'browser_get_section', 'browser_get_summary',
     ]);
     const workflowOverrides = new Set([
-      'browser_get_title', 'browser_read_text', 'browser_read_text_ast',
+      'browser_get_title', 'browser_read_text',
       'browser_read_text_enhanced', 'browser_get_overview', 'browser_get_section',
-      'browser_get_summary', 'browser_get_summary_ast',
+      'browser_get_summary',
     ]);
     for (const candidate of getAllTools(getPage()) as any[]) {
       if (workflowBrowserTools.has(candidate.name)
@@ -130,10 +130,10 @@ export class WorkflowService {
     tools.push({ name: 'browser_compare_selected_tabs', description: 'Compare the selected web tabs.', func: input => compareSelectedTabs(parseToolInput(input), options.context?.windowId) });
     tools.push({ name: 'browser_get_overview', description: 'Workflow-safe page overview.', func: getOverview });
 
-    for (const name of ['browser_read_text', 'browser_read_text_ast', 'browser_read_text_enhanced']) {
+    for (const name of ['browser_read_text', 'browser_read_text_enhanced']) {
       tools.push({ name, description: `Workflow-safe text reader (${name}).`, func: readMain });
     }
-    for (const name of ['browser_get_summary', 'browser_get_summary_ast']) {
+    for (const name of ['browser_get_summary']) {
       tools.push({ name, description: `Workflow-safe page summary (${name}).`, func: getSummary });
     }
     tools.push({

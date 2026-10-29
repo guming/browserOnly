@@ -315,7 +315,7 @@ ${fullText}`;
         try {
           const request = attempt === 0
             ? prompt
-            : `${prompt}\n\nYour previous response was invalid. Return only the requested JSON object with every required field.`;
+            : `${prompt}\n\nYour previous response was invalid JSON or did not match the requested structure. Correct the response and return only one valid JSON object with every required field. Check commas, brackets, and quotation marks.`;
           const response = await requestAi(request, []);
           const parsed = parseJsonResponse(response);
           if (!validator(parsed)) throw new Error('The model returned an invalid structured response');
@@ -344,34 +344,56 @@ ${fullText}`;
   }
 
   function parseJsonResponse(response) {
-    const cleaned = String(response).replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-    const start = cleaned.indexOf('{');
-    const end = cleaned.lastIndexOf('}');
-    if (start === -1 || end === -1) throw new Error('No JSON object in AI response');
-    return JSON.parse(cleaned.slice(start, end + 1));
+    let cleaned = String(response).trim();
+    const fenced = cleaned.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+    if (fenced) cleaned = fenced[1].trim();
+    if (!cleaned.startsWith('{') || !cleaned.endsWith('}')) {
+      throw new Error('AI response must contain only one JSON object');
+    }
+    try {
+      return JSON.parse(cleaned);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(`Invalid JSON in AI response: ${detail}`);
+    }
   }
 
   function validateLearningGuide(value) {
     const pageCount = PDFViewerApplication.pdfDocument?.numPages || 0;
-    if (!value || typeof value.whyItMatters !== 'string') return false;
-    if (!Array.isArray(value.outcomes) || value.outcomes.length < 4 || value.outcomes.length > 6) return false;
-    if (!Array.isArray(value.readingPath) || value.readingPath.length < 3 || value.readingPath.length > 5) return false;
-    if (!value.prerequisites || !Array.isArray(value.completionCriteria)) return false;
-    return value.readingPath.every(step => Array.isArray(step.pages) && step.pages.every(page => Number.isInteger(page) && page >= 1 && page <= pageCount));
+    return Boolean(value && nonEmptyString(value.whyItMatters) &&
+      Array.isArray(value.outcomes) && value.outcomes.length >= 4 && value.outcomes.length <= 6 &&
+      value.outcomes.every(outcome => outcome && nonEmptyString(outcome.title) && nonEmptyString(outcome.description)) &&
+      value.prerequisites && Array.isArray(value.prerequisites.required) && value.prerequisites.required.every(nonEmptyString) &&
+      Array.isArray(value.prerequisites.helpful) && value.prerequisites.helpful.every(nonEmptyString) &&
+      Array.isArray(value.readingPath) && value.readingPath.length >= 3 && value.readingPath.length <= 5 &&
+      value.readingPath.every(step => step && Number.isInteger(step.step) && nonEmptyString(step.goal) && nonEmptyString(step.focus) &&
+        Array.isArray(step.pages) && step.pages.every(page => Number.isInteger(page) && page >= 1 && page <= pageCount)) &&
+      Array.isArray(value.attentionPoints) && value.attentionPoints.every(nonEmptyString) &&
+      Array.isArray(value.completionCriteria) && value.completionCriteria.every(nonEmptyString));
   }
 
   function validateOpenQuestion(value) {
-    return Boolean(value && typeof value.question === 'string' && value.question.trim() && Array.isArray(value.rubric) && value.rubric.length > 0);
+    return Boolean(value && nonEmptyString(value.question) && nonEmptyString(value.focus) &&
+      Array.isArray(value.rubric) && value.rubric.length > 0 && value.rubric.every(nonEmptyString));
   }
 
   function validateAssessment(value) {
-    return Boolean(value && ['Understood', 'Partly understood', 'Review needed'].includes(value.assessment) && Array.isArray(value.correct) && Array.isArray(value.missing) && typeof value.strongerAnswer === 'string');
+    return Boolean(value && ['Understood', 'Partly understood', 'Review needed'].includes(value.assessment) &&
+      Array.isArray(value.correct) && value.correct.every(nonEmptyString) &&
+      Array.isArray(value.missing) && value.missing.every(nonEmptyString) && nonEmptyString(value.strongerAnswer));
   }
 
   function validateQuiz(value) {
-    return Boolean(value && typeof value.title === 'string' && Array.isArray(value.questions) && value.questions.length === 5 && value.questions.every(question =>
-      question.id && typeof question.question === 'string' && Array.isArray(question.options) && question.options.length === 4 && Number.isInteger(question.correctIndex) && question.correctIndex >= 0 && question.correctIndex < 4 && typeof question.explanation === 'string'
+    return Boolean(value && nonEmptyString(value.title) && Array.isArray(value.questions) && value.questions.length === 5 && value.questions.every(question =>
+      question && nonEmptyString(question.id) && nonEmptyString(question.question) && Array.isArray(question.options) &&
+      question.options.length === 4 && question.options.every(nonEmptyString) &&
+      new Set(question.options.map(option => option.trim())).size === 4 && Number.isInteger(question.correctIndex) &&
+      question.correctIndex >= 0 && question.correctIndex < 4 && nonEmptyString(question.explanation)
     ));
+  }
+
+  function nonEmptyString(value) {
+    return typeof value === 'string' && value.trim().length > 0;
   }
 
   function renderLearningGuide(guide) {

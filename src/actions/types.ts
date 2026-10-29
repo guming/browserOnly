@@ -40,6 +40,7 @@ export interface ActionInvocation {
   pageUrl?: string;
   pageTitle?: string;
   selectionText?: string;
+  imageUrl?: string;
   instruction?: string;
   presetValues?: Record<string, unknown>;
   createdAt?: number;

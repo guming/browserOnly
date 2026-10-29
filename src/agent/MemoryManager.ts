@@ -24,7 +24,7 @@ export class MemoryManager {
         const memoryResult = await this.memoryTool.func(domain);
         
         // If we found memories, add them to the context
-        if (memoryResult && !memoryResult.startsWith("No memories found")) {
+        if (memoryResult && !memoryResult.startsWith("No reviewed memories found") && !memoryResult.startsWith("No memories found")) {
           try {
             const memories = JSON.parse(memoryResult);
             

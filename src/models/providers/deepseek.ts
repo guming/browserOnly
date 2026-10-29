@@ -1,4 +1,4 @@
-import { deepseekDefaultModelId, deepseekModels } from "../models";
+import { canonicalDeepSeekModelId, deepseekDefaultModelId, deepseekModels } from "../models";
 import { ApiStream, LLMProvider, ModelInfo, ProviderOptions } from "./types";
 import OpenAI from "openai";
 
@@ -201,9 +201,14 @@ export class DeepSeekProvider implements LLMProvider {
       
               // Handle usage information
               if (chunk.usage) {
+                const promptTokens = chunk.usage.prompt_tokens || 0;
+                const cacheReadTokens = chunk.usage.prompt_cache_hit_tokens
+                  ?? chunk.usage.prompt_tokens_details?.cached_tokens
+                  ?? 0;
                 yield {
                   type: "usage",
-                  inputTokens: chunk.usage.prompt_tokens || 0,
+                  inputTokens: Math.max(0, promptTokens - cacheReadTokens),
+                  cacheReadTokens,
                   outputTokens: chunk.usage.completion_tokens || 0,
                 };
               }
@@ -287,16 +292,11 @@ export class DeepSeekProvider implements LLMProvider {
     }
     getModel(): { id: string; info: ModelInfo; } {
         console.log("this.options.apiModelId",this.options.apiModelId)
-        const modelId = this.options.apiModelId || deepseekDefaultModelId ;
-
-        // Check if the model ID exists in our models, otherwise use the default
-        const safeModelId = Object.keys(deepseekModels).includes(modelId) 
-            ? modelId as keyof typeof deepseekModels 
-            : deepseekDefaultModelId;
+        const modelId = canonicalDeepSeekModelId(this.options.apiModelId || deepseekDefaultModelId);
         
         return {
             id: modelId,
-            info: deepseekModels[safeModelId],
+            info: deepseekModels[modelId],
         };
     }
     

@@ -65,12 +65,28 @@ export async function handleMonitorMessage(message: any): Promise<MonitorRespons
       }
       case 'monitorCreate': {
         const now = Date.now();
-        const monitor: Monitor = { ...message.monitor, id: `monitor-${crypto.randomUUID()}`, kind: 'page_text', status: 'active', scheduleMinutes: MONITOR_DEFAULT_SCHEDULE_MINUTES, trigger: { type: 'changed' }, normalization: {}, readiness: {}, consecutiveFailures: 0, triggerActive: false, createdAt: now, updatedAt: now, nextRunAt: now };
+        const kind = message.monitor.kind === 'page_text' ? 'page_text' : 'text';
+        const monitor: Monitor = { ...message.monitor, id: `monitor-${crypto.randomUUID()}`, kind, status: 'active', scheduleMinutes: MONITOR_DEFAULT_SCHEDULE_MINUTES, trigger: { type: 'changed' }, normalization: {}, readiness: {}, consecutiveFailures: 0, triggerActive: false, createdAt: now, updatedAt: now, nextRunAt: now };
         if (!monitor.name?.trim() || !monitor.url || !monitor.instruction?.trim()) return fail('INVALID_REQUEST', 'Name, URL, and monitoring instruction are required');
+        if (kind === 'text' && monitor.locator && !monitor.locator.fallbackOrder?.length) return fail('INVALID_REQUEST', 'Invalid target');
         try { const url = new URL(monitor.url); if (!['http:', 'https:'].includes(url.protocol)) throw new Error(); } catch { return fail('INVALID_REQUEST', 'Monitor URL must use HTTP or HTTPS'); }
         await store.saveMonitor(monitor);
         const run = await new MonitorRunner().run(monitor.id, 'creation');
         if (run.status === 'failed') { await store.deleteMonitor(monitor.id); return fail(run.errorCode ?? 'UNKNOWN', run.errorMessage ?? 'Baseline failed'); }
+        return ok(await store.getMonitor(monitor.id));
+      }
+      case 'monitorUpdateTarget': {
+        const monitor = await store.getMonitor(String(message.monitorId ?? ''));
+        if (!monitor) return fail('INVALID_REQUEST', 'Monitor not found');
+        const locator = message.locator;
+        if (locator && (!Array.isArray(locator.fallbackOrder) || !locator.fallbackOrder.length)) return fail('INVALID_REQUEST', 'Invalid target');
+        const changedAt = Date.now();
+        await store.saveMonitor({ ...monitor, kind: 'text', locator, targetChangedAt: changedAt, triggerActive: false, updatedAt: changedAt });
+        const run = await new MonitorRunner().run(monitor.id, 'creation');
+        if (run.status === 'failed') {
+          await store.saveMonitor(monitor);
+          return fail(run.errorCode ?? 'UNKNOWN', run.errorMessage ?? 'New baseline failed');
+        }
         return ok(await store.getMonitor(monitor.id));
       }
       case 'monitorRunNow': await scheduler.runNow(message.monitorId); return ok(true);

@@ -5,7 +5,8 @@ describe('ActionResolver and workflow actions', () => {
   it('routes actions by their declared run behavior', () => {
     const resolver = new ActionResolver(new ActionRegistry());
     expect(resolver.resolve({ actionId: 'summarize', source: 'page_actions', tabId: 1, windowId: 2, pageUrl: 'https://example.com' }).type).toBe('direct');
-    expect(resolver.resolve({ actionId: 'extract', source: 'page_actions', tabId: 1, windowId: 2, pageUrl: 'https://example.com' }).type).toBe('configure');
+    expect(resolver.resolve({ actionId: 'explain', source: 'context_menu', tabId: 1, windowId: 2, selectionText: 'A selected phrase' }).type).toBe('direct');
+    expect(resolver.resolve({ actionId: 'extract', source: 'page_actions', tabId: 1, windowId: 2, pageUrl: 'https://example.com' }).type).toBe('confirm');
   });
 
   it('creates deterministic unique aliases for duplicate workflow names', () => {

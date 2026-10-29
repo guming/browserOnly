@@ -60,21 +60,27 @@ export function lookupMemories(page: Page) {
         }
 
         const memoryService = MemoryService.getInstance();
-        const memories = await memoryService.getMemoriesByDomain(domain);
-
-        if (memories.length === 0) {
-          return `No memories found for domain: ${domain}`;
+        const allMemories = await memoryService.getMemoriesByDomain(domain);
+        const reviewAgeMs = 30 * 24 * 60 * 60 * 1000;
+        for (const memory of allMemories) {
+          if (memory.status === 'active' && (!memory.lastVerifiedAt || Date.now() - memory.lastVerifiedAt > reviewAgeMs) && memory.id !== undefined) {
+            await memoryService.updateMemory(memory.id, { status: 'needs_review' });
+            memory.status = 'needs_review';
+          }
         }
-
-        // Sort memories by creation date (newest first)
-        memories.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        const memories = allMemories
+          .filter(memory => memory.status === 'active')
+          .sort((a, b) => (b.lastVerifiedAt || b.updatedAt || 0) - (a.lastVerifiedAt || a.updatedAt || 0))
+          .slice(0, 3);
+        if (memories.length === 0) return `No reviewed memories found for domain: ${domain}`;
 
         // Format the memories in a more concise way
         const formattedMemories = memories.map(memory => ({
+          id: memory.id,
           domain: memory.domain,
           taskDescription: memory.taskDescription,
           toolSequence: memory.toolSequence,
-          createdAt: memory.createdAt ? new Date(memory.createdAt).toISOString() : 'unknown'
+          lastVerifiedAt: memory.lastVerifiedAt ? new Date(memory.lastVerifiedAt).toISOString() : 'unknown'
         }));
 
         return JSON.stringify(formattedMemories, null, 2);

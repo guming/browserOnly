@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 
-export type TranslationProvider = 'primary' | 'anthropic' | 'openai' | 'gemini' | 'ollama' | 'openai-compatible' | 'deepseek';
+export type TranslationProvider = 'auto' | 'primary' | 'anthropic' | 'openai' | 'gemini' | 'ollama' | 'openai-compatible' | 'deepseek';
 
 export const translationLanguages = [
   { value: 'zh-CN', label: 'Chinese (Simplified)' }, { value: 'zh-TW', label: 'Chinese (Traditional)' },
@@ -10,7 +10,7 @@ export const translationLanguages = [
 ] as const;
 
 export interface ConfiguredProvider {
-  id: Exclude<TranslationProvider, 'primary'>;
+  id: Exclude<TranslationProvider, 'primary' | 'auto'>;
   name: string;
 }
 
@@ -38,7 +38,7 @@ export function FeaturesTab({ pdfInterceptorEnabled, setPdfInterceptorEnabled, t
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
   const availableProviderIds = useMemo(() => new Set(configuredProviders.map((item) => item.id)), [configuredProviders]);
-  const selectedProviderIsAvailable = translationProvider === 'primary' || availableProviderIds.has(translationProvider);
+  const selectedProviderIsAvailable = translationProvider === 'auto' || translationProvider === 'primary' || availableProviderIds.has(translationProvider);
 
   const handleSave = () => {
     if (!selectedProviderIsAvailable) return;
@@ -96,6 +96,7 @@ export function FeaturesTab({ pdfInterceptorEnabled, setPdfInterceptorEnabled, t
               </select>
               <label htmlFor="translation-provider">LLM provider</label>
               <select id="translation-provider" className="select select-bordered" value={translationProvider} onChange={(event) => setTranslationProvider(event.target.value as TranslationProvider)}>
+                <option value="auto">Automatic (lowest-cost configured model)</option>
                 <option value="primary">Follow default provider ({providerNames[primaryProvider] || primaryProvider})</option>
                 {configuredProviders.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
               </select>

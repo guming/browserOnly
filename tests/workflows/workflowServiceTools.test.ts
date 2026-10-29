@@ -1,7 +1,7 @@
 import 'openai/shims/node';
 jest.mock('../../src/agent/tools', () => ({
   getAllTools: jest.fn(() => [
-    'browser_get_title', 'browser_read_text', 'browser_read_text_ast',
+    'browser_get_title', 'browser_read_text',
     'browser_get_overview', 'browser_get_section', 'browser_get_summary',
     'browser_query',
   ].map(name => ({ name, description: name, func: jest.fn() }))),
@@ -32,10 +32,12 @@ describe('WorkflowService tool registration', () => {
     const registeredTools = runner.run.mock.calls[0][2].tools as Array<{ name: string }>;
     const names = registeredTools.map(tool => tool.name);
     for (const name of [
-      'browser_get_title', 'browser_read_text', 'browser_read_text_ast',
+      'browser_get_title', 'browser_read_text',
       'browser_get_overview', 'browser_get_section', 'browser_get_summary',
     ]) {
       expect(names.filter(candidate => candidate === name)).toHaveLength(1);
     }
+    expect(names).not.toContain('browser_read_text_ast');
+    expect(names).not.toContain('browser_get_summary_ast');
   });
 });

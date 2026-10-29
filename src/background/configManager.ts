@@ -1,5 +1,6 @@
 import { AnthropicProvider } from '../models/providers/anthropic';
 import { DeepSeekProvider } from '../models/providers/deepseek';
+import { canonicalDeepSeekModelId } from '../models/models';
 import { GeminiProvider } from '../models/providers/gemini';
 import { DEFAULT_OLLAMA_BASE_URL, OllamaProvider, OllamaProviderOptions, OllamaModelConfig } from '../models/providers/ollama';
 import { OpenAIProvider } from '../models/providers/openai';
@@ -8,7 +9,7 @@ import { OpenAICompatibleProvider } from '../models/providers/openai-compatible'
 export interface ProviderConfig {
   provider: 'anthropic' | 'openai' | 'gemini' | 'ollama' | 'openai-compatible' | 'deepseek';
   /** Provider used by translation features. 'primary' follows the main provider. */
-  translationProvider?: 'primary' | 'anthropic' | 'openai' | 'gemini' | 'ollama' | 'openai-compatible' | 'deepseek';
+  translationProvider?: 'auto' | 'primary' | 'anthropic' | 'openai' | 'gemini' | 'ollama' | 'openai-compatible' | 'deepseek';
   apiKey: string;
   apiModelId?: string;
   baseUrl?: string;
@@ -49,7 +50,7 @@ export class ConfigManager {
   async getProviderConfig(providerOverride?: ProviderConfig['provider']): Promise<ProviderConfig> {
     const result = await chrome.storage.sync.get({
       provider: 'anthropic',
-      translationProvider: 'primary',
+      translationProvider: 'auto',
       anthropicApiKey: '',
       anthropicModelId: 'claude-3-7-sonnet-20250219',
       anthropicBaseUrl: '',
@@ -64,7 +65,7 @@ export class ConfigManager {
       ollamaBaseUrl: DEFAULT_OLLAMA_BASE_URL,
       ollamaCustomModels: [],
       deepseekApiKey: '',
-      deepseekModelId: 'deepseek-chat',
+      deepseekModelId: 'deepseek-flash',
       deepseekBaseUrl: '',
       thinkingBudgetTokens: 0,
       // openai-compatible
@@ -118,7 +119,7 @@ export class ConfigManager {
           provider: 'deepseek',
           translationProvider,
           apiKey: result.deepseekApiKey,
-          apiModelId: result.deepseekModelId,
+          apiModelId: canonicalDeepSeekModelId(result.deepseekModelId),
           baseUrl: result.deepseekBaseUrl,
         };
       case 'openai-compatible':

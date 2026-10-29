@@ -1,7 +1,8 @@
 import { createDiff } from './DiffEngine';
 import { extractElementInPage, extractPageTextInPage, locatorCandidates } from './MonitorExtractor';
 import { MonitorStore } from './MonitorStore';
-import { notifyMonitorChange, notifyMonitorFailure } from './NotificationService';
+import { discoverMonitorTarget } from './TargetDiscovery';
+import { notifyMonitorChange, notifyMonitorFailure, notifySlackMonitorChange } from './NotificationService';
 import { evaluateTrigger } from './TriggerEvaluator';
 import { hashText, normalizePrice, normalizeStock, normalizeText, valueText } from './normalizers';
 import type { Monitor, MonitorErrorCode, MonitorRun, MonitorRunSource, MonitorSnapshot } from './types';
@@ -17,7 +18,7 @@ export class MonitorRunner {
     chrome.runtime.sendMessage({ action: 'monitorRunUpdated', monitorId }).catch(() => undefined);
     let tabId: number | undefined;
     try {
-      if (monitor.kind !== 'page_text' && !monitor.locator) throw coded('LOCATOR_NOT_FOUND', 'Monitor has no element locator');
+      if (monitor.kind !== 'page_text' && !monitor.locator && source !== 'creation') throw coded('LOCATOR_NOT_FOUND', 'Saved target is missing');
       const tab = await chrome.tabs.create({ url: monitor.url, active: false });
       tabId = tab.id;
       if (tabId === undefined) throw coded('TAB_CLOSED', 'Browser did not create an execution tab');
@@ -26,6 +27,14 @@ export class MonitorRunner {
       if (loadedTab.url?.startsWith('chrome-error://')) throw coded('NAVIGATION_FAILED', 'The monitored page did not load. Check the site and try again.');
       await delay(1_000);
       if (monitor.readiness.waitForText) await waitForText(tabId, monitor.readiness.waitForText, 15_000);
+      if (monitor.kind !== 'page_text' && !monitor.locator) {
+        const page = await chrome.scripting.executeScript({ target: { tabId }, func: () => document.body?.outerHTML ?? '' });
+        monitor.locator = await discoverMonitorTarget(monitor.instruction ?? '', page[0]?.result ?? '');
+        const check = await chrome.scripting.executeScript({ target: { tabId }, func: extractElementInPage, args: [locatorCandidates(monitor.locator)] });
+        const value = check[0]?.result?.value.trim();
+        if (!value || value.length > 500) throw coded('LOCATOR_NOT_FOUND', 'Could not verify one specific target value');
+        await store.saveMonitor(monitor);
+      }
       const injection = monitor.kind === 'page_text'
         ? await chrome.scripting.executeScript({ target: { tabId }, func: extractPageTextInPage })
         : await chrome.scripting.executeScript({ target: { tabId }, func: extractElementInPage, args: [locatorCandidates(monitor.locator!), monitor.kind === 'stock'] });
@@ -39,7 +48,8 @@ export class MonitorRunner {
         url: extracted.url, pageTitle: extracted.title, kind: monitor.kind, rawValue: extracted.value.slice(0, 20_000),
         normalizedValue, contentHash: hashText(valueText(normalizedValue)), locatorUsed: extracted.locatorUsed,
       };
-      const previous = await store.latestSnapshot(monitorId);
+      const latest = await store.latestSnapshot(monitorId);
+      const previous = latest && (!monitor.targetChangedAt || latest.observedAt >= monitor.targetChangedAt) ? latest : undefined;
       await store.saveSnapshot(snapshot);
       run.snapshotId = snapshot.id;
       const diff = previous ? createDiff(previous, snapshot) : undefined;
@@ -51,7 +61,10 @@ export class MonitorRunner {
       const updated: Monitor = { ...monitor, lastCheckedAt: run.endedAt, lastSuccessfulAt: run.endedAt, nextRunAt: run.endedAt + monitor.scheduleMinutes * 60_000, consecutiveFailures: 0, triggerActive: trigger.nextTriggerActive, updatedAt: run.endedAt };
       await Promise.all([store.saveRun(run), store.saveMonitor(updated)]);
       await store.cleanupMonitor(monitorId);
-      if (trigger.shouldNotify && diff) await notifyMonitorChange(updated, diff);
+      if (trigger.shouldNotify && diff) {
+        await notifyMonitorChange(updated, diff).catch(error => console.warn('[monitoring] browser notification failed', error));
+        await notifySlackMonitorChange(updated, diff).catch(error => console.warn('[monitoring] Slack notification status could not be saved', error));
+      }
     } catch (error) {
       const parsed = classifyMonitorError(error);
       run.status = 'failed'; run.endedAt = Date.now(); run.errorCode = parsed.code; run.errorMessage = parsed.message;

@@ -57,7 +57,7 @@ export const browserReadTextEnhanced: ToolFactory = (page: Page) =>
   new DynamicTool({
     name: "browser_read_text_enhanced",
     description:
-      "Enhanced text extraction with semantic search and caching. Much faster than browser_read_text on repeated calls.\n" +
+      "Search page content for a specific query with semantic matching and caching. Use this in place of a full-page read when only matching sections are needed; do not follow it with a full-page read unless required content is missing.\n" +
       "Options (comma-separated):\n" +
       "  • query=<text> - semantic search for specific content\n" +
       "  • limit=<n> - return top N sections (default 3)\n" +
@@ -282,7 +282,7 @@ async function searchCachedContent(
 export const browserGetPageSummary: ToolFactory = (page: Page) =>
   new DynamicTool({
     name: "browser_get_summary",
-    description: "Get a quick summary of the page (title + first few sections). Faster than reading full text.",
+    description: "Get a short page preview (title and first few sections) when a preview alone answers the task. Use browser_read_text when the full visible content is required.",
     func: async (maxLength: string = "500") => {
       try {
         return await withActivePage(page, async (activePage) => {
@@ -304,7 +304,7 @@ export const browserGetPageSummary: ToolFactory = (page: Page) =>
 export const browserReadMainContent: ToolFactory = (page: Page) =>
   new DynamicTool({
     name: "browser_read_main",
-    description: "Extract only the main content of the page, skipping navigation, headers, and footers. More focused than browser_read_text.",
+    description: "Extract only main page content, skipping navigation, headers, and footers. Use this instead of another full-page read when only main content is needed.",
     func: async () => {
       try {
         return await withActivePage(page, async (activePage) => {

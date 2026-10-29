@@ -20,6 +20,7 @@ export function extractElementInPage(candidates: string[], allowMissing = false)
   const bodyText = document.body?.innerText ?? '';
   const authRequired = /\b(sign in|log in|登录|登陆)\b/i.test(bodyText.slice(0, 5000)) && /login|signin|auth/i.test(location.href);
   const captchaDetected = /captcha|verify you are human|人机验证|安全验证/i.test(bodyText.slice(0, 10000));
+  let ambiguous = false;
   for (const candidate of candidates) {
     let elements: Element[] = [];
     if (candidate.startsWith('text:')) {
@@ -34,10 +35,11 @@ export function extractElementInPage(candidates: string[], allowMissing = false)
       const value = 'value' in element ? String((element as HTMLInputElement).value) : (element.innerText || element.textContent || '');
       return { value, title: document.title, url: location.href, locatorUsed: candidate, found: true, authRequired, captchaDetected };
     }
-    if (visible.length > 1) throw new Error('MULTIPLE_MATCHES');
+    if (visible.length > 1) ambiguous = true;
   }
   if (authRequired) throw new Error('AUTH_REQUIRED');
   if (captchaDetected) throw new Error('CAPTCHA_DETECTED');
+  if (ambiguous) throw new Error('MULTIPLE_MATCHES');
   if (allowMissing) return { value: '', title: document.title, url: location.href, locatorUsed: candidates[0] ?? '', found: false, authRequired, captchaDetected };
   throw new Error('LOCATOR_NOT_FOUND');
 }

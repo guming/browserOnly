@@ -51,16 +51,6 @@ import {
   browserClearCache
 } from "./enhancedReadTools";
 
-import {
-  browserReadTextAST,
-  browserGetOverview,
-  browserGetSection,
-  browserGetPageSummaryAST,
-  browserGetASTStats,
-  browserGetTopContent,
-  browserManageASTCache
-} from "./astReadTools";
-
 import { 
   browserMoveMouse, 
   browserClickXY, 
@@ -188,15 +178,6 @@ export {
   browserGetCacheStats,
   browserClearCache,
 
-  // AST read tools
-  browserReadTextAST,
-  browserGetOverview,
-  browserGetSection,
-  browserGetPageSummaryAST,
-  browserGetASTStats,
-  browserGetTopContent,
-  browserManageASTCache,
-
   // Extract tools
   startExtract,
 
@@ -290,15 +271,6 @@ export function getAllTools(page: Page) {
     browserReadMainContent(page),
     browserGetCacheStats(page),
     browserClearCache(page),
-
-    // AST read tools
-    browserReadTextAST(page),
-    browserGetOverview(page),
-    browserGetSection(page),
-    browserGetPageSummaryAST(page),
-    browserGetASTStats(page),
-    browserGetTopContent(page),
-    browserManageASTCache(page),
 
     // Extract tools
     startExtract(page),

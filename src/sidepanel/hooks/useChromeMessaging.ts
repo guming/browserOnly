@@ -230,7 +230,7 @@ export const useChromeMessaging = ({
     onAgentStatusUpdate
   ]);
 
-  const executePrompt = (prompt: string, role: string, selectedTabIds?: number[], contextMode?: AskContextMode, taskMode?: 'operator' | 'ask') => {
+  const executePrompt = (prompt: string, role: string, selectedTabIds?: number[], contextMode?: AskContextMode, taskMode?: 'operator' | 'ask', taskKind?: 'explain') => {
     return new Promise<void>((resolve, reject) => {
       try {
         // Send message to background script with tab ID and optional multitab IDs
@@ -240,6 +240,7 @@ export const useChromeMessaging = ({
           role,
           contextMode,
           taskMode,
+          taskKind,
           tabId,
           windowId
         };

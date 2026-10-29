@@ -1,5 +1,12 @@
 import { ConfigManager } from "../background/configManager";
-import { anthropicModels, openaiModels, geminiModels, ollamaModels, deepseekModels } from "../models/models";
+import { anthropicModels, openaiModels, geminiModels, ollamaModels, deepseekModels, canonicalDeepSeekModelId } from "../models/models";
+
+function isDeepSeekPeakPricingPeriod(date = new Date()): boolean {
+  const day = date.getUTCDay();
+  const hour = date.getUTCHours();
+  if (day === 0 || day === 6) return false;
+  return (hour >= 1 && hour < 4) || (hour >= 6 && hour < 10);
+}
 
 export interface TokenUsage {
   inputTokens: number;
@@ -106,6 +113,9 @@ export class TokenTrackingService {
       outputPrice: number;
       cacheWritesPrice?: number;
       cacheReadsPrice?: number;
+      peakInputPrice?: number;
+      peakOutputPrice?: number;
+      peakCacheReadsPrice?: number;
     } | undefined;
 
     switch (this.currentProvider) {
@@ -120,9 +130,7 @@ export class TokenTrackingService {
         }
         break;
       case 'deepseek':
-        if (this.currentModelId && this.currentModelId in deepseekModels) {
-          model = deepseekModels[this.currentModelId as keyof typeof deepseekModels];
-        }
+        model = deepseekModels[canonicalDeepSeekModelId(this.currentModelId)];
         break;
       case 'gemini':
         if (this.currentModelId && this.currentModelId in geminiModels) {
@@ -134,12 +142,13 @@ export class TokenTrackingService {
         break;
     }
 
-    const inputPrice = model?.inputPrice || 0;
+    const isDeepSeekPeak = this.currentProvider === 'deepseek' && isDeepSeekPeakPricingPeriod();
+    const inputPrice = (isDeepSeekPeak ? model?.peakInputPrice : model?.inputPrice) || 0;
     return {
       inputPrice,
-      outputPrice: model?.outputPrice || 0,
+      outputPrice: (isDeepSeekPeak ? model?.peakOutputPrice : model?.outputPrice) || 0,
       cacheWritesPrice: model?.cacheWritesPrice ?? inputPrice,
-      cacheReadsPrice: model?.cacheReadsPrice ?? inputPrice,
+      cacheReadsPrice: (isDeepSeekPeak ? model?.peakCacheReadsPrice : model?.cacheReadsPrice) ?? inputPrice,
     };
   }
 

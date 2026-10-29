@@ -132,34 +132,9 @@ export class WorkflowRunner {
               },
             } : undefined;
             result = await withTimeout(replayAction ? options.executeReplay!(step, String(candidate), this.abortController.signal) : tool.func(typeof candidate === 'string' ? candidate : JSON.stringify(candidate), toolContext), step.timeoutMs, () => { if (toolContext || replayAction) this.abortController.abort(); });
-            // AST extraction relies on page.evaluate(), which is not available
-            // in every extension/isolated-world context. Keep recorded
-            // automations runnable by falling back to the plain page reader.
-            if (/window is not defined/i.test(result) && step.toolName === 'browser_read_text_ast') {
-              const fallbackTool = options.tools.find(candidateTool => candidateTool.name === 'browser_read_text');
-              if (fallbackTool) {
-                result = await withTimeout(fallbackTool.func(''), step.timeoutMs);
-              }
-            }
             if (!/^error\b|^Error\b|^Action cancelled/i.test(result.trim())) break;
             lastError = new Error(result);
           } catch (error) {
-            // Some page.evaluate implementations throw instead of returning
-            // an error string. Apply the same AST fallback to both forms.
-            if (step.toolName === 'browser_read_text_ast' && /window is not defined/i.test(String(error))) {
-              const fallbackTool = options.tools.find(candidateTool => candidateTool.name === 'browser_read_text');
-              if (fallbackTool) {
-                try {
-                  result = await withTimeout(fallbackTool.func(''), step.timeoutMs);
-                  if (!/^error\b|^Error\b|^Action cancelled/i.test(result.trim())) break;
-                  lastError = new Error(result);
-                  continue;
-                } catch (fallbackError) {
-                  lastError = fallbackError;
-                  continue;
-                }
-              }
-            }
             lastError = error;
           }
         }

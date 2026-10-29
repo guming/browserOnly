@@ -176,10 +176,9 @@ export class ExecutionEngine {
   }
 
   private isPageReadTool(toolName: string): boolean {
-    return toolName === 'browser_read_text_ast'
-      || toolName === 'browser_read_text_enhanced'
+    return toolName === 'browser_read_text_enhanced'
       || toolName === 'browser_read_text'
-      || toolName === 'browser_read_page';
+      || toolName === 'browser_read_main';
   }
 
   private isWindowContextError(value: unknown): boolean {
@@ -290,8 +289,8 @@ export class ExecutionEngine {
     console.debug(`Token update: input=${chunk.inputTokens || 0}, output=${chunk.outputTokens || 0}, cacheWrite=${chunk.cacheWriteTokens || 0}, cacheRead=${chunk.cacheReadTokens || 0}`);
 
     // Handle input tokens (only from message_start)
-    if (chunk.inputTokens) {
-      updatedInputTokens = chunk.inputTokens;
+    if (chunk.inputTokens || chunk.cacheWriteTokens || chunk.cacheReadTokens) {
+      updatedInputTokens = chunk.inputTokens ?? 0;
       // Track input tokens with cache tokens if available
       tokenTracker.trackInputTokens(
         updatedInputTokens,
@@ -756,7 +755,7 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
           } catch (error) {
             // If not valid JSON, add as plain text
             const repairInstruction = this.isToolFailure(result)
-              ? `\nThe tool did not accomplish the step. Re-observe the current page, adapt any stale memory or selector, and continue the original task. Do not finish until success is verified.`
+              ? `\nThe tool did not accomplish the step. If an action selector failed, inspect the relevant element with one focused DOM or accessibility observation and update any stale memory. If a page read failed or omitted needed content, try one suitable alternative read tool. Reuse successful observations for an unchanged page and continue the original task until success is verified.`
               : '';
             messages.push({ role: "user", content: `Tool result: ${result}${repairInstruction}` });
           }

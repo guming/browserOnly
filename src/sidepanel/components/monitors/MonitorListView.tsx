@@ -8,7 +8,7 @@ export function MonitorListView({ tabId }: { tabId?: number }) {
   const [startingRuns, setStartingRuns] = useState<Set<string>>(new Set());
   const load = () => chrome.runtime.sendMessage({ action: 'monitorList' }).then(response => { if (response.success) setMonitors(response.data); });
   useEffect(() => { load(); const listener = (message: any) => { if (message.action === 'monitorRunUpdated') load(); }; chrome.runtime.onMessage.addListener(listener); return () => chrome.runtime.onMessage.removeListener(listener); }, []);
-  if (selected) return <MonitorDetailView monitorId={selected} onBack={() => { setSelected(undefined); load(); }} />;
+  if (selected) return <MonitorDetailView monitorId={selected} tabId={tabId} onBack={() => { setSelected(undefined); load(); }} />;
   if (mode === 'create') return <MonitorCreateView tabId={tabId} onCancel={() => setMode('list')} onCreated={id => { setMode('list'); setSelected(id); load(); }} />;
   const action = async (name: string, id: string) => { await chrome.runtime.sendMessage({ action: name, monitorId: id }); load(); };
   const runNow = async (id: string) => {

@@ -93,8 +93,8 @@ export class SimpleChatAgent {
     let updatedOutputTokens = outputTokens;
 
     // Handle input tokens (only from message_start)
-    if (chunk.inputTokens) {
-      updatedInputTokens = chunk.inputTokens;
+    if (chunk.inputTokens || chunk.cacheWriteTokens || chunk.cacheReadTokens) {
+      updatedInputTokens = chunk.inputTokens ?? 0;
       tokenTracker.trackInputTokens(updatedInputTokens, {
         write: chunk.cacheWriteTokens,
         read: chunk.cacheReadTokens,

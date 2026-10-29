@@ -32,6 +32,7 @@ export interface ExecutePromptMessage {
   role?: string;
   contextMode?: 'current-tab' | 'standalone';
   taskMode?: 'operator' | 'ask';
+  taskKind?: 'explain';
 }
 
 export interface CancelExecutionMessage {

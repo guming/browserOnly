@@ -44,7 +44,7 @@ export const browserSnapshotDom: ToolFactory = (page: Page) =>
   new DynamicTool({
     name: "browser_snapshot_dom",
     description:
-      "Capture DOM snapshot of the current page. Options (comma-separated):\n" +
+      "Inspect page structure to find elements and selectors for actions. For visible page text, use browser_read_text instead. Options (comma-separated):\n" +
       "  • selector=<css_selector> - capture only elements matching this selector\n" +
       "  • clean - remove scripts, styles, and other non-visible elements\n" +
       "  • structure - return only element tags, ids, and classes (no content)\n" +
@@ -395,7 +395,7 @@ export const browserReadText: ToolFactory = (page: Page) =>
   new DynamicTool({
     name: "browser_read_text",
     description:
-      "Return visible text with actual HTTP(S) link URLs. Preserve item links in extracted tables as Markdown links; never invent URLs.",
+      "Read the current page's visible text in DOM order, including actual HTTP(S) link URLs. Use this for ordinary page reading, exact links, or content that may have changed without navigation. Use browser_read_main when only the main article matters. Never invent URLs.",
     func: async () => {
       try {
         return await withActivePage(page, async (activePage) => retryAfterNavigation(activePage, async () => {

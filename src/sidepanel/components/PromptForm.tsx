@@ -12,6 +12,7 @@ import { ActionChip } from './actions/ActionChip';
 import type { ActionInvocation } from '../../actions';
 
 interface PromptFormProps {
+  pageActions?: React.ReactNode;
   onSubmit: (prompt: string, role: string, selectedTabIds?: number[], contextMode?: AskContextMode, taskMode?: ModeType) => void;
   onCancel: () => void;
   isProcessing: boolean;
@@ -28,11 +29,11 @@ type RoleType = OperatorRoleType | 'books' | ExpertId;
 type NotebookLMOption = 'summary' | 'study-guide' | 'faq' | 'mindmap';
 
 const operatorRoleOptions = [
-  { value: 'operator', label: 'Browser Operator' },
+  { value: 'operator', label: 'Browser' },
   { value: 'notebooklm', label: 'NotebookLM' },
-  { value: 'researcher', label: 'Research Analyst' },
-  { value: 'health', label: 'Medical Assistant' },
-  { value: 'wiki', label: 'Wiki Assistant' },
+  { value: 'researcher', label: 'Research' },
+  { value: 'health', label: 'Medical' },
+  { value: 'wiki', label: 'Wiki' },
 ] as const satisfies ReadonlyArray<{ value: OperatorRoleType; label: string }>;
 
 const notebookLMOptions = [
@@ -45,7 +46,7 @@ const notebookLMOptions = [
 const isOperatorRole = (value: string): value is OperatorRoleType =>
   operatorRoleOptions.some(option => option.value === value);
 
-export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isProcessing, tabStatus, initialAction, onRunDirectAction }) => {
+export const PromptForm: React.FC<PromptFormProps> = ({ pageActions, onSubmit, onCancel, isProcessing, tabStatus, initialAction, onRunDirectAction }) => {
   const [prompt, setPrompt] = useState('');
   const [mode, setMode] = useState<ModeType>('operator');
   const [role, setRole] = useState<RoleType>('operator');
@@ -130,14 +131,15 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
 
   return (
     <form className="relative" onSubmit={handleSubmit}>
-      <nav aria-label="Mode" className="mb-3 flex gap-1 border-b border-stone-200 pb-2">
+      <div className="mb-3 flex items-center gap-2 overflow-x-auto border-b border-stone-200 pb-2">
+      <nav aria-label="Mode" className="flex shrink-0 rounded-md bg-stone-100 p-0.5">
         {(['operator', 'ask'] as const).map(item => (
           <button
             aria-current={mode === item ? 'page' : undefined}
-            className={`min-h-8 rounded-md px-3 text-xs font-semibold transition-[background-color,color,transform] duration-150 active:scale-[0.98] motion-reduce:transform-none ${
+            className={`min-h-8 rounded-md px-2 text-xs font-semibold transition-[background-color,color,transform] duration-150 active:scale-[0.98] motion-reduce:transform-none ${
               mode === item
-                ? 'bg-[#eaf2f7] text-[#315a78]'
-                : 'text-stone-500 hover:bg-stone-100 hover:text-stone-900'
+                ? 'bg-white text-[#315a78] shadow-sm'
+                : 'text-stone-500 hover:text-stone-900'
             }`}
             disabled={isDisabled}
             key={item}
@@ -148,6 +150,14 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
           </button>
         ))}
       </nav>
+      {mode === 'operator' && <div className="relative w-36 shrink-0">
+        <select aria-label="Assistant role" className="min-h-8 w-full cursor-pointer appearance-none rounded-lg border-0 bg-stone-100 py-1 pl-3 pr-7 text-xs font-semibold text-stone-800 hover:bg-stone-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#315a78] disabled:cursor-not-allowed disabled:opacity-50" disabled={isDisabled} onChange={event => setRole(isOperatorRole(event.target.value) ? event.target.value : 'operator')} value={role}>
+          {operatorRoleOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+        </select>
+        <svg aria-hidden="true" className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-stone-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      </div>}
+      {pageActions}
+      </div>
 
       {mode === 'ask' ? (
         <>
@@ -258,76 +268,49 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, onCancel, isPr
         </>
       ) : (
         <div className="space-y-3">
-          <div className="relative">
-            <select
-              aria-label="Assistant role"
-              className="w-full appearance-none rounded-lg border border-stone-300 bg-white px-3 py-2.5 pr-9 text-sm font-medium text-stone-800 outline-none transition-[border-color,box-shadow] duration-150 hover:border-stone-500 focus:border-[#315a78] focus:ring-2 focus:ring-[#315a78]/10"
-              disabled={isDisabled}
-              onChange={event => setRole(isOperatorRole(event.target.value) ? event.target.value : 'operator')}
-              value={role}
-            >
-              {operatorRoleOptions.map(option => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-            <svg aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
-            </svg>
-          </div>
-
+          {(role === 'notebooklm' || role === 'researcher') && <div className={role === 'notebooklm' ? 'flex items-center gap-2 overflow-x-auto border-b border-stone-200 pb-1' : ''}>
           {role === 'notebooklm' && (
-            <section className="space-y-2">
-              <div className="grid grid-cols-4 gap-2">
-                {notebookLMOptions.map(option => (
-                  <button
-                    className={`min-h-16 rounded-lg border px-2 py-2 text-xs font-medium transition-colors duration-150 active:scale-[0.98] motion-reduce:transform-none ${
-                      selectedNotebookLMOption === option.id
-                        ? 'border-[#315a78] bg-[#eaf2f7] text-[#315a78]'
-                        : 'border-stone-200 bg-white text-stone-600 hover:border-stone-400 hover:text-stone-900'
-                    }`}
-                    disabled={isDisabled}
-                    key={option.id}
-                    onClick={() => {
-                      setSelectedNotebookLMOption(option.id);
-                    }}
-                    type="button"
-                  >
-                    <span className="mt-1 block">{option.title}</span>
-                  </button>
-                ))}
-              </div>
-              <p className="rounded-lg bg-stone-100 px-3 py-2 text-xs leading-5 text-stone-600">
-                <strong className="font-semibold text-stone-800">{selectedNotebookOption?.title}: </strong>
-                {selectedNotebookOption?.description}
-              </p>
-            </section>
+            <div aria-label="NotebookLM output type" className="flex shrink-0 items-center gap-1" role="group">
+              <span className="mr-1 shrink-0 text-[11px] font-semibold text-stone-500">Create</span>
+              {notebookLMOptions.map(option => (
+                <button
+                  key={option.id}
+                  type="button"
+                  aria-pressed={selectedNotebookLMOption === option.id}
+                  title={option.description}
+                  disabled={isDisabled}
+                  onClick={() => setSelectedNotebookLMOption(option.id)}
+                  className={`min-h-8 shrink-0 rounded-md px-2 text-xs font-medium transition-colors duration-150 disabled:opacity-50 ${selectedNotebookLMOption === option.id ? 'bg-[#eaf2f7] text-[#315a78]' : 'text-stone-600 hover:bg-stone-100 hover:text-[#315a78]'}`}
+                >
+                  {option.title}
+                </button>
+              ))}
+            </div>
           )}
 
           {(role === 'researcher' || role === 'notebooklm') && (
-            <section className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-semibold text-stone-900">{role === 'notebooklm' ? 'Source Tabs' : 'Multi-Tab Analysis'}</h3>
-                  <p className="mt-0.5 text-xs leading-5 text-stone-500">
-                    {selectedTabIds.length > 0 ? `${selectedTabIds.length} tabs selected` : role === 'notebooklm' ? 'Select pages to use together, or use the current tab.' : 'Analyze several open tabs together.'}
-                  </p>
+            <section className={role === 'notebooklm' ? 'flex shrink-0 items-center gap-1 border-l border-stone-200 pl-2 text-xs' : 'flex flex-wrap items-center gap-2 text-xs'}>
+              <div className="flex items-center gap-1">
+                <div className="whitespace-nowrap text-stone-500">
+                  {selectedTabIds.length > 0 ? `${selectedTabIds.length} source tabs` : 'Current tab'}
                 </div>
                 <button
-                  className="min-h-10 shrink-0 rounded-md border border-stone-300 bg-white px-3 text-xs font-semibold text-stone-700 transition-colors duration-150 hover:border-stone-500 hover:text-stone-900 active:scale-[0.98] motion-reduce:transform-none"
+                  className="min-h-8 rounded-md px-2 font-medium text-[#315a78] hover:bg-[#eaf2f7] disabled:opacity-50"
                   disabled={isDisabled}
                   onClick={() => setShowMultiTabSelector(true)}
                   type="button"
                 >
-                  Select Tabs
+                  Change sources
                 </button>
               </div>
               {selectedTabIds.length > 0 && (
-                <button className="mt-2 text-xs font-medium text-stone-500 hover:text-stone-900" onClick={() => setSelectedTabIds([])} type="button">
-                  Clear selection
+                <button className="text-xs text-stone-500 hover:text-stone-900" onClick={() => setSelectedTabIds([])} type="button">
+                  Use current tab
                 </button>
               )}
             </section>
           )}
+          </div>}
         </div>
       )}
 

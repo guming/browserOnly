@@ -152,6 +152,10 @@ export function ProvidersTab({
             Choose the default provider for LLM tasks, then configure its connection settings.
             Your API keys are stored securely in your browser's storage.
           </p>
+          <div className="mb-4 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-slate-700">
+            <p className="font-semibold text-slate-900">Models for OCR and translation</p>
+            <p className="mt-1">OCR automatically uses the lowest-cost configured model with verified image support. Translation uses your choice in Features: a selected provider takes priority, while Automatic chooses the lowest-cost configured model. Eligible local Ollama models have no API cost.</p>
+          </div>
           
           {/* Provider Selector */}
           <ProviderSelector provider={provider} setProvider={setProvider} />

@@ -139,19 +139,40 @@ export const openaiModels = {
 
 //DeepSeek
 export type DeepSeekModelId = keyof typeof deepseekModels;
-export const deepseekDefaultModelId: DeepSeekModelId = "deepseek-reasoner";
+export const deepseekDefaultModelId: DeepSeekModelId = "deepseek-flash";
 export const deepseekModels = {
-  "deepseek-reasoner": {
-    name: "deepseek-reasoner",
-    inputPrice: 0.28,
-    outputPrice: 1.09,
-    maxTokens: 4096,
-    contextWindow: 128000,
+  "deepseek-flash": {
+    name: "DeepSeek V4.1 Flash",
+    inputPrice: 0.15,
+    outputPrice: 0.6,
+    cacheReadsPrice: 0.003,
+    peakInputPrice: 0.3,
+    peakOutputPrice: 1.2,
+    peakCacheReadsPrice: 0.006,
+    maxTokens: 384000,
+    contextWindow: 1000000,
     supportsImages: true,
     supportsPromptCache: true,
-    cacheReadsPrice: 1.25,
+  },
+  "deepseek-v4-pro": {
+    name: "DeepSeek V4 Pro",
+    inputPrice: 0.66,
+    outputPrice: 1.98,
+    cacheReadsPrice: 0.022,
+    peakInputPrice: 1.32,
+    peakOutputPrice: 3.96,
+    peakCacheReadsPrice: 0.044,
+    maxTokens: 384000,
+    contextWindow: 1000000,
+    supportsImages: false,
+    supportsPromptCache: true,
   },
 };
+
+export function canonicalDeepSeekModelId(modelId: string): DeepSeekModelId {
+  if (modelId === "deepseek-reasoner" || modelId === "deepseek-chat") return "deepseek-flash";
+  return modelId in deepseekModels ? modelId as DeepSeekModelId : deepseekDefaultModelId;
+}
 
 // Gemini Models
 export type GeminiModelId = keyof typeof geminiModels;

@@ -608,9 +608,9 @@ function handleExecutePrompt(
   if (message.tabId) {
     // Check if this is a multitab analysis request
     if ((message as any).multiTabAnalysis && (message as any).selectedTabIds) {
-      executePrompt(message.prompt, message.tabId, false, message.role, (message as any).selectedTabIds, message.contextMode, message.taskMode);
+      executePrompt(message.prompt, message.tabId, false, message.role, (message as any).selectedTabIds, message.contextMode, message.taskMode, message.taskKind);
     } else {
-      executePrompt(message.prompt, message.tabId, false, message.role, undefined, message.contextMode, message.taskMode);
+      executePrompt(message.prompt, message.tabId, false, message.role, undefined, message.contextMode, message.taskMode, message.taskKind);
     }
   } else {
     executePrompt(message.prompt);

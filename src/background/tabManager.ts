@@ -366,7 +366,7 @@ export async function attachToTab(tabId: number, windowId?: number, retryCount: 
       }
     } catch (error) {
       logWithTimestamp(`Error getting tab info: ${error}`, 'warn');
-      return false;
+      return { error: 'tab_lookup_failed', reason: `Could not read the tab: ${error instanceof Error ? error.message : String(error)}` };
     }
     
     // Store the window ID if provided
@@ -487,11 +487,11 @@ export async function attachToTab(tabId: number, windowId?: number, retryCount: 
       
       // For other errors or if we've exceeded retry attempts, just handle normally
       handleError(error, `attachment for tab ${tabId}`);
-      return false;
+      return { error: 'attach_failed', reason: `Could not connect to this tab: ${errorMessage}` };
     }
   } catch (error) {
     handleError(error, 'attachToTab');
-    return false;
+    return { error: 'attach_failed', reason: `Could not connect to this tab: ${error instanceof Error ? error.message : String(error)}` };
   }
 }
 

@@ -1,6 +1,6 @@
 import { faCog, faCircleInfo } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ConfigManager } from '../../background/configManager';
 import { TokenTrackingService } from '../../tracking/tokenTrackingService';
 
@@ -20,6 +20,24 @@ export function ProviderSelector({ isProcessing, compact = false }: ProviderSele
   const [currentProvider, setCurrentProvider] = useState<string>('');
   const [currentModel, setCurrentModel] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isModelMenuOpen, setModelMenuOpen] = useState(false);
+  const modelMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isModelMenuOpen) return;
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!modelMenuRef.current?.contains(event.target as Node)) setModelMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setModelMenuOpen(false);
+    };
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [isModelMenuOpen]);
   
   // Function to load provider options
   const loadOptions = async () => {
@@ -85,11 +103,9 @@ export function ProviderSelector({ isProcessing, compact = false }: ProviderSele
     }
   };
   
-  const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
-    const [provider, modelId] = value.split('|');
-    
+  const selectModel = async (provider: string, modelId: string) => {
     if (provider && modelId) {
+      setModelMenuOpen(false);
       setCurrentProvider(provider);
       setCurrentModel(modelId);
       
@@ -123,6 +139,11 @@ export function ProviderSelector({ isProcessing, compact = false }: ProviderSele
       window.location.reload();
     }
   };
+
+  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const [provider, modelId] = e.target.value.split('|');
+    void selectModel(provider, modelId);
+  };
   
   if (isLoading || options.length === 0) {
     return null;
@@ -141,19 +162,19 @@ export function ProviderSelector({ isProcessing, compact = false }: ProviderSele
         >
           <FontAwesomeIcon icon={faCog} className="text-xs" />
         </button>
-        <select
-          aria-label="Model"
-          className="h-7 max-w-[150px] min-w-0 rounded-md border border-stone-300 bg-white px-2 text-xs font-medium text-stone-700 outline-none hover:border-stone-500 focus:border-[#315a78] focus:ring-2 focus:ring-[#315a78]/10"
-          value={`${currentProvider}|${currentModel}`}
-          onChange={handleChange}
-          disabled={isProcessing}
-        >
-          {options.map(option => option.models.map(model => (
-            <option key={`${option.provider}|${model.id}`} value={`${option.provider}|${model.id}`}>
-              {model.name}
-            </option>
-          )))}
-        </select>
+        <div className="relative min-w-0" ref={modelMenuRef}>
+          <button type="button" aria-label="Model" aria-expanded={isModelMenuOpen} aria-haspopup="listbox" disabled={isProcessing} onClick={() => setModelMenuOpen(value => !value)} className="flex h-7 max-w-[210px] min-w-0 items-center gap-1.5 rounded-md border border-stone-300 bg-white px-2 text-xs font-medium text-stone-700 hover:border-stone-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#315a78] disabled:opacity-50">
+            <span className="truncate">{options.find(option => option.provider === currentProvider)?.models.find(model => model.id === currentModel)?.name || currentModel}</span>
+            {currentProvider === 'ollama' && <span className="shrink-0 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800">Local</span>}
+            <span aria-hidden="true" className="shrink-0 text-stone-400">⌄</span>
+          </button>
+          {isModelMenuOpen && <div role="listbox" aria-label="Available models" className="absolute bottom-full left-0 z-50 mb-1 max-h-64 min-w-48 overflow-y-auto rounded-lg border border-stone-200 bg-white p-1 shadow-lg">
+            {options.flatMap(option => option.models.map(model => <button type="button" role="option" aria-selected={option.provider === currentProvider && model.id === currentModel} key={`${option.provider}|${model.id}`} onClick={() => void selectModel(option.provider, model.id)} className="flex min-h-9 w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-stone-700 hover:bg-stone-100 aria-selected:bg-[#eaf2f7]">
+              <span className="min-w-0 flex-1 truncate">{model.name}</span>
+              {option.provider === 'ollama' && <span className="shrink-0 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800">Local</span>}
+            </button>))}
+          </div>}
+        </div>
       </div>
     );
   }

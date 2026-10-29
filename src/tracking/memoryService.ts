@@ -8,6 +8,11 @@ export interface AgentMemory {
   taskDescription: string;  // Short description of what was accomplished
   toolSequence: string[];  // Array of tool calls with their inputs
   createdAt: number;  // Timestamp
+  updatedAt?: number;
+  lastVerifiedAt?: number;
+  status?: 'active' | 'needs_review' | 'disabled';
+  source?: 'reflection' | 'manual' | 'import' | 'default' | 'legacy';
+  sourceRunId?: string;
 }
 
 export class MemoryService {
@@ -15,7 +20,7 @@ export class MemoryService {
   private db: IDBDatabase | null = null;
   private readonly DB_NAME = 'BrowserOnly-memories';
   private readonly STORE_NAME = 'memories';
-  private DB_VERSION = 1; // Not readonly so we can increment it if needed
+  private DB_VERSION = 2;
   private isInitialized = false;
   private hasImportedDefaultMemories = false;
 
@@ -48,23 +53,7 @@ export class MemoryService {
       this.db = null;
       this.isInitialized = false;
 
-      // Delete and recreate the database with a higher version
-      return new Promise((resolve, reject) => {
-        const deleteRequest = indexedDB.deleteDatabase(this.DB_NAME);
-
-        deleteRequest.onsuccess = () => {
-          logWithTimestamp(`Database ${this.DB_NAME} deleted successfully, recreating`);
-
-          // Reinitialize with the same version
-          this.init().then(resolve).catch(reject);
-        };
-
-        deleteRequest.onerror = (event) => {
-          const error = (event.target as IDBRequest).error;
-          logWithTimestamp(`Error deleting database: ${error?.message || 'Unknown error'}`, 'error');
-          reject(error);
-        };
-      });
+      throw new Error(`Memory store ${this.STORE_NAME} is missing; existing database was preserved`);
     }
 
     return Promise.resolve();
@@ -108,7 +97,20 @@ export class MemoryService {
 
             logWithTimestamp(`Created ${this.STORE_NAME} object store in ${this.DB_NAME} database`);
           } else {
-            logWithTimestamp(`Object store ${this.STORE_NAME} already exists`);
+            const store = request.transaction!.objectStore(this.STORE_NAME);
+            const cursorRequest = store.openCursor();
+            cursorRequest.onsuccess = () => {
+              const cursor = cursorRequest.result;
+              if (!cursor) return;
+              const memory = cursor.value as AgentMemory;
+              cursor.update({
+                ...memory,
+                updatedAt: memory.updatedAt ?? memory.createdAt,
+                status: memory.status ?? 'needs_review',
+                source: memory.source ?? 'legacy',
+              });
+              cursor.continue();
+            };
           }
         };
 
@@ -130,26 +132,8 @@ export class MemoryService {
             this.db = null;
             this.isInitialized = false;
 
-            // Delete and recreate the database with a higher version
-            const deleteRequest = indexedDB.deleteDatabase(this.DB_NAME);
-
-            deleteRequest.onsuccess = () => {
-              logWithTimestamp(`Database ${this.DB_NAME} deleted successfully, recreating`);
-
-              // No need to increment version if we're deleting and recreating the database
-              // The database will be created with the current version
-
-              // Reinitialize with the same version
-              this.init().then(resolve).catch(reject);
-            };
-
-            deleteRequest.onerror = (event) => {
-              const error = (event.target as IDBRequest).error;
-              logWithTimestamp(`Error deleting database: ${error?.message || 'Unknown error'}`, 'error');
-              reject(error);
-            };
-
-            return; // Don't resolve yet, wait for the recursive call to complete
+            reject(new Error(`Memory store ${this.STORE_NAME} is missing; existing database was preserved`));
+            return;
           }
 
           resolve();
@@ -266,8 +250,10 @@ export class MemoryService {
           const updatedMemory = {
             ...existingMemory,
             ...memory,
-            // Always update the timestamp
-            createdAt: Date.now()
+            id,
+            createdAt: existingMemory.createdAt,
+            updatedAt: Date.now(),
+            lastVerifiedAt: memory.status === 'active' ? Date.now() : existingMemory.lastVerifiedAt,
           };
 
           // Put the updated memory back
@@ -306,8 +292,12 @@ export class MemoryService {
       throw new Error('Database not initialized');
     }
 
-    // Normalize the domain before storing
+    // Normalize metadata before storing. New and imported records require review.
     memory.domain = normalizeDomain(memory.domain);
+    memory.status = memory.status ?? 'needs_review';
+    memory.source = memory.source ?? 'manual';
+    memory.updatedAt = Date.now();
+    delete memory.id;
 
     // Check if a similar memory already exists
     const existingId = await this.findSimilarMemory(memory);
@@ -397,6 +387,18 @@ export class MemoryService {
         reject(error);
       }
     });
+  }
+
+  public async markStepFailed(domain: string, toolName: string, input: string): Promise<void> {
+    const expected = `${toolName} | ${input.trim()}`;
+    const parameterizedType = toolName === 'browser_type' ? `browser_type | ${input.split('|')[0]}|[text]` : null;
+    const memories = await this.getMemoriesByDomain(domain);
+    for (const memory of memories) {
+      if (memory.status !== 'active' || memory.id === undefined) continue;
+      if (memory.toolSequence.some(step => step.trim() === expected || (parameterizedType !== null && step.trim() === parameterizedType))) {
+        await this.updateMemory(memory.id, { status: 'needs_review' });
+      }
+    }
   }
 
   // Get all memories
@@ -546,7 +548,7 @@ export class MemoryService {
           delete memory.id;
 
           // Store the memory (this will check for duplicates)
-          await this.storeMemory(memory);
+          await this.storeMemory({ ...memory, source: 'default', status: 'needs_review' });
           importedCount++;
         } catch (error) {
           logWithTimestamp(`Error importing memory: ${error instanceof Error ? error.message : String(error)}`, 'warn');

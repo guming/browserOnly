@@ -1,5 +1,5 @@
 // Define message types
-export type MessageType = 'system' | 'llm' | 'screenshot' | 'workflow' | 'workflow_offer' | 'task_complete';
+export type MessageType = 'system' | 'llm' | 'ocr' | 'image_analysis' | 'screenshot' | 'workflow' | 'workflow_offer' | 'task_complete';
 
 export interface Message {
   type: MessageType;

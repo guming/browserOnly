@@ -42,14 +42,14 @@ export const CANONICAL_SEQUENCE: string = `## CANONICAL SEQUENCE
      • **Stop and read** the returned memory *before doing anything else*.
   
   3. **Apply memory (if any)**
-     • If the memory closely matches the user's current request and contains a "Tools:" block, REPLAY each listed tool line-by-line
-     • Copy selectors/arguments verbatim.
+     • Treat a matching "Tools:" block as a suggestion. Check its selectors and arguments against the current page before acting; skip stale steps and unnecessary read calls.
      • If no suitable memory exists, skip to Step 4.
   
-  4. **Choose one focused observation tool** based on the request. Do not call multiple overlapping overview, text, DOM, and accessibility tools for the same page state.
+  4. **Choose one focused observation tool** based on the request. A successful observation is enough for the current page state; do not repeat it with another overview, text, DOM, or accessibility tool.
      • If the user asks to list, collect, or extract page URLs/links, call browser_extract_links once (use internal, external, or all only as needed). After a complete result, stop exploring the DOM and answer.
-     • For other tasks, choose the single most relevant tool: browser_read_text_ast, browser_read_page, browser_snapshot_dom, or browser_screenshot. Use browser_query only to inspect a specific selector when the required element is unknown.
-     • browser_read_page is used only when the user requests to crawl webpage content. Do not overuse it.
+     • To read the current page's visible text or follow link URLs, use browser_read_text. Use browser_read_main when the task needs only the main article content; use browser_get_summary for a short preview. Choose one of these for the current page state.
+     • To find an element for an action, use browser_snapshot_dom or browser_accessible_tree. Use browser_query only to inspect a specific selector when the required element is unknown. Use browser_screenshot when visual position matters.
+     • After a successful read, call a different observation tool only if a specific missing detail is needed. Do not use a second full-page read merely to verify the first.
   
   5. **Analyze → Act** – Plan the remainder of the task and execute further tools.
 
@@ -66,7 +66,7 @@ export const CANONICAL_SEQUENCE: string = `## CANONICAL SEQUENCE
      - [x] Type search term
      - [ ] Press Enter
 
-   • Always verify success after each step (via observation tools) before moving to the next.
+   • Verify actions that change page state using the smallest relevant observation. Reuse the latest result while the page state has not changed.
 
    • If any task fails or context changes, **update the plan** and regenerate the checklist accordingly.`;
 
@@ -81,7 +81,7 @@ export const MEMORY_FORMAT: string = ` ### MEMORY FORMAT  (for Step 3)
   browser_press_key | Enter
   \\\`\\\`\\\`
   
-  Treat the "Tools:" list as a ready-made macro.
+  Treat the "Tools:" list as a historical example. Recheck selectors on the current page and omit redundant reads.
   
   When creating memories, ensure valid JSON with:
   • Double quotes for keys and string values
@@ -91,7 +91,7 @@ export const MEMORY_FORMAT: string = ` ### MEMORY FORMAT  (for Step 3)
   ### VERIFICATION NOTES  (Step 4)
   • Describe exactly what you see—never assume.
   • If an expected element is missing, state that.
-  • Double-check critical states with a second observation tool.
+  • Double-check a critical state with a second observation tool only when the first result is ambiguous or incomplete.
   
   ────────────────────────────────────────
   ## TOOL-CALL SYNTAX

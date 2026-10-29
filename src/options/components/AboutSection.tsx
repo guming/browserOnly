@@ -3,6 +3,7 @@ import React from 'react';
 const providers = ['Anthropic', 'OpenAI', 'Google Gemini', 'DeepSeek', 'Ollama'];
 
 export function AboutSection() {
+  const version = typeof chrome !== 'undefined' ? chrome.runtime.getManifest().version : '';
   return (
     <section className="about-section" aria-labelledby="about-title">
       <div className="section-kicker">Overview</div>
@@ -11,7 +12,7 @@ export function AboutSection() {
           <h2 id="about-title">About BrowserOnly</h2>
           <p className="about-lede">Browser automation controlled by plain language.</p>
         </div>
-        <span className="version-chip">v0.4.6</span>
+        <span className="version-chip">v{version}</span>
       </div>
       <div className="about-copy">
         <p>BrowserOnly lets you operate Chrome from the side panel. Describe the task, and the extension turns it into browser actions through your chosen model.</p>

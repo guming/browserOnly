@@ -246,14 +246,15 @@ export class BrowserAgent {
  */
 export async function createBrowserAgent(
   page: Page,
-  apiKey: string
+  apiKey: string,
+  configOverride?: ProviderConfig
 ): Promise<BrowserAgent> {
   // Get provider configuration
   const configManager = ConfigManager.getInstance();
   let providerConfig: ProviderConfig;
 
   try {
-    providerConfig = await configManager.getProviderConfig();
+    providerConfig = configOverride || await configManager.getProviderConfig();
   } catch (error) {
     console.warn('Failed to get provider configuration, using default:', error);
     providerConfig = {
@@ -262,6 +263,8 @@ export async function createBrowserAgent(
       apiModelId: 'claude-3-7-sonnet-20250219',
     };
   }
+
+  if (configOverride) providerConfig = { ...configOverride };
 
   // Special case for Ollama: it doesn't require an API key
   if (providerConfig.provider === 'ollama') {
@@ -281,6 +284,7 @@ export async function createBrowserAgent(
     apiKey: providerConfig.apiKey,
     apiModelId: providerConfig.apiModelId,
     baseUrl: providerConfig.baseUrl,
+    openaiCompatibleModels: providerConfig.openaiCompatibleModels,
     thinkingBudgetTokens: providerConfig.thinkingBudgetTokens,
     dangerouslyAllowBrowser: true,
   });

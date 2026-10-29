@@ -5,6 +5,7 @@ import { putPendingAction } from '../actions';
 import { cleanupOnUnload, setupTabListeners } from './tabManager';
 import { logWithTimestamp } from './utils';
 import { setupMonitoring } from '../monitoring/backgroundIntegration';
+import { TaskModelRoutingService } from '../models/routing/TaskModelRoutingService';
 
 /**
  * Initialize the extension
@@ -42,14 +43,29 @@ function setupEventListeners(): void {
         key === 'openaiApiKey' ||
         key === 'geminiApiKey' ||
         key === 'ollamaApiKey' ||
+        key === 'deepseekApiKey' ||
+        key === 'openaiCompatibleApiKey' ||
         key === 'anthropicBaseUrl' ||
         key === 'openaiBaseUrl' ||
         key === 'geminiBaseUrl' ||
-        key === 'ollamaBaseUrl'
+        key === 'ollamaBaseUrl' ||
+        key === 'deepseekBaseUrl' ||
+        key === 'openaiCompatibleBaseUrl' ||
+        key === 'anthropicModelId' ||
+        key === 'openaiModelId' ||
+        key === 'geminiModelId' ||
+        key === 'ollamaModelId' ||
+        key === 'deepseekModelId' ||
+        key === 'openaiCompatibleModelId' ||
+        key === 'openaiCompatibleModels' ||
+        key === 'ollamaCustomModels'
         || key === 'translationProvider'
       );
 
       if (providerConfigChanged) {
+        void TaskModelRoutingService.getAssignments(true).catch(error => {
+          logWithTimestamp(`Could not refresh task model assignments: ${String(error)}`, 'warn');
+        });
         // Notify all clients that provider configuration has changed
         chrome.runtime.sendMessage({
           action: 'providerConfigChanged'
@@ -118,21 +134,6 @@ function setupEventListeners(): void {
       await cleanupOnUnload();
       logWithTimestamp('Cleanup completed successfully');
 
-      // Delete the memory database on uninstall/disable
-      try {
-        logWithTimestamp('Deleting memory database');
-        const request = indexedDB.deleteDatabase('BrowserOnly-memories');
-
-        request.onsuccess = () => {
-          logWithTimestamp('Memory database deleted successfully');
-        };
-
-        request.onerror = (event) => {
-          logWithTimestamp(`Error deleting memory database: ${(event.target as IDBRequest).error}`, 'error');
-        };
-      } catch (error) {
-        logWithTimestamp(`Exception deleting memory database: ${error}`, 'error');
-      }
     } catch (error) {
       logWithTimestamp(`Error during cleanup: ${String(error)}`, 'error');
     }
@@ -145,21 +146,6 @@ function setupEventListeners(): void {
       await cleanupOnUnload();
       logWithTimestamp('Cleanup before update completed successfully');
 
-      // Delete the memory database before update
-      try {
-        logWithTimestamp('Deleting memory database before update');
-        const request = indexedDB.deleteDatabase('BrowserOnly-memories');
-
-        request.onsuccess = () => {
-          logWithTimestamp('Memory database deleted successfully before update');
-        };
-
-        request.onerror = (event) => {
-          logWithTimestamp(`Error deleting memory database before update: ${(event.target as IDBRequest).error}`, 'error');
-        };
-      } catch (error) {
-        logWithTimestamp(`Exception deleting memory database before update: ${error}`, 'error');
-      }
     } catch (error) {
       logWithTimestamp(`Error during pre-update cleanup: ${String(error)}`, 'error');
     }
@@ -167,7 +153,7 @@ function setupEventListeners(): void {
 
   chrome.runtime.onInstalled.addListener(async () => {
     await chrome.contextMenus.removeAll();
-    chrome.contextMenus.create({ id: 'browserOnlyRoot', title: 'BrowserOnly', contexts: ['page', 'selection'] });
+    chrome.contextMenus.create({ id: 'browserOnlyRoot', title: 'BrowserOnly', contexts: ['page', 'selection', 'image'] });
     chrome.contextMenus.create({
       id: "copyToPrompt",
       title: "Send selection to BrowserOnly",
@@ -175,16 +161,17 @@ function setupEventListeners(): void {
       parentId: 'browserOnlyRoot'
     });
     chrome.contextMenus.create({ id: 'summarizeSelection', title: 'Summarize selection', contexts: ['selection'], parentId: 'browserOnlyRoot' });
+    chrome.contextMenus.create({ id: 'explainSelection', title: 'Explain selection', contexts: ['selection'], parentId: 'browserOnlyRoot' });
     chrome.contextMenus.create({ id: 'extractSelection', title: 'Extract from selection', contexts: ['selection'], parentId: 'browserOnlyRoot' });
     chrome.contextMenus.create({ id: 'summarizePage', title: 'Summarize this page', contexts: ['page'], parentId: 'browserOnlyRoot' });
     chrome.contextMenus.create({ id: 'extractPage', title: 'Extract structured data', contexts: ['page'], parentId: 'browserOnlyRoot' });
     chrome.contextMenus.create({ id: 'translateSelection', title: 'Translate selection', contexts: ['selection'], parentId: 'browserOnlyRoot' });
     chrome.contextMenus.create({ id: 'translatePage', title: 'Translate this page', contexts: ['page'], parentId: 'browserOnlyRoot' });
-    chrome.contextMenus.create({ id: 'runWorkflowSelection', title: 'Run workflow…', contexts: ['selection'], parentId: 'browserOnlyRoot' });
-    chrome.contextMenus.create({ id: 'runWorkflowPage', title: 'Run workflow…', contexts: ['page'], parentId: 'browserOnlyRoot' });
+    chrome.contextMenus.create({ id: 'ocrImage', title: 'Recognize text in image', contexts: ['image'], parentId: 'browserOnlyRoot' });
+    chrome.contextMenus.create({ id: 'understandImage', title: 'Understand this image', contexts: ['image'], parentId: 'browserOnlyRoot' });
   });
 
-  chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  chrome.contextMenus.onClicked.addListener((info, tab) => {
     console.log("copyToPrompt",info)
     if (info.menuItemId === "copyToPrompt") {
       // 将选中的文本存入 storage
@@ -195,14 +182,22 @@ function setupEventListeners(): void {
       });
       // 打开 sidepanel
       if(tab?.id){
-        chrome.sidePanel.open({ tabId: tab.id });
+        void chrome.sidePanel.open({ tabId: tab.id }).catch(error => logWithTimestamp(`Error opening side panel: ${String(error)}`, 'error'));
       }
     }
-    const actionMap: Record<string, string> = { summarizeSelection: 'summarize', extractSelection: 'extract', summarizePage: 'summarize', extractPage: 'extract', translateSelection: 'translate', translatePage: 'translate', runWorkflowSelection: 'workflow-picker', runWorkflowPage: 'workflow-picker' };
+    const actionMap: Record<string, string> = { summarizeSelection: 'summarize', explainSelection: 'explain', extractSelection: 'extract', summarizePage: 'summarize', extractPage: 'extract', translateSelection: 'translate', translatePage: 'translate' };
+    if ((info.menuItemId === 'ocrImage' || info.menuItemId === 'understandImage') && tab?.id !== undefined && info.srcUrl) {
+      const actionId = info.menuItemId === 'ocrImage' ? 'ocr-image' : 'understand-image';
+      const pending = putPendingAction({ actionId, source: 'context_menu', tabId: tab.id, windowId: tab.windowId, pageUrl: tab.url, pageTitle: tab.title, imageUrl: info.srcUrl, createdAt: Date.now() });
+      void chrome.sidePanel.open({ tabId: tab.id }).catch(error => logWithTimestamp(`Error opening side panel: ${String(error)}`, 'error'));
+      void pending.catch(error => logWithTimestamp(`Error saving OCR action: ${String(error)}`, 'error'));
+      return;
+    }
     const actionId = actionMap[String(info.menuItemId)];
     if (actionId && tab?.id !== undefined) {
-      await putPendingAction({ actionId, source: 'context_menu', tabId: tab.id, windowId: tab.windowId, pageUrl: tab.url, pageTitle: tab.title, selectionText: info.selectionText, createdAt: Date.now() });
-      await chrome.sidePanel.open({ tabId: tab.id });
+      const pending = putPendingAction({ actionId, source: 'context_menu', tabId: tab.id, windowId: tab.windowId, pageUrl: tab.url, pageTitle: tab.title, selectionText: info.selectionText, createdAt: Date.now() });
+      void chrome.sidePanel.open({ tabId: tab.id }).catch(error => logWithTimestamp(`Error opening side panel: ${String(error)}`, 'error'));
+      void pending.catch(error => logWithTimestamp(`Error saving context menu action: ${String(error)}`, 'error'));
     }
   });
 

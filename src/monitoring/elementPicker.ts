@@ -34,8 +34,15 @@ export function installElementPicker(): Promise<RawElementSelection | null> {
       const prohibited = input.type === 'password' || /cc-|one-time-code/.test(autocomplete);
       const label = element.id ? document.querySelector(`label[for="${CSS.escape(element.id)}"]`)?.textContent?.trim() : undefined;
       const text = (element.innerText || input.value || element.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 20000);
-      const css = element.id ? `#${CSS.escape(element.id)}` : `${element.tagName.toLowerCase()}${element.classList.length ? `.${[...element.classList].slice(0, 2).map(item => CSS.escape(item)).join('.')}` : ''}`;
-      const result: RawElementSelection = { sample: text, tagName: element.tagName.toLowerCase(), role: element.getAttribute('role') ?? undefined, accessibleName: element.getAttribute('aria-label') ?? label, label, testId: element.dataset.testid, id: element.id || undefined, text: text.slice(0, 120), css, prohibited };
+      const parts: string[] = [];
+      for (let node: Element | null = element; node && node !== document.body; node = node.parentElement) {
+        if (node.id) { parts.unshift(`#${CSS.escape(node.id)}`); break; }
+        const siblings = node.parentElement ? [...node.parentElement.children].filter(child => child.tagName === node!.tagName) : [];
+        parts.unshift(`${node.tagName.toLowerCase()}:nth-of-type(${siblings.indexOf(node) + 1})`);
+      }
+      const css = parts.join(' > ');
+      // A changing number must never become a text locator: the next value would no longer match.
+      const result: RawElementSelection = { sample: text, tagName: element.tagName.toLowerCase(), testId: element.dataset.testid, id: element.id || undefined, css, prohibited };
       cleanup(); resolve(result);
     };
     document.addEventListener('mousemove', move, true); document.addEventListener('click', pick, true); document.addEventListener('keydown', key, true);

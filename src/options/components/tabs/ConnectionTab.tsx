@@ -1,5 +1,5 @@
 import { NotionSettings } from '../NotionSettings';
-import { DuckDBSettings } from '../DuckDBSettings';
+import { SlackSettings } from '../SlackSettings';
 
 interface ConnectionTabProps {
   notionEnabled: boolean;
@@ -8,12 +8,6 @@ interface ConnectionTabProps {
   setNotionBearerToken: (token: string) => void;
   notionDatabaseId: string;
   setNotionDatabaseId: (databaseId: string) => void;
-  duckdbEnabled: boolean;
-  setDuckdbEnabled: (enabled: boolean) => void;
-  duckdbConnectionString: string;
-  setDuckdbConnectionString: (connectionString: string) => void;
-  duckdbDatabasePath: string;
-  setDuckdbDatabasePath: (databasePath: string) => void;
 }
 
 export function ConnectionTab({
@@ -22,13 +16,7 @@ export function ConnectionTab({
   notionBearerToken,
   setNotionBearerToken,
   notionDatabaseId,
-  setNotionDatabaseId,
-  duckdbEnabled,
-  setDuckdbEnabled,
-  duckdbConnectionString,
-  setDuckdbConnectionString,
-  duckdbDatabasePath,
-  setDuckdbDatabasePath
+  setNotionDatabaseId
 }: ConnectionTabProps) {
 
   return (
@@ -43,6 +31,7 @@ export function ConnectionTab({
 
       {/* Main Content Area */}
       <div className="space-y-4">
+        <SlackSettings />
         {/* Notion Integration Card */}
         <NotionSettings
           notionEnabled={notionEnabled}
@@ -53,28 +42,6 @@ export function ConnectionTab({
           setNotionDatabaseId={setNotionDatabaseId}
         />
 
-        {/* DuckDB Integration Card */}
-        <DuckDBSettings
-          duckdbEnabled={duckdbEnabled}
-          setDuckdbEnabled={setDuckdbEnabled}
-          duckdbConnectionString={duckdbConnectionString}
-          setDuckdbConnectionString={setDuckdbConnectionString}
-          duckdbDatabasePath={duckdbDatabasePath}
-          setDuckdbDatabasePath={setDuckdbDatabasePath}
-        />
-
-        {/* Future Integrations Placeholder */}
-        <div className="card bg-base-200/50 border border-dashed border-base-300/60">
-          <div className="card-body text-center py-8">
-            <div className="text-4xl mb-3">🚧</div>
-            <h3 className="text-lg font-semibold text-base-content/70 mb-1">
-              More Integrations Coming Soon
-            </h3>
-            <p className="text-sm text-base-content/50 max-w-sm mx-auto">
-              We're working on adding more service integrations to expand your productivity toolkit.
-            </p>
-          </div>
-        </div>
       </div>
     </div>
   );

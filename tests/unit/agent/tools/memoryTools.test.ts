@@ -31,6 +31,7 @@ const mockMemoryService = {
   getInstance: jest.fn(),
   storeMemory: jest.fn() as jest.MockedFunction<any>,
   getMemoriesByDomain: jest.fn() as jest.MockedFunction<any>,
+  updateMemory: jest.fn() as jest.MockedFunction<any>,
   getAllMemories: jest.fn() as jest.MockedFunction<any>,
   deleteMemory: jest.fn() as jest.MockedFunction<any>,
   clearMemories: jest.fn() as jest.MockedFunction<any>,
@@ -61,6 +62,7 @@ describe('Memory Tools', () => {
     // Reset mock implementations
     mockMemoryService.storeMemory.mockResolvedValue(1);
     mockMemoryService.getMemoriesByDomain.mockResolvedValue([]);
+    mockMemoryService.updateMemory.mockResolvedValue(1);
     mockMemoryService.getAllMemories.mockResolvedValue([]);
     mockMemoryService.deleteMemory.mockResolvedValue(undefined);
     mockMemoryService.clearMemories.mockResolvedValue(undefined);
@@ -217,12 +219,16 @@ describe('Memory Tools', () => {
           domain: 'example.com',
           taskDescription: 'Login process',
           toolSequence: ['browser_click', 'browser_fill'],
+          status: 'active',
+          lastVerifiedAt: Date.now(),
           createdAt: 1640995200000
         },
         {
           domain: 'example.com',
           taskDescription: 'Search functionality',
           toolSequence: ['browser_fill', 'browser_click'],
+          status: 'active',
+          lastVerifiedAt: Date.now(),
           createdAt: 1640995300000
         }
       ];
@@ -251,22 +257,26 @@ describe('Memory Tools', () => {
 
       const result = await tool.func('example.com');
 
-      expect(result).toBe('No memories found for domain: example.com');
+      expect(result).toBe('No reviewed memories found for domain: example.com');
     });
 
-    it('should sort memories by creation date (newest first)', async () => {
+    it('should sort confirmed memories by verification date (newest first)', async () => {
       const tool = lookupMemories(mockPage);
       const mockMemories = [
         {
           domain: 'example.com',
           taskDescription: 'Older task',
           toolSequence: ['browser_click'],
+          status: 'active',
+          lastVerifiedAt: Date.now() - 1000,
           createdAt: 1640995200000
         },
         {
           domain: 'example.com',
           taskDescription: 'Newer task',
           toolSequence: ['browser_fill'],
+          status: 'active',
+          lastVerifiedAt: Date.now(),
           createdAt: 1640995300000
         }
       ];
@@ -298,13 +308,14 @@ describe('Memory Tools', () => {
       expect(result).toBe('Error looking up memories: Database error');
     });
 
-    it('should handle memories without creation date', async () => {
+    it('should exclude memories awaiting review', async () => {
       const tool = lookupMemories(mockPage);
       const mockMemories = [
         {
           domain: 'example.com',
           taskDescription: 'Task without date',
-          toolSequence: ['browser_click']
+          toolSequence: ['browser_click'],
+          status: 'needs_review'
           // No createdAt field
         }
       ];
@@ -312,9 +323,18 @@ describe('Memory Tools', () => {
       mockMemoryService.getMemoriesByDomain.mockResolvedValue(mockMemories);
 
       const result = await tool.func('example.com');
-      const parsedResult = JSON.parse(result);
+      expect(result).toBe('No reviewed memories found for domain: example.com');
+    });
 
-      expect(parsedResult[0].createdAt).toBe('unknown');
+    it('should require review after 30 days', async () => {
+      const tool = lookupMemories(mockPage);
+      mockMemoryService.getMemoriesByDomain.mockResolvedValue([{
+        id: 7, domain: 'example.com', taskDescription: 'Old task', toolSequence: ['browser_click | #old'],
+        status: 'active', lastVerifiedAt: Date.now() - 31 * 24 * 60 * 60 * 1000,
+      }]);
+
+      expect(await tool.func('example.com')).toBe('No reviewed memories found for domain: example.com');
+      expect(mockMemoryService.updateMemory).toHaveBeenCalledWith(7, { status: 'needs_review' });
     });
   });
 
@@ -483,6 +503,7 @@ describe('Memory Tools', () => {
         domain: 'workflow.com',
         taskDescription: 'Complete workflow',
         toolSequence: ['browser_click', 'browser_fill'],
+        status: 'active',
         createdAt: Date.now()
       }];
       mockMemoryService.getMemoriesByDomain.mockResolvedValue(mockMemories);

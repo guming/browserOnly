@@ -2,6 +2,7 @@ import type { ActionDefinition } from './types';
 
 export const builtInActions: readonly ActionDefinition[] = [
   { id: 'summarize', kind: 'built_in', slashCommand: '/summarize', name: 'Summarize current page', description: 'Summarize the current page or selection', keywords: ['summary', 'page', 'selection'], runBehavior: 'direct', supportedContexts: ['page', 'selection'] },
+  { id: 'explain', kind: 'built_in', slashCommand: '/explain', name: 'Explain selection', description: 'Explain the selected text in plain language', keywords: ['explanation', 'meaning', 'selection'], runBehavior: 'direct', supportedContexts: ['selection'] },
   { id: 'translate', kind: 'built_in', slashCommand: '/translate', name: 'Translate current page', description: 'Translate the current page or selection', keywords: ['translation', 'language'], runBehavior: 'direct', supportedContexts: ['page', 'selection'] },
   { id: 'extract', kind: 'built_in', slashCommand: '/extract', name: 'Extract from page', description: 'Describe what to extract, or send empty to convert the whole page to Markdown', keywords: ['data', 'table', 'csv', 'json', 'markdown', 'page'], runBehavior: 'confirm', supportedContexts: ['page', 'selection', 'tabs'] },
   { id: 'extract-urls', kind: 'built_in', slashCommand: '/url', name: 'Extract page URLs', description: 'List unique links from the current page', keywords: ['url', 'urls', 'links', 'extract links'], runBehavior: 'direct', supportedContexts: ['page'] },

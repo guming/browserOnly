@@ -4,7 +4,8 @@ import {
   openaiDefaultModelId,
   geminiDefaultModelId,
   ollamaDefaultModelId,
-  deepseekDefaultModelId
+  deepseekDefaultModelId,
+  canonicalDeepSeekModelId
 } from '../models/models';
 
 // Import components
@@ -76,7 +77,7 @@ export function Options() {
 
   // PDF Viewer settings
   const [pdfInterceptorEnabled, setPdfInterceptorEnabled] = useState(true);
-  const [translationProvider, setTranslationProvider] = useState<TranslationProvider>('primary');
+  const [translationProvider, setTranslationProvider] = useState<TranslationProvider>('auto');
   const [targetLanguage, setTargetLanguage] = useState(defaultTargetLanguage);
 
   // Load saved settings when component mounts
@@ -112,7 +113,7 @@ export function Options() {
       duckdbConnectionString: '',
       duckdbDatabasePath: ':memory:',
       'pdf-interceptor-enabled': false,
-      translationProvider: 'primary',
+      translationProvider: 'auto',
       targetLanguage: '',
     }, (result) => {
       
@@ -124,7 +125,7 @@ export function Options() {
       setOpenaiModelId(result.openaiModelId);
       setOpenaiBaseUrl(result.openaiBaseUrl);
       setDeepseekApiKey(result.deepseekApiKey);
-      setDeepseekModelId(result.deepseekModelId);
+      setDeepseekModelId(canonicalDeepSeekModelId(result.deepseekModelId));
       setDeepseekBaseUrl(result.deepseekBaseUrl);
       setGeminiApiKey(result.geminiApiKey);
       setGeminiModelId(result.geminiModelId);

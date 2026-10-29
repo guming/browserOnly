@@ -8,8 +8,10 @@ import { setCurrentPage } from "../agent/PageContextManager"
 import { contextTokenCount } from "../agent/TokenManager";
 import { ScreenshotManager } from "../tracking/screenshotManager";
 import { TokenTrackingService } from "../tracking/tokenTrackingService";
+import { MemoryService } from "../tracking/memoryService";
 import { ConfigManager } from "./configManager";
-import { saveReflectionMemory } from "./reflectionController";
+import { TaskModelRoutingService } from "../models/routing/TaskModelRoutingService";
+import { saveReflectionMemory, recordReflectionSource, clearReflectionSource } from "./reflectionController";
 import { 
   resetStreamingState, 
   addToStreamingBuffer, 
@@ -502,12 +504,19 @@ export async function executePrompt(
   selectedTabIds?: number[],
   contextMode?: 'current-tab' | 'standalone',
   taskMode?: 'operator' | 'ask',
+  taskKind?: 'explain',
 ): Promise<void> {
   const originalTaskInstruction = prompt;
   try {
     // Get provider configuration from ConfigManager
     const configManager = ConfigManager.getInstance();
-    const providerConfig = await configManager.getProviderConfig();
+    let providerConfig = await configManager.getProviderConfig();
+    if (taskKind === 'explain') {
+      const assignment = await TaskModelRoutingService.getAssignment('explain');
+      if (!assignment) throw new Error('Automatic Explain has no eligible configured model. Configure a supported model first.');
+      providerConfig = await configManager.getProviderConfig(assignment.provider);
+      providerConfig = { ...providerConfig, apiModelId: assignment.modelId };
+    }
     
     // Make API key optional for Ollama
     if (!providerConfig.apiKey && providerConfig.provider !== 'ollama') {
@@ -534,6 +543,7 @@ export async function executePrompt(
       sendUIMessage('processingComplete', null, tabId);
       return;
     }
+    if (!isReflectionPrompt) clearReflectionSource(targetTabId);
     
     logWithTimestamp(`Executing prompt for tab ${targetTabId}: "${prompt}"`);
     
@@ -563,18 +573,13 @@ export async function executePrompt(
       // Attach to the tab
       const attachResult = await attachToTab(targetTabId);
       
-      // Check if attachResult is an object with error information
-      if (attachResult !== true && attachResult !== false && typeof attachResult === 'object' && 'error' in attachResult) {
-        // This is a specific error case with detailed information
-        if (attachResult.error === 'unsupported_tab') {
-          // Handle unsupported tab error with a specific message
-          sendUIMessage('updateOutput', {
-            type: 'system',
-            content: `Error: ${attachResult.reason} Please try using the extension in a regular web page tab.`
-          }, targetTabId);
-          sendUIMessage('processingComplete', null, targetTabId);
-          return;
-        }
+      if (attachResult === false || typeof attachResult === 'object') {
+        sendUIMessage('updateOutput', {
+          type: 'system',
+          content: `Error: ${attachResult === false ? 'Could not connect to this tab. Check the extension background console for the attachment error.' : attachResult.reason}`
+        }, targetTabId);
+        sendUIMessage('processingComplete', null, targetTabId);
+        return;
       } else if (attachResult === true) {
         // Check if we navigated to google.com
         try {
@@ -597,7 +602,7 @@ export async function executePrompt(
         targetTabId = attachResult;
       }
       
-      await initializeAgent(targetTabId);
+      if (taskKind !== 'explain') await initializeAgent(targetTabId);
     }
 
     // Get the updated tab state
@@ -607,7 +612,7 @@ export async function executePrompt(
     if (!updatedTabState?.page || !updatedTabState?.windowId) {
       sendUIMessage('updateOutput', {
         type: 'system',
-        content: 'Error: Failed to initialize Playwright or create agent. This may be because you are using the extension in an unsupported tab type.'
+        content: 'Error: The tab connected, but its page state is unavailable. Please retry after the page finishes loading.'
       }, targetTabId);
       sendUIMessage('processingComplete', null, targetTabId);
       return;
@@ -938,18 +943,9 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
         
         // If this is a reflection prompt, directly save the memory
         if (isReflectionPrompt) {
-          // Get the domain from the current page
           try {
-            updatedTabState.page.evaluate(() => globalThis.location?.href || '')
-              .then((url: string) => {
-                const domain = new URL(url).hostname;
-                
-                // Directly save the memory
-                saveReflectionMemory(content, domain, targetTabId);
-              })
-              .catch((error: any) => {
-                logWithTimestamp(`Error getting domain for reflection: ${error instanceof Error ? error.message : String(error)}`, 'error');
-              });
+            const url = await updatedTabState.page.evaluate(() => globalThis.location?.href || '');
+            await saveReflectionMemory(content, new URL(url).hostname, targetTabId);
           } catch (error) {
             logWithTimestamp(`Error in domain extraction for reflection: ${error instanceof Error ? error.message : String(error)}`, 'error');
           }
@@ -1082,6 +1078,10 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
       },
       onToolEvent: (event) => {
         traceRecorder.record({ ...event, tabId: targetTabId, windowId: updatedTabState.windowId });
+        if (!isReflectionPrompt && event.result?.ok === false && currentDomain && typeof event.input === 'string') {
+          void MemoryService.getInstance().markStepFailed(currentDomain, event.toolName, event.input)
+            .catch(error => logWithTimestamp(`Could not mark failed memory step: ${String(error)}`, 'warn'));
+        }
       },
       onExecutionEnd: (status) => { executionStatus = status; },
       onComplete: () => {
@@ -1114,6 +1114,12 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
         }
 
         const trace = traceRecorder.finish();
+        if (!isReflectionPrompt) {
+          clearReflectionSource(targetTabId);
+          if (executionStatus === 'completed' && taskMode === 'operator' && currentDomain) {
+            recordReflectionSource(targetTabId, currentDomain, originalTaskInstruction, trace);
+          }
+        }
         const isUrlExtractionCommand = trace.some(event => event.toolName === 'browser_extract_links');
         let hasWorkflowOffer = false;
         if (!isUrlExtractionCommand && shouldOfferRecordedWorkflow({ taskMode, executionStatus, recordedEventCount: trace.length, isReflectionPrompt, isMultiTabAnalysis: !!isMultiTabAnalysis })) {
@@ -1152,7 +1158,9 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
       return;
     }
     
-    const agent = getAgentForWindow(updatedWindowId);
+    const agent = taskKind === 'explain'
+      ? await createBrowserAgent(updatedTabState.page, providerConfig.apiKey || 'dummy-key-for-ollama', providerConfig)
+      : getAgentForWindow(updatedWindowId);
     
     if (!agent) {
       sendUIMessage('updateOutput', {

@@ -126,14 +126,18 @@ export function NotionSettings({
         auth: notionBearerToken,
       });
 
-      await client.testConnection();
+      const connected = await client.testConnection();
+      if (!connected) throw new Error('Notion token authentication failed');
+      if (notionDatabaseId.trim()) await client.getDatabase(notionDatabaseId.trim());
 
       setTestStatus('✅ Connection successful! Notion tools are available.');
 
       // Load databases after successful connection test
       await loadAvailableDatabases();
+      return true;
     } catch (error) {
       setTestStatus(`❌ Connection failed: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
     } finally {
       setIsTesting(false);
     }
@@ -174,10 +178,10 @@ export function NotionSettings({
 
   const handleTestAndSave = async () => {
     // First test the connection
-    await handleTestConnection();
+    const passed = await handleTestConnection();
     
     // If test was successful, then save
-    if (testStatus.includes('✅')) {
+    if (passed) {
       await handleSaveConnection();
     }
   };

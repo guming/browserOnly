@@ -104,7 +104,7 @@ interface VerticalTabsProps {
 }
 
 export function VerticalTabs(props: VerticalTabsProps) {
-  const [activeTab, setActiveTab] = useState('general');
+  const [activeTab, setActiveTab] = useState(() => window.location.hash === '#memory' ? 'memory' : 'general');
 
   const tabs = [
     { id: 'general', label: 'General', icon: '01' },
@@ -191,12 +191,6 @@ export function VerticalTabs(props: VerticalTabsProps) {
           setNotionBearerToken={props.setNotionBearerToken}
           notionDatabaseId={props.notionDatabaseId}
           setNotionDatabaseId={props.setNotionDatabaseId}
-          duckdbEnabled={props.duckdbEnabled}
-          setDuckdbEnabled={props.setDuckdbEnabled}
-          duckdbConnectionString={props.duckdbConnectionString}
-          setDuckdbConnectionString={props.setDuckdbConnectionString}
-          duckdbDatabasePath={props.duckdbDatabasePath}
-          setDuckdbDatabasePath={props.setDuckdbDatabasePath}
         />;
       case 'memory':
         return <MemoryTab />;

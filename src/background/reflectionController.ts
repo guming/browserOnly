@@ -4,6 +4,35 @@ import { MemoryService, AgentMemory } from '../tracking/memoryService';
 import { executePrompt } from './agentController';
 import { getTabState, getWindowForTab, getAgentForWindow } from './tabManager';
 import { logWithTimestamp, handleError, sendUIMessage } from './utils';
+import type { ToolTraceEvent } from '../workflows/types';
+
+type ReflectionSource = { domain: string; task: string; runId: string; toolSequence: string[] };
+const reflectionSources = new Map<number, ReflectionSource>();
+
+export function clearReflectionSource(tabId: number): void {
+  reflectionSources.delete(tabId);
+}
+
+export function recordReflectionSource(tabId: number, domain: string, task: string, trace: ToolTraceEvent[]): void {
+  const actionNames = new Set(['browser_click', 'browser_type', 'browser_keyboard_type', 'browser_press_key']);
+  const toolSequence = trace
+    .filter(event => event.result?.ok === true && actionNames.has(event.toolName))
+    .map(event => {
+      const input = String(event.input ?? '');
+      const safeInput = event.toolName === 'browser_type'
+        ? `${input.split('|')[0]}|[text]`
+        : event.toolName === 'browser_keyboard_type' ? '[text]' : input;
+      return `${event.toolName} | ${safeInput}`;
+    });
+  if (toolSequence.length === 0) {
+    clearReflectionSource(tabId);
+    return;
+  }
+  reflectionSources.set(tabId, {
+    domain: normalizeDomain(domain), task, toolSequence,
+    runId: trace[0]?.executionId ?? `${Date.now()}-${tabId}`,
+  });
+}
 
 // Function to directly save a memory from the reflection process
 export async function saveReflectionMemory(content: string, domain: string, tabId: number): Promise<void> {
@@ -43,6 +72,11 @@ export async function triggerReflection(tabId?: number): Promise<void> {
       }
     }
     const tabState = getTabState(activeTabId);
+    const source = reflectionSources.get(activeTabId);
+    if (!source) {
+      sendUIMessage('updateOutput', { type: 'system', content: 'No completed browser task is available to reflect on.' }, activeTabId);
+      return;
+    }
     
     // Get the window ID for this tab
     const windowId = getWindowForTab(activeTabId);
@@ -92,30 +126,11 @@ export async function triggerReflection(tabId?: number): Promise<void> {
     }, activeTabId, windowId);
     
     // Create a reflection prompt
-    const reflectionPrompt = `
-      Please analyze the conversation history and identify useful patterns for accomplishing tasks on ${domain}.
-      
-      Create a structured memory record with:
-      1. A short description of the task that was accomplished
-      2. The optimal sequence of tools that were used to solve it
-      
-      Format your response as a valid JSON object with these fields:
-      {
-        "domain": "${domain}",
-        "taskDescription": "brief description of the task",
-        "toolSequence": ["tool1 | input1", "tool2 | input2", ...]
-      }
-      
-      Focus only on the most useful and reusable patterns. If multiple tasks were performed, create separate memory records for each distinct task. Only save memories that are new or significantly different from existing ones.
-      
-      NOTE: The domain will be normalized (e.g., "www.example.com" becomes "example.com") to ensure consistent memory retrieval regardless of whether the user includes "www." or not.
-      
-      IMPORTANT: Your response must be valid JSON or a code block containing valid JSON. Ensure your JSON:
-      - Uses double quotes for keys and string values
-      - Has proper commas between elements (no trailing commas)
-      - Properly escapes special characters in strings
-      - Has balanced braces and brackets
-    `;
+    if (source.domain !== domain) {
+      sendUIMessage('updateOutput', { type: 'system', content: 'The current website differs from the completed task. Return to that website before reflecting.' }, activeTabId);
+      return;
+    }
+    const reflectionPrompt = `Summarize only this completed browser task as one reusable task description.\nOriginal request: ${source.task}\nVerified tool steps: ${JSON.stringify(source.toolSequence)}\nReturn only JSON: {"taskDescription":"brief task description"}. Do not invent steps or use earlier conversation history.`;
     
     // Execute the reflection prompt with callbacks, marking it as a reflection prompt
     executePrompt(reflectionPrompt, activeTabId, true);
@@ -133,6 +148,8 @@ export async function triggerReflection(tabId?: number): Promise<void> {
  */
 async function processReflectionOutput(output: string, domain: string, tabId: number, isCorrection: boolean = false): Promise<void> {
   try {
+    const source = reflectionSources.get(tabId);
+    if (!source || source.domain !== domain) throw new Error('No matching completed task trace is available');
     // Check if IndexedDB is available
     if (typeof indexedDB === 'undefined') {
       logWithTimestamp(`IndexedDB is not available in this browser environment`, 'error');
@@ -153,7 +170,7 @@ async function processReflectionOutput(output: string, domain: string, tabId: nu
       const cleanJsonStr = jsonStr.trim();
       
       // Try to parse the JSON
-      let memories: AgentMemory[] = [];
+      let memories: Array<{ taskDescription?: unknown }> = [];
       try {
         const parsed = JSON.parse(cleanJsonStr);
         
@@ -193,19 +210,19 @@ async function processReflectionOutput(output: string, domain: string, tabId: nu
       const memoryService = MemoryService.getInstance();
       await memoryService.init();
       
-      // Save each memory
+      // Save one candidate. Steps and domain come from the verified execution trace.
       const savedIds: number[] = [];
-      for (const memory of memories) {
-        // Validate the memory
-        if (!memory.domain || !memory.taskDescription || !memory.toolSequence) {
-          logWithTimestamp(`Invalid memory: missing required fields`, 'warn');
-          continue;
-        }
-        
-        // Normalize the domain of the memory
-        memory.domain = normalizeDomain(memory.domain);
-        
-        // Save the memory
+      for (const candidate of memories.slice(0, 1)) {
+        if (typeof candidate?.taskDescription !== 'string' || !candidate.taskDescription.trim()) continue;
+        const memory: AgentMemory = {
+          domain: source.domain,
+          taskDescription: candidate.taskDescription.trim().slice(0, 160),
+          toolSequence: source.toolSequence,
+          createdAt: Date.now(),
+          source: 'reflection',
+          sourceRunId: source.runId,
+          status: 'needs_review',
+        };
         try {
           const id = await memoryService.storeMemory(memory);
           savedIds.push(id);
@@ -218,7 +235,7 @@ async function processReflectionOutput(output: string, domain: string, tabId: nu
       if (savedIds.length > 0) {
         sendUIMessage('updateOutput', {
           type: 'system',
-          content: `✅ Saved ${savedIds.length} memories for ${domain}. The agent will now remember how to perform these tasks on this website.`
+          content: `Saved ${savedIds.length} memory candidate for ${domain}. Review it in Settings → Memory before the agent uses it.`
         }, tabId);
       } else {
         sendUIMessage('updateOutput', {
@@ -266,12 +283,7 @@ async function correctReflectionJSON(malformedJson: string, error: Error, domain
       ${malformedJson}
       \`\`\`
       
-      Please correct the JSON and provide a valid version that follows this structure:
-      {
-        "domain": "${domain}",
-        "taskDescription": "brief description of the task",
-        "toolSequence": ["tool1 | input1", "tool2 | input2", ...]
-      }
+      Please correct the JSON and provide only: {"taskDescription":"brief task description"}
     `;
     
     // Notify the UI about the correction attempt

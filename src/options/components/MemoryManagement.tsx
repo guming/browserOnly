@@ -1,9 +1,19 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { MemoryService } from '../../tracking/memoryService';
+import { MemoryService, type AgentMemory } from '../../tracking/memoryService';
 
 export function MemoryManagement() {
   // Memory management state
   const [memoryCount, setMemoryCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [memories, setMemories] = useState<AgentMemory[]>([]);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [draftTask, setDraftTask] = useState('');
+  const [draftSteps, setDraftSteps] = useState('');
+  const [managementStatus, setManagementStatus] = useState('');
   const [exportStatus, setExportStatus] = useState('');
   const [importStatus, setImportStatus] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -15,10 +25,74 @@ export function MemoryManagement() {
       await memoryService.init();
       const memories = await memoryService.getAllMemories();
       setMemoryCount(memories.length);
+      setMemories(memories.sort((a, b) => {
+        const aReview = (a.status ?? 'needs_review') === 'needs_review' ? 1 : 0;
+        const bReview = (b.status ?? 'needs_review') === 'needs_review' ? 1 : 0;
+        return bReview - aReview || (b.updatedAt ?? b.createdAt) - (a.updatedAt ?? a.createdAt);
+      }));
+      setLoadError(false);
     } catch (error) {
       console.error('Error loading memory count:', error);
+      setLoadError(true);
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  const updateStatus = async (memory: AgentMemory, status: AgentMemory['status']) => {
+    if (memory.id === undefined || !status) return;
+    try {
+      await MemoryService.getInstance().updateMemory(memory.id, { status });
+      await loadMemoryCount();
+      setManagementStatus(status === 'active' ? 'Memory confirmed for use.' : 'Memory status updated.');
+    } catch (error) {
+      setManagementStatus(`Could not update memory: ${String(error)}`);
+    }
+  };
+
+  const saveEdit = async (memory: AgentMemory) => {
+    if (memory.id === undefined) return;
+    const steps = draftSteps.split('\n').map(step => step.trim()).filter(Boolean);
+    if (!draftTask.trim() || steps.length === 0) {
+      setManagementStatus('Task and at least one tool step are required.');
+      return;
+    }
+    try {
+      await MemoryService.getInstance().updateMemory(memory.id, {
+        taskDescription: draftTask.trim(), toolSequence: steps, status: 'needs_review',
+      });
+      setEditingId(null);
+      await loadMemoryCount();
+      setManagementStatus('Memory saved. Review its steps, then confirm it for use.');
+    } catch (error) {
+      setManagementStatus(`Could not save memory: ${String(error)}`);
+    }
+  };
+
+  const deleteRecord = async (memory: AgentMemory) => {
+    if (memory.id === undefined) {
+      setManagementStatus('This memory has no saved ID and cannot be deleted.');
+      return;
+    }
+    if (deletingId !== memory.id) {
+      setDeletingId(memory.id);
+      return;
+    }
+    try {
+      await MemoryService.getInstance().deleteMemory(memory.id);
+      setDeletingId(null);
+      await loadMemoryCount();
+      setManagementStatus('Memory deleted.');
+    } catch (error) {
+      setManagementStatus(`Could not delete memory: ${String(error)}`);
+      setDeletingId(null);
+    }
+  };
+
+  const visibleMemories = memories.filter(memory => {
+    const matchesText = `${memory.domain} ${memory.taskDescription}`.toLowerCase().includes(search.toLowerCase());
+    return matchesText && (statusFilter === 'all' || (memory.status ?? 'needs_review') === statusFilter);
+  });
 
   // Export memories function
   const handleExportMemories = async () => {
@@ -84,7 +158,7 @@ export function MemoryManagement() {
               memory.createdAt = Date.now();
             }
             
-            await memoryService.storeMemory(memory);
+            await memoryService.storeMemory({ ...memory, source: 'import', status: 'needs_review' });
             importedCount++;
           }
           
@@ -121,183 +195,87 @@ export function MemoryManagement() {
     loadMemoryCount();
   }, []);
 
-  return (
-    <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-lg border border-white/50 overflow-hidden hover:shadow-xl transition-all duration-300">
-  <div className="bg-gradient-to-r from-sky-50 to-blue-50 border-b border-sky-100 px-6 py-4">
-    <h2 className="text-2xl font-bold text-gray-800 flex items-center">
-      <span className="mr-3 text-3xl">🧠</span>
-      Memory Management
-    </h2>
-  </div>
-  
-  <div className="p-6 space-y-6">
-    {/* Introduction Section */}
-    <div className="bg-gradient-to-r from-violet-50/50 to-purple-50/50 rounded-2xl p-4 border border-violet-100/50">
-      <div className="flex items-start space-x-3">
-        <div className="flex-shrink-0 mt-1">
-          <div className="w-8 h-8 bg-gradient-to-r from-violet-500 to-purple-600 rounded-full flex items-center justify-center">
-            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-        </div>
-        <div>
-          <p className="text-gray-700 leading-relaxed">
-            <span className="font-semibold text-violet-700">BrowserOnly</span> intelligently stores memories of successful interactions with websites to enhance future automation. 
-            Export your memories for backup or transfer them to another device seamlessly.
-          </p>
-          <div className="mt-2 flex items-center space-x-2">
-            <div className="flex items-center space-x-1">
-              <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-              <span className="text-sm text-gray-600">Auto Learning</span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-              <span className="text-sm text-gray-600">Portable</span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
-              <span className="text-sm text-gray-600">Smart Recall</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+  const reviewCount = memories.filter(memory => (memory.status ?? 'needs_review') === 'needs_review').length;
+  const statusLabel: Record<string, string> = { needs_review: 'Needs review', active: 'Ready to use', disabled: 'Paused' };
 
-    {/* Memory Count Display */}
-    <div className="bg-gradient-to-r from-emerald-50/50 to-teal-50/50 rounded-2xl p-4 border border-emerald-100/50">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full flex items-center justify-center">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-          </div>
+  return (
+    <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+      <header className="border-b border-gray-200 px-5 py-5 sm:px-7">
+        <h2 className="text-xl font-semibold text-gray-900">Memory</h2>
+        <p className="mt-1 text-sm text-gray-600">Review the website tasks BrowserOnly has saved. Only memories you confirm can be reused.</p>
+      </header>
+
+      <div className="space-y-6 px-5 py-6 sm:px-7">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-lg font-semibold text-emerald-700">Memory Collection</h3>
-            <p className="text-sm text-emerald-600">Stored interaction patterns and optimizations</p>
+            <h3 className="font-semibold text-gray-900">Saved tasks <span className="ml-1 text-sm font-normal text-gray-500">{isLoading ? '…' : memoryCount}</span></h3>
+            {!isLoading && reviewCount > 0 && <p className="mt-1 text-sm text-amber-700">{reviewCount} waiting for your review</p>}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={handleExportMemories} disabled={memoryCount === 0 || isLoading} className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">Export</button>
+            <button type="button" onClick={triggerFileInput} className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Import</button>
+            <input type="file" ref={fileInputRef} onChange={handleImportMemories} accept=".json,application/json" className="hidden" aria-label="Import memories from JSON" />
           </div>
         </div>
-        <div className="bg-white/70 backdrop-blur-sm rounded-xl px-4 py-2 border border-white/50 shadow-sm">
-          <div className="flex items-center space-x-2">
-            <span className="text-sm font-medium text-gray-600">Current memories:</span>
-            <span className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-sm font-medium rounded-full shadow-sm">
-              {memoryCount}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-    
-    {/* Action Buttons */}
-    <div className="bg-gradient-to-r from-sky-50/50 to-cyan-50/50 rounded-2xl p-4 border border-sky-100/50">
-      <h3 className="text-lg font-semibold text-sky-700 mb-4 flex items-center">
-        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12" />
-        </svg>
-        Memory Operations
-      </h3>
-      
-      <div className="flex flex-wrap gap-4">
-        <button 
-          onClick={handleExportMemories} 
-          className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-medium rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:shadow-lg"
-          disabled={memoryCount === 0}
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          <span>Export Memories</span>
-        </button>
-        
-        <button 
-          onClick={triggerFileInput} 
-          className="flex items-center space-x-2 px-6 py-3 bg-white/70 backdrop-blur-sm border border-gray-200 text-gray-700 font-medium rounded-xl shadow-md hover:bg-white/90 hover:border-gray-300 hover:shadow-lg transform hover:scale-105 transition-all duration-200"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
-          </svg>
-          <span>Import Memories</span>
-        </button>
-        
-        {/* Hidden file input for import */}
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleImportMemories}
-          accept=".json"
-          className="hidden"
-        />
-      </div>
-    </div>
-    
-    {/* Status Messages */}
-    {(exportStatus || importStatus) && (
-      <div className="space-y-3">
-        {exportStatus && (
-          <div className={`rounded-2xl p-4 border ${
-            exportStatus.includes('Error') 
-              ? 'bg-gradient-to-r from-red-50/50 to-pink-50/50 border-red-100/50' 
-              : 'bg-gradient-to-r from-green-50/50 to-emerald-50/50 border-green-100/50'
-          }`}>
-            <div className="flex items-center space-x-3">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                exportStatus.includes('Error')
-                  ? 'bg-gradient-to-r from-red-500 to-pink-600'
-                  : 'bg-gradient-to-r from-green-500 to-emerald-600'
-              }`}>
-                {exportStatus.includes('Error') ? (
-                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                ) : (
-                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-              </div>
-              <span className={`text-sm font-medium ${
-                exportStatus.includes('Error') ? 'text-red-700' : 'text-green-700'
-              }`}>
-                {exportStatus}
-              </span>
+
+        {memoryCount > 0 && <div className="flex flex-col gap-2 sm:flex-row">
+          <input aria-label="Search memories" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search by website or task" className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100" />
+          <select aria-label="Filter memory status" value={statusFilter} onChange={event => setStatusFilter(event.target.value)} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100">
+            <option value="all">All tasks</option>
+            <option value="needs_review">Needs review</option>
+            <option value="active">Ready to use</option>
+            <option value="disabled">Paused</option>
+          </select>
+        </div>}
+
+        {managementStatus && <p role="status" className="text-sm text-gray-700">{managementStatus}</p>}
+        {isLoading ? <p role="status" className="py-10 text-center text-sm text-gray-500">Loading saved tasks…</p>
+          : loadError ? <div className="py-10 text-center text-sm text-gray-600">Could not load saved tasks. <button type="button" onClick={() => void loadMemoryCount()} className="font-medium text-blue-700 underline">Try again</button></div>
+          : visibleMemories.length === 0 ? <div className="rounded-xl border border-dashed border-gray-300 px-5 py-10 text-center">
+              <p className="font-medium text-gray-800">{memoryCount === 0 ? 'No saved tasks yet' : 'No tasks match your search'}</p>
+              <p className="mt-1 text-sm text-gray-500">{memoryCount === 0 ? 'Successful website tasks will appear here for your review.' : 'Try another website, task, or status.'}</p>
             </div>
-          </div>
-        )}
-        
-        {importStatus && (
-          <div className={`rounded-2xl p-4 border ${
-            importStatus.includes('Error') 
-              ? 'bg-gradient-to-r from-red-50/50 to-pink-50/50 border-red-100/50' 
-              : 'bg-gradient-to-r from-green-50/50 to-emerald-50/50 border-green-100/50'
-          }`}>
-            <div className="flex items-center space-x-3">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                importStatus.includes('Error')
-                  ? 'bg-gradient-to-r from-red-500 to-pink-600'
-                  : 'bg-gradient-to-r from-green-500 to-emerald-600'
-              }`}>
-                {importStatus.includes('Error') ? (
-                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                ) : (
-                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-              </div>
-              <span className={`text-sm font-medium ${
-                importStatus.includes('Error') ? 'text-red-700' : 'text-green-700'
-              }`}>
-                {importStatus}
-              </span>
-            </div>
-          </div>
-        )}
+          : <div className="max-h-[38rem] space-y-2 overflow-y-auto">
+            {visibleMemories.map(memory => {
+              const status = memory.status ?? 'needs_review';
+              return <details key={memory.id} className="group rounded-xl border border-gray-200 bg-white open:border-gray-300">
+                <summary className="cursor-pointer list-none px-4 py-3 marker:hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-medium text-gray-500">{memory.domain}</p>
+                      <p className="mt-0.5 break-words font-medium text-gray-900">{memory.taskDescription}</p>
+                    </div>
+                    <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-medium ${status === 'needs_review' ? 'bg-amber-50 text-amber-800' : status === 'active' ? 'bg-emerald-50 text-emerald-800' : 'bg-gray-100 text-gray-600'}`}>{statusLabel[status] ?? status}</span>
+                  </div>
+                </summary>
+                <div className="border-t border-gray-100 px-4 pb-4 pt-3">
+                  <p className="text-xs text-gray-500">Saved {new Date(memory.createdAt).toLocaleDateString()} · {memory.lastVerifiedAt ? `Verified ${new Date(memory.lastVerifiedAt).toLocaleDateString()}` : 'Not verified yet'}</p>
+                  <p className="mt-3 text-xs font-medium uppercase tracking-wide text-gray-500">Steps</p>
+                  {editingId === memory.id ? <div className="mt-2 space-y-2">
+                    <input aria-label="Memory task" value={draftTask} onChange={event => setDraftTask(event.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                    <textarea aria-label="Memory steps" value={draftSteps} onChange={event => setDraftSteps(event.target.value)} rows={Math.max(3, memory.toolSequence.length)} className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm" />
+                    <div className="flex gap-2"><button type="button" onClick={() => void saveEdit(memory)} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">Save changes</button><button type="button" onClick={() => setEditingId(null)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm">Cancel</button></div>
+                  </div> : <>
+                    <ol className="mt-2 list-decimal space-y-1 pl-5 font-mono text-sm text-gray-700">{memory.toolSequence.map((step, index) => <li key={index} className="break-all">{step}</li>)}</ol>
+                    <div className="mt-4 flex flex-wrap gap-2 text-sm">
+                      {status !== 'active' && <button type="button" onClick={() => void updateStatus(memory, 'active')} className="rounded-lg bg-blue-600 px-3 py-2 font-medium text-white hover:bg-blue-700">Confirm for use</button>}
+                      <button type="button" onClick={() => { setEditingId(memory.id ?? null); setDraftTask(memory.taskDescription); setDraftSteps(memory.toolSequence.join('\n')); }} className="rounded-lg border border-gray-300 px-3 py-2 text-gray-700 hover:bg-gray-50">Edit</button>
+                      {status !== 'disabled' && <button type="button" onClick={() => void updateStatus(memory, 'disabled')} className="rounded-lg border border-gray-300 px-3 py-2 text-gray-700 hover:bg-gray-50">Pause</button>}
+                      {deletingId === memory.id ? <>
+                        <span className="self-center text-xs text-red-700">Delete this saved task?</span>
+                        <button type="button" onClick={() => void deleteRecord(memory)} className="rounded-lg bg-red-600 px-3 py-2 font-medium text-white hover:bg-red-700">Confirm delete</button>
+                        <button type="button" onClick={() => setDeletingId(null)} className="rounded-lg px-3 py-2 text-gray-600 hover:bg-gray-100">Cancel</button>
+                      </> : <button type="button" onClick={() => void deleteRecord(memory)} className="rounded-lg px-3 py-2 text-red-700 hover:bg-red-50">Delete</button>}
+                    </div>
+                  </>}
+                </div>
+              </details>;
+            })}
+          </div>}
+
+        {(exportStatus || importStatus) && <div role="status" className="space-y-1 text-sm text-gray-700">{exportStatus && <p>{exportStatus}</p>}{importStatus && <p>{importStatus}</p>}</div>}
+        <p className="border-t border-gray-100 pt-4 text-xs text-gray-500">Importing a backup adds tasks for review. It does not make them available for use automatically.</p>
       </div>
-    )}
-  </div>
-</div>
+    </section>
   );
 }

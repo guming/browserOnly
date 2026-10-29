@@ -2,24 +2,53 @@ import { useState, useRef, useEffect } from 'react';
 import { Message } from '../types';
 import { ConversationStorageService } from '../../storage/conversationStorage';
 
+const isTransientStatus = (message: Message) => message.type === 'system' && /^(Connected to tab:|Switched to tab:|Recognizing text in image…|Understanding image…)/.test(message.content);
+
 export const useMessageManagement = () => {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [transientStatus, setTransientStatus] = useState('');
+  const transientTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => { if (transientTimer.current) clearTimeout(transientTimer.current); }, []);
   const [streamingSegments, setStreamingSegments] = useState<Record<number, string>>({});
   const [currentSegmentId, setCurrentSegmentId] = useState<number>(0);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const outputRef = useRef<HTMLDivElement>(null);
+  const [isFollowingOutput, setIsFollowingOutput] = useState(true);
   const storageService = useRef(ConversationStorageService.getInstance());
 
-  // Auto-scroll to bottom when messages or streaming segments change
+  // Follow new output until the user scrolls up to inspect earlier content.
   useEffect(() => {
-    if (outputRef.current) {
+    if (outputRef.current && isFollowingOutput) {
       outputRef.current.scrollTop = outputRef.current.scrollHeight;
     }
-  }, [messages, streamingSegments]);
+  }, [messages, streamingSegments, isFollowingOutput]);
+
+  const handleOutputScroll = () => {
+    const output = outputRef.current;
+    if (!output) return;
+    setIsFollowingOutput(output.scrollHeight - output.scrollTop - output.clientHeight < 48);
+  };
+
+  const jumpToLatestOutput = () => {
+    setIsFollowingOutput(true);
+    if (outputRef.current) outputRef.current.scrollTop = outputRef.current.scrollHeight;
+  };
 
   const addMessage = (message: Message) => {
+    if (isTransientStatus(message)) {
+      setTransientStatus(message.content);
+      if (transientTimer.current) clearTimeout(transientTimer.current);
+      transientTimer.current = setTimeout(() => setTransientStatus(''), 4000);
+      return;
+    }
     setMessages(prev => [...prev, { ...message, isComplete: true }]);
+  };
+
+  const clearTransientStatus = () => {
+    if (transientTimer.current) clearTimeout(transientTimer.current);
+    setTransientStatus('');
   };
 
   const addSystemMessage = (content: string) => {
@@ -71,7 +100,7 @@ export const useMessageManagement = () => {
     try {
       const conversation = await storageService.current.loadConversation(url);
       if (conversation) {
-        setMessages(conversation.messages);
+        setMessages(conversation.messages.filter(message => !isTransientStatus(message)));
 
         // Convert streaming segments from array to Record
         const segmentsRecord: Record<number, string> = {};
@@ -130,11 +159,16 @@ export const useMessageManagement = () => {
 
   return {
     messages,
+    transientStatus,
+    clearTransientStatus,
     streamingSegments,
     isStreaming,
     isProcessing,
     setIsProcessing,
     outputRef,
+    isFollowingOutput,
+    handleOutputScroll,
+    jumpToLatestOutput,
     addMessage,
     addSystemMessage,
     updateStreamingChunk,

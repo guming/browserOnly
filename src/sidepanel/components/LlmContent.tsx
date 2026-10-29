@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { NotionSDKClient } from '../../agent/notionClient';
 import { OfficeResponseCard, parseOfficeReportResponse } from './office/OfficeResponseCard';
+import { MarkdownTable } from './MarkdownTable';
 
 interface LlmContentProps {
   content: string;
@@ -14,6 +15,8 @@ export const LlmContent: React.FC<LlmContentProps> = ({
   notionDatabaseId 
 }) => {
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [notionToken, setNotionToken] = useState<string | null>(null);
   const [notionClient, setNotionClient] = useState<NotionSDKClient | null>(null);
@@ -21,12 +24,31 @@ export const LlmContent: React.FC<LlmContentProps> = ({
   const [isLoadingDatabases, setIsLoadingDatabases] = useState(false);
   const [showDatabaseSelector, setShowDatabaseSelector] = useState(false);
   const [selectedDatabaseId, setSelectedDatabaseId] = useState<string | null>(null);
+  const [selectedDatabaseName, setSelectedDatabaseName] = useState('');
+  const [databaseError, setDatabaseError] = useState('');
+  const [slackConfig, setSlackConfig] = useState<{ token: string; channel: string }>({ token: '', channel: '' });
+  const [slackStatus, setSlackStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
+  const [slackError, setSlackError] = useState('');
+
+  useEffect(() => {
+    const loadSlackConfig = () => {
+      chrome.storage.local.get({ slackBotToken: '', slackChannel: 'auto-web' }, result => {
+        setSlackConfig({ token: result.slackBotToken || '', channel: result.slackChannel || 'auto-web' });
+      });
+    };
+    loadSlackConfig();
+    const listener = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+      if (area === 'local' && (changes.slackBotToken || changes.slackChannel)) loadSlackConfig();
+    };
+    chrome.storage.onChanged.addListener(listener);
+    return () => chrome.storage.onChanged.removeListener(listener);
+  }, []);
 
   // Load Notion token from Chrome storage on component mount
   useEffect(() => {
     const loadNotionConfig = async () => {
       try {
-        const result = await chrome.storage.sync.get(['notionBearerToken', 'notionDatabaseId']);
+        const result = await chrome.storage.sync.get(['notionBearerToken', 'notionDatabaseId', 'notionDatabaseName']);
         const token = result.notionBearerToken;
         
         if (token) {
@@ -37,6 +59,7 @@ export const LlmContent: React.FC<LlmContentProps> = ({
         const databaseId = notionDatabaseId || result.notionDatabaseId;
         if (databaseId) {
           setSelectedDatabaseId(databaseId);
+          setSelectedDatabaseName(result.notionDatabaseName || '');
         }
       } catch (error) {
         console.error('Error loading Notion config from storage:', error);
@@ -45,6 +68,40 @@ export const LlmContent: React.FC<LlmContentProps> = ({
 
     loadNotionConfig();
   }, [notionDatabaseId]);
+
+  useEffect(() => {
+    const onChanged = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+      if (area !== 'sync' || (!changes.notionDatabaseId && !changes.notionDatabaseName && !changes.notionBearerToken)) return;
+      if (changes.notionBearerToken) {
+        const token = changes.notionBearerToken.newValue || '';
+        setNotionToken(token || null);
+        setNotionClient(token ? new NotionSDKClient({ auth: token }) : null);
+        setSelectedDatabaseName('');
+        setDatabaseError('');
+      }
+      if (changes.notionDatabaseId) setSelectedDatabaseId(changes.notionDatabaseId.newValue || null);
+      if (changes.notionDatabaseName) setSelectedDatabaseName(changes.notionDatabaseName.newValue || '');
+      else if (changes.notionDatabaseId) setSelectedDatabaseName('');
+      if (changes.notionDatabaseId) setDatabaseError('');
+    };
+    chrome.storage.onChanged.addListener(onChanged);
+    return () => chrome.storage.onChanged.removeListener(onChanged);
+  }, []);
+
+  useEffect(() => {
+    if (!notionClient || !selectedDatabaseId) return;
+    let cancelled = false;
+    void notionClient.getDatabase(selectedDatabaseId).then(database => {
+      if (cancelled) return;
+      setSelectedDatabaseName(database.title?.map((item: { plain_text?: string }) => item.plain_text ?? '').join('') || 'Untitled database');
+      setDatabaseError('');
+    }).catch(error => {
+      if (cancelled) return;
+      const status = typeof error?.status === 'number' ? `HTTP ${error.status}: ` : '';
+      setDatabaseError(`${status}${error instanceof Error ? error.message : String(error)}`);
+    });
+    return () => { cancelled = true; };
+  }, [notionClient, selectedDatabaseId]);
 
   // Load available databases from Notion
   const loadAvailableDatabases = async () => {
@@ -77,10 +134,11 @@ export const LlmContent: React.FC<LlmContentProps> = ({
   };
 
   // Select a database and save to storage
-  const selectDatabase = async (databaseId: string) => {
+  const selectDatabase = async (databaseId: string, databaseName: string) => {
     try {
-      await chrome.storage.sync.set({ 'notionDatabaseId': databaseId });
+      await chrome.storage.sync.set({ notionDatabaseId: databaseId, notionDatabaseName: databaseName });
       setSelectedDatabaseId(databaseId);
+      setSelectedDatabaseName(databaseName);
       setShowDatabaseSelector(false);
     } catch (error) {
       console.error('Error saving database ID:', error);
@@ -213,12 +271,36 @@ export const LlmContent: React.FC<LlmContentProps> = ({
       const textContent = getTextContent();
       await navigator.clipboard.writeText(textContent);
       // Show temporary success feedback
-      const originalStatus = syncStatus;
-      setSyncStatus('success');
-      setTimeout(() => setSyncStatus(originalStatus), 1500);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 1500);
     } catch (error) {
       console.error('Failed to copy to clipboard:', error);
       alert('Failed to copy to clipboard');
+    }
+  };
+
+  const sendToSlack = async () => {
+    if (!slackConfig.token.trim() || !slackConfig.channel.trim()) {
+      setSlackStatus('error');
+      return;
+    }
+    setSlackStatus('sending');
+    setSlackError('');
+    try {
+      const channel = slackConfig.channel.trim().replace(/^#/, '');
+      const response = await fetch('https://slack.com/api/chat.postMessage', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${slackConfig.token.trim()}`, 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify({ channel: `#${channel}`, text: getTextContent().slice(0, 40_000) }),
+      });
+      const result = await response.json() as { ok?: boolean; error?: string };
+      if (!response.ok || !result.ok) throw new Error(result.error ?? `Slack returned HTTP ${response.status}`);
+      setSlackStatus('success');
+      setTimeout(() => setSlackStatus('idle'), 2500);
+    } catch (error) {
+      console.error('Error sending response to Slack:', error);
+      setSlackError(error instanceof Error ? error.message : String(error));
+      setSlackStatus('error');
     }
   };
 
@@ -323,31 +405,37 @@ export const LlmContent: React.FC<LlmContentProps> = ({
     <div className="llm-content">
       {/* LLM Response Container */}
       {hasTextContent && (
-        <div className="llm-response-container border border-base-300 rounded-lg p-4 mb-4 bg-base-50">
+        <div className="llm-response-container mb-3 rounded-lg border border-stone-200 bg-white px-3 py-3 shadow-sm">
           {/* Header with controls */}
-          <div className="flex justify-between items-center mb-3 pb-2 border-b border-base-300">
-            <div className="text-sm font-medium text-base-content/80">
-              LLM Response
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 pb-2">
+            <div className="flex items-center gap-2 text-xs font-semibold text-stone-500">
+              <button
+                type="button"
+                aria-expanded={!isCollapsed}
+                aria-label={isCollapsed ? 'Expand response' : 'Collapse response'}
+                onClick={() => setIsCollapsed(value => !value)}
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-stone-500 hover:bg-stone-100"
+                title={isCollapsed ? 'Expand response' : 'Collapse response'}
+              >
+                <svg aria-hidden="true" viewBox="0 0 20 20" className={`h-4 w-4 transition-transform ${isCollapsed ? '' : 'rotate-90'}`} fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m7 4 6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </button>
+              Response
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-1">
               <button
                 onClick={copyToClipboard}
-                className="btn btn-xs btn-outline"
+                className="min-h-8 rounded-md px-2 text-xs font-medium text-[#315a78] hover:bg-[#eaf2f7]"
                 title="Copy to clipboard"
               >
-                Copy
+                {isCopied ? 'Copied' : 'Copy'}
               </button>
               
               {/* Notion Sync Button */}
               <button
                 onClick={syncToNotion}
                 disabled={isSyncing || !notionToken || !selectedDatabaseId}
-                className={`btn btn-xs ${
-                  syncStatus === 'success' ? 'btn-success' :
-                  syncStatus === 'error' ? 'btn-error' :
-                  'btn-primary'
-                }`}
-                title="Sync to Notion"
+                className={`min-h-8 rounded-md px-2 text-xs font-medium hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-40 ${syncStatus === 'error' ? 'text-red-700' : 'text-stone-600'}`}
+                title={selectedDatabaseId ? `Save to Notion database: ${selectedDatabaseName || 'Loading name'}` : 'Select a Notion database first'}
               >
                 {isSyncing ? (
                   <>
@@ -359,8 +447,17 @@ export const LlmContent: React.FC<LlmContentProps> = ({
                 ) : syncStatus === 'error' ? (
                   <>✗ Failed</>
                 ) : (
-                  <>Notion</>
+                  <>Save to Notion</>
                 )}
+              </button>
+
+              <button
+                onClick={sendToSlack}
+                disabled={slackStatus === 'sending' || !slackConfig.token.trim() || !slackConfig.channel.trim()}
+                className={`min-h-8 rounded-md px-2 text-xs font-medium hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-40 ${slackStatus === 'error' ? 'text-red-700' : 'text-stone-600'}`}
+                title={slackStatus === 'error' ? `Slack send failed: ${slackError}` : slackConfig.token ? `Send this response to #${slackConfig.channel.replace(/^#/, '')}` : 'Configure Slack Bot Token in Settings → Connections'}
+              >
+                {slackStatus === 'sending' ? <><span className="loading loading-spinner loading-xs" /> Sending…</> : slackStatus === 'success' ? '✓ Slack' : slackStatus === 'error' ? '✗ Slack' : 'Slack'}
               </button>
 
               {/* Database selector */}
@@ -372,58 +469,41 @@ export const LlmContent: React.FC<LlmContentProps> = ({
                       loadAvailableDatabases();
                     }
                   }}
-                  className="btn btn-xs btn-ghost"
+                  className="min-h-8 rounded-md px-2 text-xs font-medium text-stone-500 hover:bg-stone-100"
                   disabled={isLoadingDatabases}
-                  title="Select database"
+                  title="Choose Notion database"
                 >
                   {isLoadingDatabases ? (
                     <span className="loading loading-spinner loading-xs"></span>
                   ) : (
-                    'Settings'
+                    'Database'
                   )}
                 </button>
               )}
             </div>
           </div>
 
-          {/* Status indicators */}
-          <div className="mb-3">
-            {!notionToken && (
-              <div className="text-xs text-warning mb-1">
-                ⚠️ Notion token not configured
-              </div>
-            )}
-            
-            {notionToken && !selectedDatabaseId && (
-              <div className="text-xs text-warning mb-1">
-                ⚠️ No database selected
-              </div>
-            )}
-
-            {selectedDatabaseId && (
-              <div className="text-xs text-success mb-1">
-                ✅ Database configured
-              </div>
-            )}
-          </div>
+          <div hidden={isCollapsed}>
+          {notionToken && <p className="mb-3 text-xs text-stone-500">Notion database: <span className="font-medium text-stone-700">{selectedDatabaseId ? selectedDatabaseName || (databaseError ? 'Unavailable' : 'Loading name…') : 'Choose a database'}</span>{databaseError && <span className="ml-2 text-red-700" title={databaseError}>({databaseError})</span>}</p>}
 
           {/* Database selector dropdown */}
           {showDatabaseSelector && (
-            <div className="border border-base-300 rounded p-3 mb-3 bg-base-100">
-              <div className="text-sm font-medium mb-2">Select Database:</div>
+            <div className="mb-3 rounded-lg border border-stone-200 bg-stone-50 p-3">
+              <div className="mb-2 text-xs font-semibold text-stone-700">Save responses to</div>
               
-              {availableDatabases.length > 0 ? (
-                <div className="max-h-32 overflow-y-auto">
+              {isLoadingDatabases ? <p role="status" className="px-2 py-3 text-xs text-stone-500">Loading databases…</p> : availableDatabases.length > 0 ? (
+                <div className="max-h-40 space-y-1 overflow-y-auto">
                   {availableDatabases.map((db) => (
                     <button
                       key={db.id}
-                      onClick={() => selectDatabase(db.id)}
-                      className={`block w-full text-left p-2 hover:bg-base-200 rounded text-sm mb-1 ${
-                        selectedDatabaseId === db.id ? 'bg-primary/10 border border-primary' : ''
+                      onClick={() => selectDatabase(db.id, db.title)}
+                      aria-pressed={selectedDatabaseId === db.id}
+                      className={`flex min-h-9 w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-white ${
+                        selectedDatabaseId === db.id ? 'bg-white font-medium text-[#315a78] shadow-sm' : 'text-stone-700'
                       }`}
                     >
-                      {db.title}
-                      {selectedDatabaseId === db.id && <span className="text-primary ml-2">✓</span>}
+                      <span className="min-w-0 truncate">{db.title}</span>
+                      {selectedDatabaseId === db.id && <span className="shrink-0 text-xs">Selected ✓</span>}
                     </button>
                   ))}
                 </div>
@@ -440,12 +520,7 @@ export const LlmContent: React.FC<LlmContentProps> = ({
                 </div>
               )}
 
-              <button
-                onClick={() => setShowDatabaseSelector(false)}
-                className="btn btn-xs btn-ghost mt-2"
-              >
-                Close
-              </button>
+              <button onClick={() => setShowDatabaseSelector(false)} className="mt-2 rounded-md px-2 py-1 text-xs font-medium text-stone-500 hover:bg-white">Close</button>
             </div>
           )}
 
@@ -594,7 +669,7 @@ export const LlmContent: React.FC<LlmContentProps> = ({
                       </>;
                   },
                   blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-base-300 pl-4 italic my-2" {...props} />,
-                  table: ({node, ...props}) => <table className="border-collapse table-auto w-full my-2" {...props} />,
+                  table: ({children}) => <MarkdownTable>{children}</MarkdownTable>,
                   th: ({node, ...props}) => <th className="border border-base-300 px-4 py-2 text-left" {...props} />,
                   td: ({node, ...props}) => <td className="border border-base-300 px-4 py-2" {...props} />,
                 }}
@@ -602,6 +677,7 @@ export const LlmContent: React.FC<LlmContentProps> = ({
                 {part.content}
               </ReactMarkdown>;
             })}
+          </div>
           </div>
         </div>
       )}
