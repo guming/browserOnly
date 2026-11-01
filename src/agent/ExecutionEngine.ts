@@ -480,6 +480,17 @@ export class ExecutionEngine {
           // Check for cancellation after LLM response
           if (this.errorHandler.isExecutionCancelled()) break;
 
+          // Providers currently surface invalid native tool arguments as text.
+          // This is a failed invocation, not a successful final response.
+          if (/^Error: Failed to parse tool call\. Please try again\.$/m.test(accumulatedText)) {
+            messages.push(
+              { role: "assistant", content: accumulatedText },
+              { role: "user", content: 'The provider could not parse your tool arguments. Continue the original task and emit exactly one complete tool call. For native function calls, use valid JSON with an input string and an explicit requires_approval boolean; escape double quotes inside selectors. For XML, include all three tags: <tool>, <input>, and <requires_approval>. Do not report the task complete before the tool succeeds.' }
+            );
+            messages = trimHistory(messages);
+            continue;
+          }
+
           // Check for incomplete or malformed tool calls
           // This regex looks for tool calls that have <tool> and <input> but are missing <requires_approval>
           const incompleteApprovalRegex = /<tool>(.*?)<\/tool>\s*<input>([\s\S]*?)<\/input>(?!\s*<requires_approval>)/;

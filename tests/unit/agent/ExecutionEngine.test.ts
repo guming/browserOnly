@@ -185,6 +185,29 @@ describe('ExecutionEngine', () => {
       expect(mockCallbacks.onComplete).toHaveBeenCalledTimes(1);
     });
 
+    it('repairs provider tool-argument parse failures instead of reporting success', async () => {
+      mockCallbacks.onExecutionEnd = jest.fn();
+      mockProvider.createMessage
+        .mockImplementationOnce(() => (async function* () {
+          yield { type: 'text', text: 'Error: Failed to parse tool call. Please try again.' };
+        })())
+        .mockImplementationOnce((_system: string, messages: any[]) => {
+          expect(messages[messages.length - 1].content).toContain('valid JSON');
+          return (async function* () {
+            yield { type: 'text', text: '<tool>browser_screenshot</tool><input>{}</input><requires_approval>false</requires_approval>' };
+          })();
+        })
+        .mockImplementationOnce(() => (async function* () {
+          yield { type: 'text', text: 'Screenshot captured.' };
+        })());
+
+      await executionEngine.executePrompt('Take a screenshot', mockCallbacks, [], false, 'operator');
+
+      expect(mockProvider.createMessage).toHaveBeenCalledTimes(3);
+      expect(mockToolFunctions[0]).toHaveBeenCalledTimes(1);
+      expect(mockCallbacks.onExecutionEnd).toHaveBeenCalledWith('completed', undefined);
+    });
+
     it('should continue when the model emits action narration without its tool call', async () => {
       mockProvider.createMessage
         .mockImplementationOnce(() => (async function* () {

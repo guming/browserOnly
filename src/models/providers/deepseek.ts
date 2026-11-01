@@ -93,12 +93,13 @@ export class DeepSeekProvider implements LLMProvider {
       
             // Process the stream
             let toolCallId = null;
+            let selectedToolIndex: number | null = null;
             let toolName = null;
-            let toolArguments = null;
+            let toolArguments = "";
             let isCollectingToolCall = false;
       
             for await (const chunk of stream) {
-              const delta = chunk.choices[0]?.delta;
+              const delta = chunk.choices?.[0]?.delta;
               
               // Handle text content
               if (delta?.content) {
@@ -108,97 +109,95 @@ export class DeepSeekProvider implements LLMProvider {
                 };
               }
       
-              // Handle tool calls
-              if (delta?.tool_calls && delta.tool_calls.length > 0) {
-                const toolCall = delta.tool_calls[0];
-                
-                // If this is the start of a tool call
-                if (toolCall.index === 0 && toolCall.function?.name) {
+              // The execution engine runs one call per turn. Keep only the first
+              // indexed call; parallel argument fragments must never be combined.
+              for (const toolCall of delta?.tool_calls || []) {
+                if (selectedToolIndex === null && toolCall.function?.name) {
+                  selectedToolIndex = toolCall.index;
                   isCollectingToolCall = true;
                   toolCallId = toolCall.id;
                   toolName = toolCall.function.name;
-                  toolArguments = toolCall.function.arguments || "";
-                } 
-                // If we're continuing to collect a tool call
-                else if (isCollectingToolCall && toolCall.function?.arguments) {
-                  toolArguments += toolCall.function.arguments;
+                  toolArguments = "";
                 }
-                
-                // If this is the end of the tool call (finish_reason: "tool_calls")
-                if (chunk.choices[0]?.finish_reason === "tool_calls" && isCollectingToolCall) {
+                if (isCollectingToolCall && toolCall.index === selectedToolIndex) {
+                  toolArguments += toolCall.function?.arguments || "";
+                }
+              }
+
+              // If this is the end of the tool call (finish_reason: "tool_calls")
+              if (chunk.choices?.[0]?.finish_reason === "tool_calls" && isCollectingToolCall) {
+                try {
+                  // Try to parse the arguments as a single JSON object
+                  let args;
                   try {
-                    // Try to parse the arguments as a single JSON object
-                    let args;
-                    try {
-                      args = JSON.parse(toolArguments || "{}");
-                    } catch (parseError) {
-                      // If parsing fails, check if we have multiple concatenated JSON objects
-                      const jsonObjects = toolArguments.split(/(?<=\})(?=\{)/);
-                      if (jsonObjects.length > 1) {
-                        console.log(`Found ${jsonObjects.length} concatenated JSON objects, using the first one`);
-                        // Parse just the first object
-                        args = JSON.parse(jsonObjects[0]);
-                      } else {
-                        // Second attempt: sanitize and try again
-                        console.log("Attempting to sanitize tool arguments before parsing");
-                        // Replace double quotes in CSS selectors with single quotes
-                        const sanitizedArgs = toolArguments
-                          .replace(/(\w+)\[name="([^"]+)"\]/g, '$1[name=\'$2\']')
-                          .replace(/(\w+)\[class="([^"]+)"\]/g, '$1[class=\'$2\']')
-                          .replace(/(\w+)\[id="([^"]+)"\]/g, '$1[id=\'$2\']')
-                          .replace(/(\w+)\[type="([^"]+)"\]/g, '$1[type=\'$2\']')
-                          .replace(/(\w+)\[value="([^"]+)"\]/g, '$1[value=\'$2\']');
-                        
-                        try {
-                          args = JSON.parse(sanitizedArgs);
-                          console.log("Successfully parsed sanitized tool arguments");
-                        } catch (secondError) {
-                          console.error("Error parsing sanitized tool arguments:", secondError);
-                          
-                          // Third attempt: use regex to extract the input directly
-                          const inputMatch = toolArguments.match(/"input"\s*:\s*"([^"]*(?:\\.[^"]*)*)"/);
-                          const requiresApprovalMatch = toolArguments.match(/"requires_approval"\s*:\s*(true|false)/);
-                          
-                          if (inputMatch) {
-                            console.log("Extracted input using regex");
-                            args = {
-                              input: inputMatch[1].replace(/\\"/g, '"'),
-                              requires_approval: requiresApprovalMatch ? 
-                                requiresApprovalMatch[1] === 'true' : false
-                            };
-                          } else {
-                            throw secondError; // If we can't extract the input, re-throw
-                          }
+                    args = JSON.parse(toolArguments || "{}");
+                  } catch (parseError) {
+                    // If parsing fails, check if we have multiple concatenated JSON objects
+                    const jsonObjects = toolArguments.split(/(?<=\})(?=\{)/);
+                    if (jsonObjects.length > 1) {
+                      console.log(`Found ${jsonObjects.length} concatenated JSON objects, using the first one`);
+                      // Parse just the first object
+                      args = JSON.parse(jsonObjects[0]);
+                    } else {
+                      // Second attempt: sanitize and try again
+                      console.log("Attempting to sanitize tool arguments before parsing");
+                      // Replace double quotes in CSS selectors with single quotes
+                      const sanitizedArgs = toolArguments
+                        .replace(/(\w+)\[name="([^"]+)"\]/g, '$1[name=\'$2\']')
+                        .replace(/(\w+)\[class="([^"]+)"\]/g, '$1[class=\'$2\']')
+                        .replace(/(\w+)\[id="([^"]+)"\]/g, '$1[id=\'$2\']')
+                        .replace(/(\w+)\[type="([^"]+)"\]/g, '$1[type=\'$2\']')
+                        .replace(/(\w+)\[value="([^"]+)"\]/g, '$1[value=\'$2\']');
+
+                      try {
+                        args = JSON.parse(sanitizedArgs);
+                        console.log("Successfully parsed sanitized tool arguments");
+                      } catch (secondError) {
+                        console.error("Error parsing sanitized tool arguments:", secondError);
+
+                        // Third attempt: use regex to extract the input directly
+                        const inputMatch = toolArguments.match(/"input"\s*:\s*"([^"]*(?:\\.[^"]*)*)"/);
+                        const requiresApprovalMatch = toolArguments.match(/"requires_approval"\s*:\s*(true|false)/);
+
+                        if (inputMatch) {
+                          console.log("Extracted input using regex");
+                          args = {
+                            input: inputMatch[1].replace(/\\"/g, '"'),
+                            requires_approval: requiresApprovalMatch ?
+                              requiresApprovalMatch[1] === 'true' : false
+                          };
+                        } else {
+                          throw secondError; // If we can't extract the input, re-throw
                         }
                       }
                     }
-                    
-                    const input = args.input || "";
-                    const requiresApproval = args.requires_approval === true ? "true" : "false";
-                    
-                    // Format as XML
-                    const xmlToolCall = `<tool>${toolName}</tool>\n<input>${input}</input>\n<requires_approval>${requiresApproval}</requires_approval>`;
-                    
-                    yield {
-                      type: "text",
-                      text: xmlToolCall,
-                    };
-                    
-                    // Reset tool call collection
-                    isCollectingToolCall = false;
-                    toolCallId = null;
-                    toolName = null;
-                    toolArguments = null;
-                  } catch (error) {
-                    console.error("Error parsing tool arguments:", error);
-                    yield {
-                      type: "text",
-                      text: "Error: Failed to parse tool call. Please try again.",
-                    };
                   }
+
+                  const input = args.input || "";
+                  const requiresApproval = args.requires_approval === true ? "true" : "false";
+
+                  // Format as XML
+                  const xmlToolCall = `<tool>${toolName}</tool>\n<input>${input}</input>\n<requires_approval>${requiresApproval}</requires_approval>`;
+
+                  yield {
+                    type: "text",
+                    text: xmlToolCall,
+                  };
+
+                  // Reset tool call collection
+                  isCollectingToolCall = false;
+                  toolCallId = null;
+                  toolName = null;
+                  toolArguments = "";
+                } catch (error) {
+                  console.error("Error parsing tool arguments:", error);
+                  yield {
+                    type: "text",
+                    text: "Error: Failed to parse tool call. Please try again.",
+                  };
                 }
               }
-      
+
               // Handle usage information
               if (chunk.usage) {
                 const promptTokens = chunk.usage.prompt_tokens || 0;
