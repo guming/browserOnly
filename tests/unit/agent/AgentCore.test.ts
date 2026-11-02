@@ -50,6 +50,14 @@ describe('BrowserAgent', () => {
   });
 
   describe('constructor', () => {
+    it('disables memory tools for isolated benchmark runs while preserving browser tools', () => {
+      const tool = (name: string) => ({ name, description: name, func: jest.fn() });
+      const tools = jest.requireMock('../../../src/agent/tools/index').getAllTools;
+      tools.mockReturnValueOnce(['lookup_memories', 'save_memory', 'get_all_memories', 'browser_read_text'].map(tool));
+      const agent = new BrowserAgent(mockPage, mockAnthropicConfig, mockProvider, { memory: false });
+      expect((agent as any).toolManager.getTools().map((item: any) => item.name)).toEqual(['browser_read_text']);
+    });
+
     it('should initialize with page, config, and provider', () => {
       const agent = new BrowserAgent(mockPage, mockAnthropicConfig, mockProvider);
       

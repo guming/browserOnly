@@ -1,0 +1,25 @@
+{
+  "id": "03-wikipedia-two-hop",
+  "name": "Wikipedia: verify a person and birthplace across two pages",
+  "startUrl": "https://en.wikipedia.org/wiki/Marie_Curie",
+  "allowedHosts": [
+    "en.wikipedia.org"
+  ],
+  "answerMode": "stable",
+  "prompt": "Read the English Wikipedia article about Marie Curie and find her birth date and birth city. Follow a link to that city from the article, then verify which country the city belongs to today. Return the birth date, city, present-day country, and links to both articles. Distinguish the political jurisdiction at the time of her birth from the country today.",
+  "checks": [
+    {
+      "id": "birth",
+      "description": "出生日期为 1867-11-07，城市为 Warsaw／华沙。"
+    },
+    {
+      "id": "country",
+      "description": "今天所属国家为 Poland／波兰，不把 Russian Empire 等历史归属当成今天的国家。"
+    },
+    {
+      "id": "two-hop",
+      "description": "两个词条链接正确，轨迹证明从人物页的城市链接进入 Warsaw 并读取国家。"
+    }
+  ],
+  "language": "en"
+}

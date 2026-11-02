@@ -1,0 +1,28 @@
+{
+  "id": "08-gutenberg-catalog",
+  "name": "Project Gutenberg: find an ebook and verify reading formats",
+  "language": "en",
+  "startUrl": "https://www.gutenberg.org/",
+  "allowedHosts": [
+    "www.gutenberg.org",
+    "gutenberg.org"
+  ],
+  "answerMode": "stable",
+  "requiresLogin": false,
+  "interactiveLogin": false,
+  "prompt": "Without signing in, use Project Gutenberg to find the English text edition of Frankenstein by Mary Wollstonecraft Shelley. If multiple matching text editions are listed, choose the one with the smallest ebook number. Open its catalog page and verify the complete title, author, language, ebook number, Gutenberg release date, and copyright statement exactly as displayed. Do not confuse the original novel publication year or last update date with the Gutenberg release date. Find the Read online and Plain Text links provided by that catalog page. Open the online reading page to confirm it is the selected book, then return the catalog URL, reading URL, and plain-text URL. Do not download files, sign in, donate, or follow external bookstore links. Use null for metadata that the website does not provide; do not guess.",
+  "checks": [
+    {
+      "id": "selection",
+      "description": "Verify on-site search or catalog navigation, the English text edition, correct author, and smallest ebook number among matching editions."
+    },
+    {
+      "id": "metadata",
+      "description": "Compare complete title, author, language, ebook number, Gutenberg release date and displayed copyright statement with the opened catalog page."
+    },
+    {
+      "id": "formats",
+      "description": "Verify reading and plain-text URLs came from the selected catalog page, and the reading page was opened and matches the book."
+    }
+  ]
+}

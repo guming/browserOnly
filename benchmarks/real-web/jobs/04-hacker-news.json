@@ -1,0 +1,25 @@
+{
+  "id": "04-hacker-news",
+  "name": "Hacker News: highest-scoring front-page story",
+  "startUrl": "https://news.ycombinator.com/",
+  "allowedHosts": [
+    "news.ycombinator.com"
+  ],
+  "answerMode": "snapshot",
+  "prompt": "Inspect every story on the current first page of Hacker News; do not follow More. Among stories displaying a score, find the highest-scoring one. Break ties by choosing the story appearing earlier on the front page. First record its title, score, and comment count from that same front-page observation. Then open its comments page, verify the title, and return the comments URL. Include the front-page observation time with a time zone. Use the numbers from that observation; do not assume the first-ranked story has the highest score.",
+  "checks": [
+    {
+      "id": "coverage",
+      "description": "轨迹覆盖首页第一页所有帖子及分数，忽略无分数条目，不翻 More。"
+    },
+    {
+      "id": "maximum",
+      "description": "标题和分数是该次首页完整观测的最大值；并列按首页排名选择。"
+    },
+    {
+      "id": "comments",
+      "description": "评论数与同次首页观测一致，提供含时区观测时间，并实际打开对应 item?id= 评论页核对标题。"
+    }
+  ],
+  "language": "en"
+}

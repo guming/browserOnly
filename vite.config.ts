@@ -6,7 +6,7 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react(), tailwindcss()],
   optimizeDeps: {
     exclude: ['playwright-crx']
@@ -21,7 +21,7 @@ export default defineConfig({
       // @ts-ignore
       plugins: [sourcemaps()],
       input: {
-        'background': path.resolve(__dirname, 'src/background.ts'),
+        'background': path.resolve(__dirname, mode === 'benchmark' ? 'src/benchmark/background.ts' : 'src/background.ts'),
         'sidepanel': path.resolve(__dirname, 'src/sidepanel/index.tsx'),
         'test-editor': path.resolve(__dirname, 'test-editor.html'),
         'options': path.resolve(__dirname, 'src/options/index.tsx'),
@@ -41,4 +41,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

@@ -1,4 +1,5 @@
 import { requestApproval, cancelRunApprovals } from '../agent/approvalManager';
+import { captureScreenshot } from '../agent/tools/captureScreenshot';
 import { getAgentStatus } from '../background/agentController';
 import { createTestExecutionTab } from '../background/tabManager';
 import { AgentStatus } from '../background/types';
@@ -229,7 +230,7 @@ async function executeStep(active: ActiveRun, signal: AbortSignal, page: any, st
     const code = (error as any)?.code ?? (String(error).includes('Timeout') ? 'TIMEOUT' : 'ACTION_FAILED');
     const status: TestStepResult['status'] = code === 'CANCELLED' ? 'cancelled' : isBlocked(code, String(error)) ? 'blocked' : 'failed';
     let screenshot: string | undefined;
-    try { const bytes = await page.screenshot({ type: 'jpeg', quality: 45 }); const evidenceId = `${caseRun.id}-${step.id}`; await store.putEvidence(evidenceId, caseRun.id, `data:image/jpeg;base64,${bytesToBase64(bytes)}`); screenshot = evidenceId; } catch { /* A failed evidence capture does not erase the test result. */ }
+    try { const bytes = await captureScreenshot(page, { type: 'jpeg', quality: 45 }); const evidenceId = `${caseRun.id}-${step.id}`; await store.putEvidence(evidenceId, caseRun.id, `data:image/jpeg;base64,${bytesToBase64(bytes)}`); screenshot = evidenceId; } catch { /* A failed evidence capture does not erase the test result. */ }
     return { id: `step-${crypto.randomUUID()}`, caseRunId: caseRun.id, stepId: step.id, status, expected, actual, url: page.url(), errorCode: code, errorMessage: String(error), startedAt, endedAt: Date.now(), screenshot };
   }
 }

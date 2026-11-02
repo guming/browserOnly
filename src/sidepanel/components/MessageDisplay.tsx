@@ -7,6 +7,8 @@ import { WorkflowSaveOfferCard } from './WorkflowSaveOfferCard';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { MarkdownTable } from './MarkdownTable';
+import { executionGroups } from './executionGroups';
+import { RunDuration } from './RunDuration';
 
 interface MessageDisplayProps {
   messages: Message[];
@@ -28,33 +30,19 @@ function CollapsibleCard({ title, children }: { title: string; children: React.R
   </section>;
 }
 
-function ImageResultCard({ title, content, onCopy }: { title: string; content: string; onCopy: () => void }) {
-  const [expanded, setExpanded] = useState(true);
-  return <section className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-    <div className="flex items-center justify-between gap-2 border-b border-stone-100 px-3 py-2">
-      <div className="flex min-w-0 items-center gap-2">
-        <button type="button" aria-expanded={expanded} aria-label={`${expanded ? 'Collapse' : 'Expand'} ${title}`} onClick={() => setExpanded(value => !value)} className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-stone-500 hover:bg-stone-100" title={expanded ? 'Collapse' : 'Expand'}>
-          <svg aria-hidden="true" viewBox="0 0 20 20" className={`h-4 w-4 transition-transform ${expanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m7 4 6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        </button>
-        <span className="truncate text-xs font-semibold text-stone-700">{title}</span>
-      </div>
-      {expanded && <button type="button" className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-[#315a78] hover:bg-[#eaf2f7]" onClick={onCopy}>Copy text</button>}
-    </div>
-    {expanded && <div className="max-h-96 overflow-auto px-3 py-3 text-sm leading-6 text-stone-800 [&_h1]:mb-2 [&_h1]:text-base [&_h1]:font-semibold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-sm [&_h2]:font-semibold [&_h3]:mb-1 [&_h3]:mt-3 [&_h3]:font-semibold [&_li]:ml-4 [&_li]:list-disc [&_p]:mb-2 [&_table]:min-w-full [&_table]:border-collapse [&_td]:border [&_td]:border-stone-200 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-stone-200 [&_th]:bg-stone-50 [&_th]:px-2 [&_th]:py-1">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ table: ({ children }) => <MarkdownTable>{children}</MarkdownTable> }}>{content}</ReactMarkdown>
-    </div>}
-  </section>;
-}
-
 export const MessageDisplay: React.FC<MessageDisplayProps> = ({
   messages,
   streamingSegments,
   isStreaming,
   onOpenWorkflow
 }) => {
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   // Always show all messages
   const filteredMessages = messages;
+  const runs = executionGroups(messages);
+  const activeRun = [...runs.values()].find(group => group.activity.activity?.status === 'running');
+  const renderStreaming = () => isStreaming && Object.entries(streamingSegments).map(([id, content]) => (
+    <div key={`segment-${id}`} className="mb-2 animate-pulse"><LlmContent content={content} /></div>
+  ));
 
   if (filteredMessages.length === 0 && Object.keys(streamingSegments).length === 0) {
     return <p className="text-gray-500">No output yet</p>;
@@ -88,7 +76,7 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({
       ) : msg.type === 'llm' && msg.content.trim() === 'Execution cancelled by user.' ? (
         <div role="status" className="rounded-lg bg-stone-100 px-3 py-2 text-sm text-stone-600">Execution cancelled</div>
       ) : msg.type === 'ocr' || msg.type === 'image_analysis' ? (
-        <ImageResultCard title={msg.type === 'ocr' ? 'Text in image' : 'Image understanding'} content={msg.content} onCopy={() => void navigator.clipboard.writeText(msg.content).then(() => setCopiedIndex(index)).catch(() => setCopiedIndex(null))} />
+        <LlmContent imageTitle={msg.type === 'ocr' ? 'Text in image' : 'Image understanding'} content={msg.content} />
       ) : msg.type === 'system' && (/^(?:Executing prompt:|New .+ prompt:)/.test(msg.content) || msg.content.length > 240) ? (
         <details className="rounded-lg border border-stone-200 bg-stone-50 text-xs text-stone-600">
           <summary className="cursor-pointer px-3 py-2 font-medium text-stone-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#315a78]">{msg.content.startsWith('Executing prompt:') ? 'Executing request' : msg.content.startsWith('New ') ? 'Request submitted' : 'Activity details'} · Show details</summary>
@@ -107,6 +95,22 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({
   return (
     <div>
       {filteredMessages.map((msg, index) => {
+        const run = msg.runId && runs.get(msg.runId);
+        if (run) {
+          if (!msg.activity) return null;
+          const activity = msg.activity;
+          return <details key={msg.runId} className="my-2 rounded-lg border border-stone-200 bg-stone-50 text-xs text-stone-600" open={activity.status === 'running' ? true : undefined}>
+            <summary className="cursor-pointer px-3 py-2 font-medium">{activity.steps.length} steps · {activity.status}<RunDuration activity={activity} /></summary>
+            <div className="max-h-96 overflow-y-auto space-y-2 border-t border-stone-200 px-3 py-2">
+              <ol className="space-y-1">{activity.steps.map((step, at) => <li key={`${step.executionId}-${at}`} className="flex justify-between gap-2"><span>{at + 1}. {step.toolName.replace(/^browser_/, '').replace(/_/g, ' ')}</span><span>{step.status}{step.durationMs === undefined ? '' : ` · ${(step.durationMs / 1000).toFixed(2)}s`}</span></li>)}</ol>
+              {run.messages.map((item, at) => item.type === 'llm'
+                ? <div key={`progress-${at}`} className="whitespace-pre-wrap break-words"><ReactMarkdown remarkPlugins={[remarkGfm]}>{item.content}</ReactMarkdown></div>
+                : renderMessage(item, at))}
+              {run === activeRun && isStreaming && Object.entries(streamingSegments).map(([id, content]) =>
+                <div key={`progress-stream-${id}`} className="whitespace-pre-wrap break-words animate-pulse">{content}</div>)}
+            </div>
+          </details>;
+        }
         const group = groupAt.get(index);
         if (group) return <details key={`activity-${index}`} className="my-2 rounded-lg border border-stone-200 bg-stone-50 text-xs text-stone-600">
           <summary className="cursor-pointer list-none px-3 py-2 font-medium text-stone-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#315a78]">▸ {group.tools} tool {group.tools === 1 ? 'step' : 'steps'} · Show activity</summary>
@@ -117,11 +121,7 @@ export const MessageDisplay: React.FC<MessageDisplayProps> = ({
       })}
       
       {/* Render currently streaming segments at the end */}
-      {isStreaming && Object.entries(streamingSegments).map(([id, content]) => (
-        <div key={`segment-${id}`} className="mb-2 animate-pulse">
-          <LlmContent content={content} />
-        </div>
-      ))}
+      {!activeRun && renderStreaming()}
     </div>
   );
 };

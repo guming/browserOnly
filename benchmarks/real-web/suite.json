@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "browseronly-real-web-10",
+  "version": "3.0.0",
+  "name": "BrowserOnly 真实网站任务集",
+  "defaults": {
+    "timeoutSeconds": 300,
+    "maxToolCalls": 50
+  },
+  "instructions": "Complete the task by actually visiting and interacting with the specified website in the browser. Do not replace page verification with external search engines, website APIs, or prior knowledge. Do not log in, publish, or modify website content. Answer in English and preserve original titles and source links. If access is restricted, identify the specific blocked page and explain the restriction. Do not invent results.",
+  "instructionsEnglish": "Complete the task by actually visiting and interacting with the specified website in the browser. Do not replace page verification with external search engines, website APIs, or prior knowledge. Do not log in, publish, or modify website content. Answer in English and preserve original titles and source links. If access is restricted, identify the specific blocked page and explain the restriction. Do not invent results.",
+  "jobs": [
+    "jobs/01-github-release.json",
+    "jobs/02-github-issues.json",
+    "jobs/03-wikipedia-two-hop.json",
+    "jobs/04-hacker-news.json",
+    "jobs/05-cdc-report.json",
+    "jobs/06-arxiv-search.json",
+    "jobs/07-mdn-reference.json",
+    "jobs/08-gutenberg-catalog.json",
+    "jobs/09-nasa-news-summary.json",
+    "jobs/10-google-maps-route.json"
+  ]
+}

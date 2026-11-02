@@ -1,0 +1,14 @@
+{
+  "id": "07-mdn-reference",
+  "name": "MDN: method behavior and browser compatibility",
+  "language": "en",
+  "startUrl": "https://developer.mozilla.org/en-US/",
+  "allowedHosts": ["developer.mozilla.org"],
+  "answerMode": "stable",
+  "prompt": "Find the MDN documentation for JavaScript Array.prototype.toSorted(). Explain whether it modifies the original array and how to sort [1, 10, 21, 2] in ascending numerical order. Show the sorted result and the original array after the operation. Then inspect the Browser compatibility table and report the first desktop Chrome, Firefox, and Safari versions that support this method. Include links to the documentation and its browser compatibility section. Use the compatibility table as evidence; do not substitute the Baseline date for individual browser support versions.",
+  "checks": [
+    { "id": "behavior", "description": "说明返回新数组、不改变原数组；数值比较器为 (a, b) => a - b 或等价写法，结果 [1,2,10,21]，原值 [1,10,21,2]。" },
+    { "id": "compatibility", "description": "实际查看兼容表并正确返回桌面 Chrome、Firefox、Safari 的首次支持版本，不能只给 Baseline。" },
+    { "id": "sources", "description": "返回正确 toSorted 文档与 #browser_compatibility 章节链接，内容有本次网页观测依据。" }
+  ]
+}

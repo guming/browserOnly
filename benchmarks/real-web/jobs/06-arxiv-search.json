@@ -1,0 +1,25 @@
+{
+  "id": "06-arxiv-search",
+  "name": "arXiv: search papers by topic and submission date",
+  "startUrl": "https://arxiv.org/search/",
+  "allowedHosts": [
+    "arxiv.org"
+  ],
+  "answerMode": "stable",
+  "prompt": "Search arXiv for web agents using All fields. Find three distinct papers first submitted between 2024-01-01 and 2024-12-31 inclusive that study AI agents operating websites to complete tasks. For each paper, return the complete title, all authors, first submission date, and arXiv abstract URL, plus one sentence explaining its relevance. Open each abstract page to verify the details. Do not confuse the latest revision date with the first submission date or list multiple versions of the same paper. You do not need an exhaustive list or a citation-based ranking.",
+  "checks": [
+    {
+      "id": "search",
+      "description": "轨迹证明在 arXiv 使用 web agents 的 All fields 站内搜索，可使用高级搜索限制年份。"
+    },
+    {
+      "id": "papers",
+      "description": "恰好 3 个不同 arXiv ID，摘要确实研究 AI Agent 操作网站，首次提交日期均落在 2024 年。"
+    },
+    {
+      "id": "metadata",
+      "description": "每篇完整标题、全部作者、首次提交日期、摘要链接均与实际打开的摘要页一致。"
+    }
+  ],
+  "language": "en"
+}

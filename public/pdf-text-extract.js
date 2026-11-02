@@ -9,6 +9,8 @@
   let isTextPanelOpen = false;
   let lastFocusedElement = null;
   let extractionCompleted = false;
+  let extractionPromise = null;
+  let documentError = null;
 
   // Create a global namespace for sharing data between scripts
   window.PDFTextExtractor = window.PDFTextExtractor || {};
@@ -31,10 +33,11 @@
   };
 
   window.PDFTextExtractor.triggerExtraction = function() {
-    if (!extractionCompleted) {
-      return extractAllText();
+    if (extractionCompleted) return Promise.resolve(extractedText);
+    if (!extractionPromise) {
+      extractionPromise = extractAllText().finally(() => { extractionPromise = null; });
     }
-    return Promise.resolve(extractedText);
+    return extractionPromise;
   };
 
   // Initialize when PDF.js is ready
@@ -44,14 +47,19 @@
 
   function initializeTextExtraction() {
     // Wait for PDFViewerApplication to be ready
-    if (typeof PDFViewerApplication === 'undefined') {
+    if (typeof PDFViewerApplication === 'undefined' || !PDFViewerApplication.eventBus) {
       setTimeout(initializeTextExtraction, 100);
       return;
     }
 
     // Listen for document loaded event
     PDFViewerApplication.eventBus.on('documentloaded', function() {
+      documentError = null;
       console.log('[Text Extract] PDF document loaded, extraction available');
+    });
+
+    PDFViewerApplication.eventBus.on('documenterror', function(event) {
+      documentError = event.reason || event.message || 'Could not load the PDF document';
     });
 
     // Setup button click handler
@@ -112,7 +120,7 @@
 
     // Extract text if not already done
     if (!extractedText) {
-      extractAllText();
+      void window.PDFTextExtractor.triggerExtraction().catch(() => {});
     }
   }
 
@@ -205,13 +213,26 @@
     const paperContainer = document.querySelector('.paper-container');
     const emptyState = document.getElementById('extractionEmptyState');
 
-    if (!PDFViewerApplication.pdfDocument) {
-      showError('No PDF document loaded');
-      return;
-    }
-
     try {
       loadingDiv.style.display = 'flex';
+      document.getElementById('extractionProgress').textContent = 'Waiting for the PDF to load…';
+      contentDiv.innerHTML = '';
+      emptyState?.setAttribute('hidden', 'hidden');
+      paperContainer?.setAttribute('hidden', 'hidden');
+      const linksLoading = document.getElementById('linksLoading');
+      if (linksLoading) { linksLoading.hidden = false; linksLoading.textContent = 'Scanning document links'; }
+      if (!PDFViewerApplication.pdfDocument) {
+        if (documentError) throw new Error(documentError);
+        await new Promise((resolve, reject) => {
+          const bus = PDFViewerApplication.eventBus;
+          const cleanup = () => { bus.off('documentloaded', onLoaded); bus.off('documenterror', onError); };
+          const onLoaded = () => { cleanup(); resolve(); };
+          const onError = event => { cleanup(); reject(new Error(event.reason || event.message || 'Could not load the PDF document')); };
+          bus.on('documentloaded', onLoaded);
+          bus.on('documenterror', onError);
+        });
+      }
+      if (!PDFViewerApplication.pdfDocument) throw new Error('Could not load the PDF document');
       contentDiv.innerHTML = '';
       emptyState?.setAttribute('hidden', 'hidden');
       paperContainer?.setAttribute('hidden', 'hidden');
@@ -276,7 +297,9 @@
 
     } catch (error) {
       console.error('[Text Extract] Error:', error);
-      showError('Failed to extract text: ' + error.message);
+      showError('Failed to read document: ' + error.message);
+      const linksLoading = document.getElementById('linksLoading');
+      if (linksLoading) linksLoading.textContent = 'Could not scan links because the document could not be read.';
       loadingDiv.style.display = 'none';
       extractionCompleted = false;
       throw error;
@@ -605,7 +628,7 @@
 
   async function copyAsText() {
     if (!extractionCompleted) {
-      await extractAllText();
+      await window.PDFTextExtractor.triggerExtraction();
     }
 
     if (!hasReadableText(extractedText)) {
@@ -631,7 +654,7 @@
 
   async function copyAsMarkdown() {
     if (!extractionCompleted) {
-      await extractAllText();
+      await window.PDFTextExtractor.triggerExtraction();
     }
 
     if (!hasReadableText(extractedText)) {

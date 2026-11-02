@@ -12,7 +12,27 @@ export const browserNavigate: ToolFactory = (page: Page) =>
       try {
         return await withActivePage(page, async (activePage) => {
           // Navigate to the URL
-          await activePage.goto(url, { waitUntil: "domcontentloaded", timeout: 10000 });
+          try {
+            await activePage.goto(url, { waitUntil: "domcontentloaded", timeout: 10000 });
+          } catch (error) {
+            if (!/timeout/i.test(String(error))) throw error;
+            // A timeout is not proof of either arrival or failure. Inspect the
+            // current document without repeating navigation or waiting again.
+            try {
+              const actualUrl = activePage.url();
+              const documentState = await activePage.evaluate(() => ({
+                ready: document.readyState,
+                text: (document.body?.innerText || '').trim().slice(0, 200),
+              })) as { ready: string; text: string };
+              const expected = new URL(url), actual = new URL(actualUrl);
+              if (actual.origin === expected.origin && actual.pathname === expected.pathname && actual.search === expected.search &&
+                  ['interactive', 'complete'].includes(documentState.ready) && documentState.text) {
+                return JSON.stringify({ ok: true, data: { url: actualUrl, documentReady: true, navigationTimedOut: true,
+                  note: 'Requested URL has a readable document despite navigation timeout. Verify the requested task content before continuing; no navigation was repeated.' } });
+              }
+            } catch { /* Preserve timeout classification when document cannot be inspected. */ }
+            return JSON.stringify({ ok: false, error: { code: 'NAVIGATION_TIMEOUT', message: `Navigation timed out for ${url}; arrival could not be confirmed. Inspect the current page before retrying.`, repairable: true } });
+          }
           
           // Get the tab ID and title after navigation
           try {

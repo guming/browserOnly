@@ -6,7 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const publicDir = path.resolve(__dirname, '../public');
-const distDir = path.resolve(__dirname, '../dist');
+const distDir = path.resolve(__dirname, '..', process.argv[2] || 'dist');
 
 // Ensure dist directory exists
 if (!fs.existsSync(distDir)) {
@@ -32,4 +32,4 @@ function copyRecursive(src, dest) {
 }
 
 copyRecursive(publicDir, distDir);
-console.log('Static files copied to dist/');
+console.log(`Static files copied to ${distDir}`);

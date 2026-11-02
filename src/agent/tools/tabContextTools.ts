@@ -3,6 +3,7 @@ import type { Page } from "playwright-crx";
 import { getCurrentPage } from "../PageContextManager";
 import { ToolFactory } from "./types";
 import { getCurrentTabId } from "./utils";
+import { captureScreenshot, screenshotFailure } from './captureScreenshot';
 
 /**
  * Tool to get information about the currently active tab
@@ -175,7 +176,7 @@ export const browserScreenshotTab: ToolFactory = (page: Page) =>
         const screenshotManager = ScreenshotManager.getInstance();
         
         // Take the screenshot
-        const buffer = await targetPage.screenshot({ 
+        const buffer = await captureScreenshot(targetPage, {
           type: "jpeg", 
           fullPage, 
           quality 
@@ -207,9 +208,7 @@ export const browserScreenshotTab: ToolFactory = (page: Page) =>
           note: `Screenshot captured of tab ${tabIndex} (${fullPage ? 'full page' : 'viewport only'})`
         });
       } catch (err) {
-        return `Error taking screenshot: ${
-          err instanceof Error ? err.message : String(err)
-        }`;
+        return screenshotFailure(err);
       }
     },
   });

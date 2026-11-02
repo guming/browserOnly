@@ -49,7 +49,7 @@ export class BrowserAgent {
   /**
    * Create a new BrowserAgent
    */
-  constructor(page: Page, config: ProviderConfig, provider?: LLMProvider) {
+  constructor(page: Page, config: ProviderConfig, provider?: LLMProvider, options: { memory?: boolean } = {}) {
     // Initialize the PageContextManager with the initial page
     initializePageContext(page);
 
@@ -58,7 +58,7 @@ export class BrowserAgent {
 
     // Get all tools from the tools module and convert them to BrowserTool objects
     const rawTools = getAllTools(page);
-    const browserTools = this.convertToBrowserTools(rawTools);
+    const browserTools = this.convertToBrowserTools(rawTools).filter(tool => options.memory !== false || !/memor(?:y|ies)/i.test(tool.name));
 
     // Initialize all the components with basic tools first
     this.toolManager = new ToolManager(page, browserTools);
@@ -247,7 +247,8 @@ export class BrowserAgent {
 export async function createBrowserAgent(
   page: Page,
   apiKey: string,
-  configOverride?: ProviderConfig
+  configOverride?: ProviderConfig,
+  options: { memory?: boolean } = {},
 ): Promise<BrowserAgent> {
   // Get provider configuration
   const configManager = ConfigManager.getInstance();
@@ -290,7 +291,7 @@ export async function createBrowserAgent(
   });
 
   // Create the agent with the provider configuration and provider
-  return new BrowserAgent(page, providerConfig, provider);
+  return new BrowserAgent(page, providerConfig, provider, options);
 }
 
 /**

@@ -2256,3 +2256,20 @@
     padding: 12px;
   }
 }
+
+/* Keep waiting, empty, and error states distinct in every panel. */
+#textExtractionPanel [hidden] { display: none !important; }
+#extractionLoading {
+  margin: 4px 0;
+  border: 1px solid var(--bo-pdf-border);
+  border-radius: var(--bo-pdf-radius-sm);
+  background: var(--bo-pdf-surface);
+}
+#extractionLoading .spinner { width: 28px; height: 28px; border-width: 2px; margin-bottom: 12px; }
+.error-message { overflow-wrap: anywhere; }
+.ai-panel-actions button:disabled, .ai-send-btn:disabled { cursor: wait; opacity: 0.55; }
+@media (max-width: 560px) {
+  #extractionLoading { margin: 12px; }
+  .text-panel-tabs { overflow-x: auto; }
+  .tab-button { white-space: nowrap; }
+}

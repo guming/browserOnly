@@ -102,6 +102,26 @@ describe('ExecutionEngine', () => {
       };
     });
 
+    it('waits for evidence capture before requesting the next model action', async () => {
+      let release!: () => void;
+      let entered!: () => void;
+      const captured = new Promise<void>(resolve => { release = resolve; });
+      const started = new Promise<void>(resolve => { entered = resolve; });
+      mockCallbacks.onToolEvent = async () => { entered(); await captured; };
+      mockProvider.createMessage.mockReturnValueOnce((async function* () {
+        yield { type: 'text', text: '<tool>browser_click</tool><input>button</input><requires_approval>false</requires_approval>' };
+      })()).mockReturnValueOnce((async function* () {
+        yield { type: 'text', text: '<finish status="completed">Done</finish>' };
+      })());
+      const running = executionEngine.executePrompt('Click button', mockCallbacks, [], false, 'operator');
+      await started;
+      await Promise.resolve();
+      try { expect(mockProvider.createMessage).toHaveBeenCalledTimes(1); }
+      finally { release(); }
+      await running;
+      expect(mockProvider.createMessage).toHaveBeenCalledTimes(2);
+    });
+
     it('scopes goal-run approvals to the owner tab even when another tab is active', async () => {
       mockCallbacks.executionContext = { runId: 'run-1', workflowId: 'w1', tabId: 2, ownerTabId: 1, windowId: 3 };
       mockCallbacks.onExecutionEnd = jest.fn();
@@ -337,6 +357,26 @@ describe('ExecutionEngine', () => {
       await executionEngine.executePrompt('Explain', mockCallbacks, [], false, 'books');
       expect(mockProvider.createMessage).toHaveBeenCalledTimes(1);
       expect(mockCallbacks.onExecutionOutcome).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'completed' }));
+    });
+
+    it('requests bounded repair for an escaped finish after the initial completion reminder', async () => {
+      mockCallbacks.onExecutionOutcome = jest.fn();
+      const escaped = String.raw`<finish status=\"completed\">Answer</finish>`;
+      mockProvider.createMessage
+        .mockImplementationOnce(() => streamText('Answer'))
+        .mockImplementationOnce(() => streamText(escaped))
+        .mockImplementationOnce(() => streamText('<finish status="completed">Answer</finish>'));
+      await executionEngine.executePrompt('Read page', mockCallbacks, [], false, 'operator');
+      expect(mockProvider.createMessage).toHaveBeenCalledTimes(3);
+      expect(mockCallbacks.onExecutionOutcome).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'completed', message: 'Answer' }));
+    });
+
+    it('never accepts an escaped finish automatically and bounds repeated repairs', async () => {
+      mockCallbacks.onExecutionOutcome = jest.fn();
+      mockProvider.createMessage.mockImplementation(() => streamText(String.raw`<finish status=\"completed\">Answer</finish>`));
+      await executionEngine.executePrompt('Read page', mockCallbacks, [], false, 'operator');
+      expect(mockProvider.createMessage.mock.calls.length).toBeLessThanOrEqual(5);
+      expect(mockCallbacks.onExecutionOutcome).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'failed' }));
     });
 
     it('bounds repeated protocol errors and repeated tool failures', async () => {

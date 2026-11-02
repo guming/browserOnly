@@ -8,11 +8,13 @@ import { MarkdownTable } from './MarkdownTable';
 interface LlmContentProps {
   content: string;
   notionDatabaseId?: string;
+  imageTitle?: string;
 }
 
 export const LlmContent: React.FC<LlmContentProps> = ({ 
   content, 
-  notionDatabaseId 
+  notionDatabaseId,
+  imageTitle
 }) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
@@ -330,7 +332,7 @@ export const LlmContent: React.FC<LlmContentProps> = ({
           Name: {
             title: [{
               type: 'text',
-              text: { content: `LLM Response - ${new Date().toLocaleDateString()}` }
+              text: { content: `${imageTitle || 'LLM Response'} - ${new Date().toLocaleDateString()}` }
             }]
           }
         },
@@ -350,6 +352,7 @@ export const LlmContent: React.FC<LlmContentProps> = ({
 
   // Extract text parts (excluding tool calls)
   const extractTextParts = () => {
+    if (imageTitle) return content.trim() ? [{ type: 'text' as const, content }] : [];
     const parts: Array<{ type: 'text' | 'tool', content: string }> = [];
     
     const combinedToolCallRegex = /(```(?:xml|bash)\s*)?<tool>(.*?)<\/tool>\s*<input>([\s\S]*?)<\/input>(?:\s*<requires_approval>(.*?)<\/requires_approval>)?(\s*```)?/g;
@@ -412,14 +415,14 @@ export const LlmContent: React.FC<LlmContentProps> = ({
               <button
                 type="button"
                 aria-expanded={!isCollapsed}
-                aria-label={isCollapsed ? 'Expand response' : 'Collapse response'}
+                aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${imageTitle || 'response'}`}
                 onClick={() => setIsCollapsed(value => !value)}
                 className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-stone-500 hover:bg-stone-100"
                 title={isCollapsed ? 'Expand response' : 'Collapse response'}
               >
                 <svg aria-hidden="true" viewBox="0 0 20 20" className={`h-4 w-4 transition-transform ${isCollapsed ? '' : 'rotate-90'}`} fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m7 4 6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
               </button>
-              Response
+              {imageTitle || 'Response'}
             </div>
             <div className="flex flex-wrap items-center gap-1">
               <button
@@ -427,7 +430,7 @@ export const LlmContent: React.FC<LlmContentProps> = ({
                 className="min-h-8 rounded-md px-2 text-xs font-medium text-[#315a78] hover:bg-[#eaf2f7]"
                 title="Copy to clipboard"
               >
-                {isCopied ? 'Copied' : 'Copy'}
+                {isCopied ? 'Copied' : imageTitle ? 'Copy text' : 'Copy'}
               </button>
               
               {/* Notion Sync Button */}
@@ -525,9 +528,9 @@ export const LlmContent: React.FC<LlmContentProps> = ({
           )}
 
           {/* Response content */}
-          <div className="llm-response-content">
+          <div className={`llm-response-content ${imageTitle ? "max-h-96 overflow-auto" : ""}`}>
             {textParts.map((part, index) => {
-              const officeResponse = parseOfficeReportResponse(part.content);
+              const officeResponse = imageTitle ? null : parseOfficeReportResponse(part.content);
               if (officeResponse) {
                 const prefix = part.content.slice(0, officeResponse.start).trim();
                 return <React.Fragment key={index}>

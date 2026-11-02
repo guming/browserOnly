@@ -1,0 +1,29 @@
+{
+  "id": "09-nasa-news-summary",
+  "name": "NASA: summarize the latest five official news releases",
+  "language": "en",
+  "startUrl": "https://www.nasa.gov/news/",
+  "allowedHosts": [
+    "www.nasa.gov",
+    "nasa.gov",
+    "science.nasa.gov"
+  ],
+  "answerMode": "live",
+  "requiresLogin": false,
+  "interactiveLogin": false,
+  "prompt": "Without signing in, navigate from NASA News to the News Releases archive. Find the five most recent dated news releases available at run time, excluding generic feature articles, blog posts, photo galleries, and promoted cards outside the release list. Open each selected release and return its complete title, publication date, permanent URL, and a concise English summary grounded in that release. Order by publication date descending; for ties, keep archive display order. Summarize the main themes in three bullet points, distinguishing NASA's statements from your interpretation. Preserve the release list from one observation as your selection reference, and include its archive URL. Do not subscribe, submit forms, sign in, or use website APIs or external search. If fewer than five releases can be verified, report the actual count and any access restriction honestly.",
+  "checks": [
+    {
+      "id": "selection",
+      "description": "Verify selected archive and the latest five dated news releases against the same archive observation, excluding unrelated content and featured cards."
+    },
+    {
+      "id": "sources",
+      "description": "Compare complete titles, publication dates, permanent URLs and per-release summaries with the five opened official releases."
+    },
+    {
+      "id": "summary",
+      "description": "Review three thematic bullets for factual support, clear attribution and no invented information; confirm no subscription or submission actions."
+    }
+  ]
+}

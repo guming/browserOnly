@@ -1,0 +1,25 @@
+{
+  "id": "05-cdc-report",
+  "name": "China CDC: find a specific weekly influenza report",
+  "startUrl": "https://www.chinacdc.cn/jksj/jksj04_14249/",
+  "allowedHosts": [
+    "www.chinacdc.cn"
+  ],
+  "answerMode": "stable",
+  "prompt": "Starting from the influenza weekly reports section of the official China CDC website, find the China influenza surveillance weekly report for week 40 of 2026. Return its complete original title, year, week, issue number, publication date, official details URL, and the PDF URL linked from that details page. Match the surveillance week in the title; do not infer it from the publication date. Do not download the file or interpret medical findings.",
+  "checks": [
+    {
+      "id": "period",
+      "description": "详情页标题明确匹配 2026 年第 40 周，完整标题、年份、周次和期号均有页面依据。"
+    },
+    {
+      "id": "date",
+      "description": "发布日期由官方列表或详情页明确支持，不与监测截止日期混淆。"
+    },
+    {
+      "id": "links",
+      "description": "详情与 PDF 均为 www.chinacdc.cn 官方链接；PDF 从匹配详情页的实际附件链接取得，未猜测 URL。"
+    }
+  ],
+  "language": "en"
+}

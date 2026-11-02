@@ -28,7 +28,9 @@ export interface ExecutionCallbacks {
   onError?: (error: any) => void;
   onToolStart?: (toolName: string, toolInput: string) => void;
   onToolEnd?: (result: string) => void;
-  onToolEvent?: (event: ToolTraceEvent) => void;
+  onToolEvent?: (event: ToolTraceEvent) => void | Promise<void>;
+  onToolExecutionStart?: (event: ToolTraceEvent) => void;
+  onToolExecutionEnd?: (event: ToolTraceEvent) => void;
   onSegmentComplete?: (segment: string) => void;
   onFallbackStarted?: () => void;
 }
@@ -60,6 +62,8 @@ class CallbackAdapter {
       onToolStart: this.originalCallbacks.onToolStart,
       onToolEnd: this.originalCallbacks.onToolEnd,
       onToolEvent: this.originalCallbacks.onToolEvent,
+      onToolExecutionStart: this.originalCallbacks.onToolExecutionStart,
+      onToolExecutionEnd: this.originalCallbacks.onToolExecutionEnd,
       onSegmentComplete: this.originalCallbacks.onSegmentComplete,
       onFallbackStarted: this.originalCallbacks.onFallbackStarted
     };
@@ -708,6 +712,13 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
                 messages.push(assistantMessage(), { role: 'user', content: 'Continue with a tool call if work remains. Otherwise wrap your full answer to the original request in <finish status="completed">...</finish>, or your useful partial answer and blocker in <finish status="blocked">...</finish>. Preserve the requested detail, language, and Markdown formatting; the status wrapper must not replace the answer with an execution recap. Do not claim success without verification.' });
                 messages = this.llmProvider.toolCallFormat === 'native' ? trimNativeHistory(messages) : trimHistory(messages);
                 continue;
+              } else if (/^(?:<|&lt;)finish\b/i.test(accumulatedText.trim())) {
+                // Ask the model to repair its own declaration; never silently
+                // decode escaped markup or the JSON inside the answer.
+                if (!repair()) break;
+                messages.push(assistantMessage(), { role: 'user', content: 'Your finish declaration is malformed. Re-emit the full original answer inside a literal <finish status="completed">...</finish> or <finish status="blocked">...</finish>. Use ordinary double quotes in the status attribute, with NO backslashes, NO HTML entities and NO Markdown fence around the finish declaration. Do not JSON-stringify the response. Keep any JSON code block inside the answer valid JSON with ordinary quotes. Do not repeat browser actions just to repair formatting.' });
+                messages = this.llmProvider.toolCallFormat === 'native' ? trimNativeHistory(messages) : trimHistory(messages);
+                continue;
               } else { stop('PROTOCOL_ERROR'); }
             }
             done = true;
@@ -763,6 +774,24 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
             input: this.parseToolInput(toolInput),
             startedAt: Date.now()
           };
+          const invokeTool = async (context?: any) => {
+            traceEvent.startedAt = Date.now();
+            traceEvent.executed = true;
+            const clock = performance.now();
+            adaptedCallbacks.onToolExecutionStart?.({ ...traceEvent });
+            budget.called();
+            let attemptResult: string | undefined;
+            let attemptError: unknown;
+            try { attemptResult = await tool.func(toolInput, context); return attemptResult; }
+            catch (error) { attemptError = error; throw error; }
+            finally {
+              traceEvent.durationMs = Math.max(0, performance.now() - clock);
+              traceEvent.endedAt = Date.now();
+              adaptedCallbacks.onToolExecutionEnd?.({ ...traceEvent, result: attemptError
+                ? { ok: false, error: { code: 'EXECUTION_ERROR', message: String(attemptError), repairable: false } }
+                : decodeToolResult(attemptResult || '') });
+            }
+          };
 
           if (requiresApproval) {
             if (adaptedCallbacks.executionContext?.scheduled) throw new Error('APPROVAL_REQUIRED: Run this task manually to review and approve its actions.');
@@ -792,7 +821,7 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
                 result = await this.executeToolWithContextFallback(
                   toolName,
                   toolInput,
-                  () => { budget.called(); return tool.func(toolInput, context); }
+                  () => invokeTool(context)
                 );
               } else {
                 // User rejected, skip execution
@@ -809,16 +838,17 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
             result = await this.executeToolWithContextFallback(
               toolName,
               toolInput,
-              () => { budget.called(); return tool.func(toolInput); }
+              () => invokeTool()
             );
             console.log("tool func result: " ,result)
           }
 
-          traceEvent.endedAt = Date.now();
+          traceEvent.endedAt ??= Date.now();
+          traceEvent.executed ??= false;
           const decodedResult = decodeToolResult(result);
           const repairInstruction = [budget.record(toolName, toolInput, decodedResult), budget.guidance()].filter(Boolean).join('\n');
           traceEvent.result = decodedResult;
-          adaptedCallbacks.onToolEvent?.(traceEvent);
+          await adaptedCallbacks.onToolEvent?.(traceEvent);
 
           // Signal that tool execution is complete
           if (adaptedCallbacks.onToolEnd) {

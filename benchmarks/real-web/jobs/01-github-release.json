@@ -1,0 +1,25 @@
+{
+  "id": "01-github-release",
+  "name": "GitHub: latest stable release",
+  "startUrl": "https://github.com/microsoft/playwright",
+  "allowedHosts": [
+    "github.com"
+  ],
+  "answerMode": "live",
+  "prompt": "Find the latest official release in the microsoft/playwright repository, excluding prereleases and drafts. Return the version, publication date (YYYY-MM-DD), and release details URL. Explain how you confirmed it is an official release. Actually open the release details page to verify it. Do not confuse nightly, beta, or RC releases, or repository commit dates, with the official release and its publication date.",
+  "checks": [
+    {
+      "id": "release",
+      "description": "版本与运行时 Releases 列表最新正式发布一致，且不是预发布或草稿。"
+    },
+    {
+      "id": "date",
+      "description": "日期来自该 release 的 published 日期；使用 UTC 日期，或注明页面本地时区并提供完整时间证据。"
+    },
+    {
+      "id": "source",
+      "description": "返回可访问的 microsoft/playwright/releases/tag/ 详情链接，轨迹证明实际打开。"
+    }
+  ],
+  "language": "en"
+}

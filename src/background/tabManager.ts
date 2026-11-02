@@ -1,4 +1,5 @@
 import { crx } from 'playwright-crx';
+import { registerPageTab, getTabIdForPage } from '../agent/tools/pageTabIdentity';
 import { BrowserAgent } from '../agent/AgentCore';
 import { setCurrentPage, resetPageContext } from "../agent/PageContextManager"
 import { TabState } from './types';
@@ -45,6 +46,7 @@ export function getTabState(tabId: number): TabState | null {
  * Set the tab state for a specific tab
  */
 export function setTabState(tabId: number, state: TabState): void {
+  if (state.page) registerPageTab(state.page, tabId);
   tabStates.set(tabId, state);
 }
 
@@ -183,7 +185,8 @@ export async function getCrxApp(windowId?: number, forceNew = false): Promise<Aw
 function createCrxApp(): Promise<Awaited<ReturnType<typeof crx.start>>> {
   return crx.start().then(app => {
     // Set up event listeners
-    app.addListener('attached', ({ tabId }) => {
+    app.addListener('attached', ({ tabId, page }) => {
+      registerPageTab(page, tabId);
       addAttachedTab(tabId);
       
       // Notify UI components about the attachment
@@ -572,6 +575,8 @@ async function createTabPage(windowId: number, url: string | undefined, active: 
  * @returns Promise resolving to the tab ID or undefined if not found
  */
 async function getTabIdFromPage(page: any, windowId?: number): Promise<number | undefined> {
+  const registered = getTabIdForPage(page);
+  if (registered !== undefined) return registered;
   try {
     // Try to use internal Playwright-CRX APIs to get the tab ID
     if (page._session && page._session._connection && page._session._connection._transport) {

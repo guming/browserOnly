@@ -4,6 +4,7 @@ import type { Page } from "playwright-crx";
 import { ToolFactory } from "./types";
 import { truncate, MAX_RETURN_CHARS, MAX_SCREENSHOT_CHARS, withActivePage, getCurrentTabId, retryAfterNavigation } from "./utils";
 import { selectorCandidates } from "./selectorUtils";
+import { captureScreenshot, screenshotFailure } from './captureScreenshot';
 
 export const browserGetTitle: ToolFactory = (page: Page) =>
   new DynamicTool({
@@ -269,14 +270,24 @@ function parseSnapshotOptions(input: string) {
   return options;
 }
 
-const SELECTOR_WAIT_TIMEOUT_MS = 5000;
+
 
 export const browserQuery: ToolFactory = (page: Page) =>
   new DynamicTool({
     name: "browser_query",
     description:
-      "Return up to 10 outerHTML snippets for a CSS selector you provide.",
-    func: async (selector: string) => {
+      'Query the current DOM immediately and return up to 10 outerHTML snippets. Input: CSS selector, or JSON {"selector":"CSS", "waitMs":1000} for an explicitly expected asynchronous element (1–5000ms total wait budget). NO_MATCH means refine from observed page evidence; do not keep guessing selectors.',
+    func: async (input: string) => {
+      let selector = input;
+      let waitMs = 0;
+      if (input.trim().startsWith('{')) {
+        try {
+          const options = JSON.parse(input);
+          if (typeof options.selector !== 'string' || !options.selector.trim() || !Number.isInteger(options.waitMs) || options.waitMs < 0 || options.waitMs > 5000) throw new Error('Invalid options');
+          selector = options.selector;
+          waitMs = options.waitMs;
+        } catch { return JSON.stringify({ ok: false, error: { code: 'INVALID_INPUT', message: 'Use {selector:string, waitMs:integer 0–5000}', repairable: true } }); }
+      }
       try {
         return await withActivePage(page, async (activePage) => {
           const candidates = selectorCandidates(selector);
@@ -293,15 +304,16 @@ export const browserQuery: ToolFactory = (page: Page) =>
               continue;
             }
 
-            if (!matches.length && activePage.waitForSelector) {
+            if (!matches.length && waitMs > 0 && activePage.waitForSelector) {
               try {
-                await activePage.waitForSelector(candidate, { state: 'attached', timeout: SELECTOR_WAIT_TIMEOUT_MS });
+                await activePage.waitForSelector(candidate, { state: 'attached', timeout: waitMs });
                 matches = (await retryAfterNavigation(activePage, () => activePage.$$eval(
                   candidate,
                   (nodes: Element[]) => nodes.slice(0, 10).map((n) => n.outerHTML)
                 ))) as string[];
               } catch (error) {
                 lastError = error;
+                waitMs = 0;
               }
             }
 
@@ -309,12 +321,10 @@ export const browserQuery: ToolFactory = (page: Page) =>
           }
 
           if (lastError && candidates.length === 1) throw lastError;
-          return `Error: No nodes matched selector: ${selector}`;
+          return JSON.stringify({ ok: false, error: { code: 'NO_MATCH', message: `No nodes matched selector: ${selector}`, repairable: true } });
         });
       } catch (err) {
-        return `Error querying '${selector}': ${
-          err instanceof Error ? err.message : String(err)
-        }`;
+        return JSON.stringify({ ok: false, error: { code: /timeout/i.test(String(err)) ? 'WAIT_TIMEOUT' : 'QUERY_ERROR', message: `Error querying '${selector}': ${err instanceof Error ? err.message : String(err)}`, repairable: true } });
       }
     },
   });
@@ -533,15 +543,13 @@ export const browserScreenshot: ToolFactory = (page: Page) =>
           // Take initial screenshot
           let buffer;
           try {
-            buffer = await activePage.screenshot({ 
+            buffer = await captureScreenshot(activePage, {
               type: "jpeg", 
               fullPage, 
               quality 
             });
           } catch (screenshotError) {
-            return `Error taking initial screenshot: ${
-              screenshotError instanceof Error ? screenshotError.message : String(screenshotError)
-            }`;
+            return screenshotFailure(screenshotError);
           }
           
           let base64 = buffer.toString("base64");

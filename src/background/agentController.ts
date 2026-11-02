@@ -857,6 +857,18 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
       logWithTimestamp(`Executing single-tab prompt (no selectedTabIds provided or empty array)`);
     }
 
+    const uiRunId = `chat-${crypto.randomUUID()}`;
+    const uiRunStartedAt = Date.now();
+    const uiRunClock = performance.now();
+    const uiSteps: Array<{ executionId: string; toolName: string; status: string; durationMs?: number }> = [];
+    const publishActivity = (status: 'running' | 'completed' | 'failed' | 'cancelled' = 'running') => {
+      void sendUIMessage('updateOutput', { type: 'system', content: 'Execution', runId: uiRunId,
+        activity: { status, startedAt: uiRunStartedAt,
+          ...(status === 'running' ? {} : { endedAt: Date.now(), durationMs: Math.max(0, performance.now() - uiRunClock) }),
+          steps: uiSteps.map(step => ({ ...step })) } }, targetTabId);
+    };
+    if (!isReflectionPrompt) publishActivity();
+    let finalUiAnswer = '';
     // Execute the prompt
     sendUIMessage('updateOutput', {
       type: 'system',
@@ -919,6 +931,7 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
         }
       },
       onLlmOutput: async (content) => {
+        finalUiAnswer = content;
         // For non-streaming mode, send the complete output
         if (!useStreaming) {
           sendUIMessage('updateOutput', {
@@ -975,6 +988,7 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
         }
       },
       onToolOutput: (content) => {
+        if (/^🕹️ tool: /.test(content)) return;
         // Normal handling for tool outputs
         sendUIMessage('updateOutput', {
           type: 'system',
@@ -1072,6 +1086,15 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
             .catch(error => logWithTimestamp(`Could not mark failed memory step: ${String(error)}`, 'warn'));
         }
       },
+      onToolExecutionStart: event => {
+        uiSteps.push({ executionId: event.executionId, toolName: event.toolName, status: 'running' });
+        if (!isReflectionPrompt) publishActivity();
+      },
+      onToolExecutionEnd: event => {
+        const step = [...uiSteps].reverse().find(item => item.executionId === event.executionId && item.status === 'running');
+        if (step) Object.assign(step, { status: event.result?.ok ? 'succeeded' : 'failed', durationMs: event.durationMs });
+        if (!isReflectionPrompt) publishActivity();
+      },
       onExecutionOutcome: (outcome) => {
         executionStatus = outcome.status === 'blocked' ? 'failed' : outcome.status;
         if (outcome.status !== 'completed') logWithTimestamp(`Operator ended: ${outcome.reason}: ${outcome.message || ''}`, 'warn');
@@ -1083,7 +1106,7 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
         
         // Finalize the last segment if needed FIRST
         // This ensures the final LLM output is not lost
-        if (useStreaming && getStreamingBuffer().trim()) {
+        if (isReflectionPrompt && useStreaming && getStreamingBuffer().trim()) {
           // Check if this segment contains a tool call
           const hasToolCall = /<tool>(.*?)<\/tool>\s*<input>([\s\S]*?)<\/input>/.test(getStreamingBuffer());
           
@@ -1099,6 +1122,11 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
         // Signal that streaming is complete
         if (useStreaming) {
           signalStreamingComplete(targetTabId, windowId);
+        }
+        if (!isReflectionPrompt) {
+          for (const step of uiSteps) if (step.status === 'running') step.status = executionStatus === 'cancelled' ? 'cancelled' : 'interrupted';
+          publishActivity(executionStatus || 'failed');
+          if (finalUiAnswer.trim()) void sendUIMessage('updateOutput', { type: 'llm', content: finalUiAnswer, runId: `${uiRunId}-answer` }, targetTabId, windowId);
         }
         
         // Set agent status to IDLE

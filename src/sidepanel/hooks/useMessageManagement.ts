@@ -17,6 +17,7 @@ export const useMessageManagement = () => {
   const outputRef = useRef<HTMLDivElement>(null);
   const [isFollowingOutput, setIsFollowingOutput] = useState(true);
   const storageService = useRef(ConversationStorageService.getInstance());
+  const activeRun = useRef<string | undefined>(undefined);
 
   // Follow new output until the user scrolls up to inspect earlier content.
   useEffect(() => {
@@ -37,13 +38,26 @@ export const useMessageManagement = () => {
   };
 
   const addMessage = (message: Message) => {
+    if (message.activity && message.runId) {
+      activeRun.current = message.activity.status === 'running' ? message.runId : undefined;
+      setMessages(prev => {
+        const index = prev.findIndex(item => item.runId === message.runId && item.activity);
+        if (index < 0) return [...prev, message];
+        return prev.map((item, at) => at === index ? message : item);
+      });
+      return;
+    }
     if (isTransientStatus(message)) {
       setTransientStatus(message.content);
       if (transientTimer.current) clearTimeout(transientTimer.current);
       transientTimer.current = setTimeout(() => setTransientStatus(''), 4000);
       return;
     }
-    setMessages(prev => [...prev, { ...message, isComplete: true }]);
+    setMessages(prev => {
+      const parentRun = message.runId?.endsWith('-answer') ? message.runId.slice(0, -7) : undefined;
+      const existing = parentRun ? prev.filter(item => !(item.runId === parentRun && item.type === 'llm' && item.content === message.content)) : prev;
+      return [...existing, { ...message, runId: message.runId || activeRun.current, isComplete: true }];
+    });
   };
 
   const clearTransientStatus = () => {
@@ -89,6 +103,7 @@ export const useMessageManagement = () => {
   };
 
   const clearMessages = () => {
+    activeRun.current = undefined;
     setMessages([]);
     setStreamingSegments({});
   };

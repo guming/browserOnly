@@ -2,6 +2,8 @@
 export type MessageType = 'system' | 'llm' | 'ocr' | 'image_analysis' | 'screenshot' | 'workflow' | 'workflow_offer' | 'task_complete';
 
 export interface Message {
+  runId?: string;
+  activity?: { status: 'running' | 'completed' | 'failed' | 'cancelled'; startedAt?: number; endedAt?: number; durationMs?: number; steps: Array<{ executionId: string; toolName: string; status: string; durationMs?: number }> };
   type: MessageType;
   content: string;
   isComplete?: boolean;

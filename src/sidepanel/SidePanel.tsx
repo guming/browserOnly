@@ -33,6 +33,7 @@ export function SidePanel() {
   const [failedRunCount, setFailedRunCount] = useState(0);
   const [monitorCount, setMonitorCount] = useState(0);
   const [pendingAction, setPendingAction] = useState<ActionInvocation>();
+  const [imageTasks, setImageTasks] = useState<Record<string, 'ocr' | 'understand'>>({});
   const lastOcrAction = useRef('');
   const [showWorkflowPicker, setShowWorkflowPicker] = useState(false);
   useEffect(() => { if (pendingAction?.actionId === 'workflow-picker') setShowWorkflowPicker(true); }, [pendingAction]);
@@ -184,7 +185,6 @@ export function SidePanel() {
   const {
     messages,
     transientStatus,
-    clearTransientStatus,
     streamingSegments,
     isStreaming,
     isProcessing,
@@ -539,6 +539,7 @@ export function SidePanel() {
               </div>
             </div>
             
+            {activeView === 'tasks' && Object.entries(imageTasks).map(([key, task]) => <div key={key} role="status" className="mx-4 mt-2 flex items-center gap-2 rounded-md bg-stone-100 px-3 py-2 text-xs text-stone-600"><span className="loading loading-spinner loading-xs" aria-hidden="true" />{task === 'understand' ? 'Understanding image…' : 'Recognizing text in image…'}</div>)}
             {activeView === 'tasks' && transientStatus && <div role="status" className="mx-4 mt-2 truncate rounded-md bg-stone-100 px-3 py-2 text-xs text-stone-600" title={transientStatus}>{transientStatus}</div>}
 
             {/* 优化滚动容器 - 固定高度防止信息显示不全 */}
@@ -583,13 +584,13 @@ export function SidePanel() {
               if (lastOcrAction.current === key) return;
               lastOcrAction.current = key;
               const task = invocation.actionId === 'understand-image' ? 'understand' : 'ocr';
-              addSystemMessage(task === 'understand' ? 'Understanding image…' : 'Recognizing text in image…');
+              setImageTasks(current => ({ ...current, [key]: task }));
               void recognizeImageText(invocation.imageUrl ?? '', task).then(text => {
-                clearTransientStatus();
                 addMessage({ type: task === 'understand' ? 'image_analysis' : 'ocr', content: text });
               }).catch(error => {
-                clearTransientStatus();
                 addSystemMessage(`${task === 'understand' ? 'Could not understand image' : 'Could not recognize image text'}: ${error instanceof Error ? error.message : String(error)}`);
+              }).finally(() => {
+                setImageTasks(current => { const next = { ...current }; delete next[key]; return next; });
               });
             }} />
             {activeView === 'tasks' && showWorkflowPicker && <WorkflowPicker pageUrl={currentTabUrl} onClose={() => setShowWorkflowPicker(false)} onWorkflow={workflow => { setShowWorkflowPicker(false); if (workflow.variables.length) { setActiveView('workflows'); setChatWorkflowId(workflow.id); setChatWorkflowMode('run'); return; } const targetTabId = currentSelectedTabId ?? tabId; if (typeof targetTabId === 'number') chrome.runtime.sendMessage({ action: 'runWorkflow', workflowId: workflow.id, versionId: workflow.activeVersionId, ownerTabId: targetTabId, ownerWindowId: windowId, executionMode: workflow.executionMode }); }} onTemplate={template => { setShowWorkflowPicker(false); const candidate = instantiateTemplate(template); const targetTabId = currentSelectedTabId ?? tabId; if (candidate.workflow.variables.length) { setTemplateRun(candidate); setActiveView('workflows'); return; } if (typeof targetTabId === 'number') chrome.runtime.sendMessage({ action: 'runWorkflow', workflowId: candidate.workflow.id, versionId: candidate.version.id, transientWorkflow: candidate.workflow, transientVersion: candidate.version, ownerTabId: targetTabId, ownerWindowId: windowId, executionMode: candidate.workflow.executionMode }); }} />}

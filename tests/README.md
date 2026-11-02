@@ -1,5 +1,7 @@
 # BrowserOnly Test Suite Documentation
 
+真实网站上的 Agent 任务评测见 [7 个真实网站任务](../benchmarks/real-web/README.md)。它使用真实扩展和模型，由人工发起及验收，与下文的 mock 单元测试分开记录。
+
 ## Overview
 
 This document describes the test suite structure, configuration, and development practices for the BrowserOnly browser automation extension. The test suite provides comprehensive coverage with **548 passing tests** across **18 test suites**.

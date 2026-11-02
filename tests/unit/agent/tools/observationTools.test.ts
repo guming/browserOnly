@@ -14,6 +14,10 @@ import {
 // Mock dependencies before importing the tools
 jest.mock('../../../../src/agent/PageContextManager', () => mockPageContextManager);
 jest.mock('../../../../src/tracking/screenshotManager', () => ({ ScreenshotManager: mockScreenshotManager }));
+jest.mock('../../../../src/agent/tools/captureScreenshot', () => ({
+  ...jest.requireActual<any>('../../../../src/agent/tools/captureScreenshot'),
+  captureScreenshot: (page: any, options: any) => page.screenshot(options),
+}));
 
 // Mock Chrome APIs
 global.chrome = mockChromeAPIs as any;
@@ -255,7 +259,7 @@ describe('Observation Tools', () => {
 
       const result = await tool.func('.stale-selector');
 
-      expect(result).toBe('Error: No nodes matched selector: .stale-selector');
+      expect(JSON.parse(result).error.code).toBe('NO_MATCH');
     });
 
     it('should limit results to 10 elements', async () => {
@@ -284,7 +288,16 @@ describe('Observation Tools', () => {
 
       const result = await tool.func('.nonexistent');
 
-      expect(result).toBe('Error: No nodes matched selector: .nonexistent');
+      expect(JSON.parse(result).error.code).toBe('NO_MATCH');
+      expect(mockPage.waitForSelector).not.toHaveBeenCalled();
+    });
+
+    it('classifies explicit wait timeouts and rejects unbounded waits', async () => {
+      mockPage.$$eval.mockResolvedValue([]);
+      mockPage.waitForSelector.mockRejectedValue(new Error('Timeout exceeded'));
+      const tool = browserQuery(mockPage);
+      expect(JSON.parse(await tool.func('{"selector":".late","waitMs":1000}')).error.code).toBe('WAIT_TIMEOUT');
+      expect(JSON.parse(await tool.func('{"selector":".late","waitMs":60000}')).error.code).toBe('INVALID_INPUT');
     });
 
     it('should handle query errors', async () => {
@@ -293,7 +306,7 @@ describe('Observation Tools', () => {
 
       const result = await tool.func('invalid[selector');
 
-      expect(result).toContain('Error querying \'invalid[selector\': Element not found');
+      expect(JSON.parse(result).error.code).toBe('QUERY_ERROR');
     });
 
     it('should wait for a navigation in progress and retry the query', async () => {
@@ -329,9 +342,9 @@ describe('Observation Tools', () => {
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce(['<div id="J_goodsList"></div>']);
 
-      const result = await tool.func('div[id="J_goodsList"]');
+      const result = await tool.func(JSON.stringify({ selector: 'div[id="J_goodsList"]', waitMs: 1000 }));
 
-      expect(mockPage.waitForSelector).toHaveBeenCalledWith('div[id="J_goodsList"]', { state: 'attached', timeout: 5000 });
+      expect(mockPage.waitForSelector).toHaveBeenCalledWith('div[id="J_goodsList"]', { state: 'attached', timeout: 1000 });
       expect(result).toContain('<div id="J_goodsList"></div>');
     });
 
@@ -523,7 +536,7 @@ describe('Observation Tools', () => {
 
       const result = await tool.func('');
 
-      expect(result).toContain('Error taking initial screenshot: Permission denied');
+      expect(JSON.parse(result)).toMatchObject({ ok: false, error: { code: 'SCREENSHOT_FAILED', message: 'Permission denied' } });
     });
 
     it('should handle page dimension errors', async () => {

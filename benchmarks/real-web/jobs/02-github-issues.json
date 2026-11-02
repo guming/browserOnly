@@ -1,0 +1,25 @@
+{
+  "id": "02-github-issues",
+  "name": "GitHub: filter and sort issues",
+  "startUrl": "https://github.com/microsoft/vscode/issues",
+  "allowedHosts": [
+    "github.com"
+  ],
+  "answerMode": "live",
+  "prompt": "In the microsoft/vscode repository, filter Issues to open issues carrying the bug label and sort by most recently updated, descending. Return the first five issue numbers, complete titles, and details URLs. Exclude pull requests and issues that merely contain bug in their title without the bug label. Do not sort by creation date. State the final filter and sorting conditions you used.",
+  "checks": [
+    {
+      "id": "filter",
+      "description": "实际执行 is:issue is:open label:bug sort:updated-desc 或语义等价的页面筛选。"
+    },
+    {
+      "id": "rows",
+      "description": "5 条编号、完整标题、链接与运行时筛选结果前 5 条一致；若不足 5 条需证明完整列表。"
+    },
+    {
+      "id": "order",
+      "description": "顺序与同一次页面观测的最近更新降序一致，无 PR、已关闭项或重复。"
+    }
+  ],
+  "language": "en"
+}

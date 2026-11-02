@@ -36,6 +36,25 @@ describe('Navigation Tools', () => {
   });
 
   describe('browserNavigate', () => {
+    it('recovers timeout only when requested URL and readable ready document agree', async () => {
+      mockPage.goto.mockRejectedValue(new Error('Timeout 10000ms exceeded'));
+      mockPage.url.mockReturnValue('https://example.com/path');
+      mockPage.evaluate.mockResolvedValue({ ready: 'interactive', text: 'Actual document content' });
+      const result = JSON.parse(await browserNavigate(mockPage).func('https://example.com/path'));
+      expect(result.ok).toBe(true);
+      expect(result.data.navigationTimedOut).toBe(true);
+      expect(mockPage.goto).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not recover a timeout on the wrong URL or an empty document', async () => {
+      mockPage.goto.mockRejectedValue(new Error('Timeout 10000ms exceeded'));
+      mockPage.url.mockReturnValue('https://example.com/old');
+      mockPage.evaluate.mockResolvedValue({ ready: 'complete', text: 'Old document' });
+      expect(JSON.parse(await browserNavigate(mockPage).func('https://example.com/new')).error.code).toBe('NAVIGATION_TIMEOUT');
+      mockPage.url.mockReturnValue('https://example.com/new');
+      mockPage.evaluate.mockResolvedValue({ ready: 'complete', text: '' });
+      expect(JSON.parse(await browserNavigate(mockPage).func('https://example.com/new')).error.code).toBe('NAVIGATION_TIMEOUT');
+    });
     it('should navigate to a valid URL', async () => {
       const tool = browserNavigate(mockPage);
       mockPage.goto.mockResolvedValue(undefined);

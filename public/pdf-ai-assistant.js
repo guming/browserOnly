@@ -22,7 +22,7 @@ Respond in the language used by the user. Prefer concise, specific explanations 
   document.addEventListener('DOMContentLoaded', initializeAiAssistant);
 
   function initializeAiAssistant() {
-    if (typeof PDFViewerApplication === 'undefined') {
+    if (typeof PDFViewerApplication === 'undefined' || !PDFViewerApplication.eventBus) {
       setTimeout(initializeAiAssistant, 100);
       return;
     }
@@ -272,8 +272,12 @@ ${fullText}`;
   async function ensureDocumentText() {
     if (!window.PDFTextExtractor) throw new Error('PDF text extraction is unavailable');
     if (!window.PDFTextExtractor.hasExtractedText()) {
-      showToast('Extracting text from PDF');
-      await window.PDFTextExtractor.triggerExtraction();
+      setProcessing(true, 'Reading document text');
+      try {
+        await window.PDFTextExtractor.triggerExtraction();
+      } finally {
+        setProcessing(false);
+      }
     }
     const fullText = window.PDFTextExtractor.getExtractedText();
     if (!fullText || !fullText.replace(/## Page \d+/g, '').trim()) {

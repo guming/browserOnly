@@ -149,6 +149,8 @@ export interface WorkflowStepRun {
 }
 
 export interface ToolTraceEvent {
+  durationMs?: number;
+  executed?: boolean;
   executionId: string;
   toolName: string;
   input: unknown;

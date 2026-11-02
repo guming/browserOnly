@@ -1,0 +1,29 @@
+{
+  "id": "10-google-maps-route",
+  "name": "Google Maps: verify a place and compare transit routes",
+  "language": "en",
+  "startUrl": "https://www.google.com/maps?hl=en",
+  "allowedHosts": [
+    "www.google.com",
+    "maps.google.com",
+    "consent.google.com"
+  ],
+  "answerMode": "snapshot",
+  "requiresLogin": false,
+  "interactiveLogin": false,
+  "prompt": "Without signing in, search Google Maps for the British Museum and confirm the correct location in London. Record its full address. Request public transport directions from London King's Cross railway station to the British Museum, using Depart now. Compare the transit routes shown and select the shortest displayed total duration; break ties by choosing the first displayed route. Return the exact origin and destination names, destination address, selected route's total duration, walking duration (if explicitly shown), transit lines, and a shareable Maps route URL. Include the observation time with a time zone and explain how you selected the fastest displayed route. Use one consistent route observation; do not combine numbers from different refreshes. If walking duration or line information is not available, use null rather than guessing. Do not sign in, save places, submit reviews, share via messages, or change account settings. You may dismiss or decline a consent prompt to access the map. Report any access restriction honestly.",
+  "checks": [
+    {
+      "id": "place",
+      "description": "Verify the London British Museum and full address against its opened place page."
+    },
+    {
+      "id": "route",
+      "description": "Verify King's Cross railway station as origin, British Museum as destination, public transport mode, Depart now, and the shortest displayed route from one observation."
+    },
+    {
+      "id": "details",
+      "description": "Verify total and walking durations, transit lines, route URL and timestamp against the same route evidence; unavailable optional fields must be null. No account write actions."
+    }
+  ]
+}
