@@ -1,16 +1,17 @@
-import { LLMProvider, StreamChunk } from "../models/providers/types";
+import { operatorTaskMessages } from "./TaskContext";
+import { LLMProvider, StreamChunk, NativeToolCall } from "../models/providers/types";
 import { TokenTrackingService } from "../tracking/tokenTrackingService";
 import { ErrorHandler } from "./ErrorHandler";
 import { MemoryManager } from "./MemoryManager";
 import { PromptManager } from "./PromptManager";
-import { trimHistory } from "./TokenManager";
+import { trimHistory, trimNativeHistory } from "./TokenManager";
 import { ToolManager } from "./ToolManager";
 import { requestApproval } from "./approvalManager";
 import type { ToolTraceEvent } from "../workflows/types";
 
-// Constants
-const MAX_STEPS = 50;            // prevent infinite loops
-const MAX_OUTPUT_TOKENS = 1024;  // max tokens for LLM response
+import { decodeToolResult } from "./ToolResult";
+import { ExecutionBudget } from "./ExecutionBudget";
+import { parseFinish, type ExecutionOutcome } from "./ExecutionOutcome";
 
 /**
  * Callback interface for execution
@@ -18,9 +19,10 @@ const MAX_OUTPUT_TOKENS = 1024;  // max tokens for LLM response
 export interface ExecutionCallbacks {
   executionContext?: { runId: string; workflowId: string; tabId: number; ownerTabId: number; windowId: number; scheduled?: boolean };
   onExecutionEnd?: (status: 'completed' | 'cancelled' | 'failed', error?: string) => void;
+  onExecutionOutcome?: (outcome: ExecutionOutcome) => void;
   onModelUsage?: (inputTokens: number, outputTokens: number) => void;
   onLlmChunk?: (s: string) => void;
-  onLlmOutput: (s: string) => void;
+  onLlmOutput: (s: string) => void | Promise<void>;
   onToolOutput: (s: string) => void;
   onComplete: () => void;
   onError?: (error: any) => void;
@@ -37,7 +39,7 @@ export interface ExecutionCallbacks {
 class CallbackAdapter {
   private originalCallbacks: ExecutionCallbacks;
   private isStreaming: boolean;
-  private buffer: string = '';
+
 
   constructor(callbacks: ExecutionCallbacks, isStreaming: boolean) {
     this.originalCallbacks = callbacks;
@@ -52,6 +54,7 @@ class CallbackAdapter {
       onComplete: this.handleComplete.bind(this),
       executionContext: this.originalCallbacks.executionContext,
       onExecutionEnd: this.originalCallbacks.onExecutionEnd,
+      onExecutionOutcome: this.originalCallbacks.onExecutionOutcome,
       onModelUsage: this.originalCallbacks.onModelUsage,
       onError: this.originalCallbacks.onError,
       onToolStart: this.originalCallbacks.onToolStart,
@@ -66,19 +69,10 @@ class CallbackAdapter {
     if (this.isStreaming && this.originalCallbacks.onLlmChunk) {
       // Pass through in streaming mode
       this.originalCallbacks.onLlmChunk(chunk);
-    } else {
-      // Buffer in non-streaming mode
-      this.buffer += chunk;
     }
   }
 
   private handleComplete(): void {
-    // In non-streaming mode, emit the full buffer at completion
-    if (!this.isStreaming && this.buffer.length > 0) {
-      this.originalCallbacks.onLlmOutput(this.buffer);
-      this.buffer = '';
-    }
-
     this.originalCallbacks.onComplete();
   }
 }
@@ -93,6 +87,7 @@ export class ExecutionEngine {
   private promptManager: PromptManager;
   private memoryManager: MemoryManager;
   private errorHandler: ErrorHandler;
+  private executing = false;
 
   constructor(
     llmProvider: LLMProvider,
@@ -140,10 +135,6 @@ export class ExecutionEngine {
     // narrow so ordinary final prose such as "let me know" still completes.
     return /\b(?:now|next|then)\s*,?\s*(?:let me|i(?:'ll| will)|we(?:'ll| will))\s+(?!know\b)(?:click|type|enter|search|open|navigate|select|choose|submit|press|inspect|find|check|verify|scroll|add|fill)\b/i.test(text)
       || /\blet me\s+(?!know\b)(?:click|type|enter|search|open|navigate|select|choose|submit|press|inspect|find|check|verify|scroll|add|fill)\b/i.test(text);
-  }
-
-  private isToolFailure(result: string): boolean {
-    return /^(?:error\b|Action cancelled|No (?:nodes|elements) (?:matched|found)|Unable to\b)/i.test(result.trim());
   }
 
   /**
@@ -323,10 +314,12 @@ export class ExecutionEngine {
     messages: any[],
     adaptedCallbacks: ExecutionCallbacks,
     role:string = 'operator'
-  ): Promise<{ accumulatedText: string, toolCallDetected: boolean }> {
+  ): Promise<{ accumulatedText: string, toolCallDetected: boolean, nativeToolCall?: NativeToolCall; reasoningContent: string }> {
     let accumulatedText = "";
     let streamBuffer = "";
     let toolCallDetected = false;
+    let nativeToolCall: NativeToolCall | undefined;
+    let reasoningContent = '';
 
     // Get tools from the ToolManager
      // 处理带连字符和不带连字符的角色字符串
@@ -347,9 +340,11 @@ export class ExecutionEngine {
   console.log('Selected option:', selectedOption); // 具体选项值 或 undefined
 
   // Get tools from the ToolManager
-  const tools = this.toolManager.getTools();
+  const tools = baseRole === 'reflection' ? [] : this.toolManager.getTools();
 
-  const systemPrompt = this.promptManager.getSystemPrompt(baseRole, selectedOption);
+  const systemPrompt = baseRole === 'reflection'
+    ? 'Describe only the completed task and captured successful steps supplied by the user. Return one JSON object with a taskDescription string. Do not execute browser tools, inspect pages, resume tasks, or use earlier conversation history. Do not emit XML completion wrappers.'
+    : this.promptManager.getSystemPrompt(baseRole, selectedOption);
 
     // Use provider interface instead of direct Anthropic API
     const stream = this.llmProvider.createMessage(
@@ -373,6 +368,19 @@ export class ExecutionEngine {
         outputTokens = result.updatedOutputTokens;
       }
 
+      if (chunk.type === 'reasoning' && typeof chunk.reasoning === 'string') {
+        reasoningContent += chunk.reasoning;
+        continue;
+      }
+      if (chunk.type === 'tool_call') {
+        const call = chunk.toolCall;
+        if (!call || typeof call.name !== 'string' || typeof call.input !== 'string' || typeof call.requiresApproval !== 'boolean') throw new Error('Invalid native tool event');
+        if (nativeToolCall) throw new Error('Multiple native tool events in one response');
+        nativeToolCall = call;
+        toolCallDetected = true;
+        adaptedCallbacks.onToolStart?.(call.name, call.input);
+        continue;
+      }
       // Handle text chunks
       if (chunk.type === 'text' && chunk.text) {
         const textChunk = chunk.text;
@@ -381,7 +389,7 @@ export class ExecutionEngine {
 
         // Normalize the whole buffer because the malformed closing token may
         // be split across multiple streaming chunks.
-        streamBuffer = this.normalizeToolCallMarkup(streamBuffer);
+        if (this.llmProvider.toolCallFormat !== 'native') streamBuffer = this.normalizeToolCallMarkup(streamBuffer);
 
         // Only look for complete tool calls with all three required tags
         const completeToolCallRegex = /(```(?:xml|bash)\s*)?<tool>(.*?)<\/tool>\s*<input>([\s\S]*?)<\/input>\s*<requires_approval>(.*?)<\/requires_approval>(\s*```)?/;
@@ -390,7 +398,7 @@ export class ExecutionEngine {
         const completeToolCallMatch = streamBuffer.match(completeToolCallRegex);
 
         // Only process complete tool calls with all three required tags
-        if (completeToolCallMatch && !toolCallDetected) {
+        if (completeToolCallMatch && !toolCallDetected && this.llmProvider.toolCallFormat !== 'native') {
           toolCallDetected = true;
           console.log("Complete tool call detected:", completeToolCallMatch);
 
@@ -425,7 +433,10 @@ export class ExecutionEngine {
         }
 
         // If no tool call detected yet, continue sending chunks
-        if (!toolCallDetected && adaptedCallbacks.onLlmChunk) {
+        const start = streamBuffer.trimStart();
+        const isFinish = (role === 'operator' || role?.startsWith('operator-')) &&
+          ('<finish'.startsWith(start) || start.startsWith('<finish'));
+        if (!toolCallDetected && !isFinish && adaptedCallbacks.onLlmChunk) {
           adaptedCallbacks.onLlmChunk(textChunk);
         }
       }
@@ -435,14 +446,17 @@ export class ExecutionEngine {
     console.log("Streaming completed. Accumulated text length:", accumulatedText.length);
 
     // Decode any escaped HTML entities in the accumulated text
-    accumulatedText = this.decodeHtmlEntities(accumulatedText);
-    accumulatedText = this.normalizeToolCallMarkup(accumulatedText);
+    if (this.llmProvider.toolCallFormat !== 'native') {
+      accumulatedText = this.decodeHtmlEntities(accumulatedText);
+      accumulatedText = this.normalizeToolCallMarkup(accumulatedText);
+    }
     console.log("Decoded HTML entities in accumulated text");
 
     adaptedCallbacks.onModelUsage?.(inputTokens, outputTokens);
-    adaptedCallbacks.onLlmOutput(accumulatedText);
+    const finish = (role === 'operator' || role?.startsWith('operator-')) ? parseFinish(accumulatedText) : undefined;
+    if (accumulatedText.trim()) await adaptedCallbacks.onLlmOutput(finish?.message || accumulatedText);
 
-    return { accumulatedText, toolCallDetected };
+    return { accumulatedText, toolCallDetected, nativeToolCall, reasoningContent };
   }
 
   /**
@@ -455,6 +469,15 @@ export class ExecutionEngine {
     isStreaming: boolean,
     role:string
   ): Promise<void> {
+    if (this.executing) {
+      const outcome: ExecutionOutcome = { status: 'blocked', reason: 'EXECUTION_BUSY', message: 'A task is already running in this browser window. Stop it or wait for completion before starting another.' };
+      callbacks.onLlmOutput(outcome.message!);
+      callbacks.onExecutionOutcome?.(outcome);
+      callbacks.onExecutionEnd?.('failed', outcome.message);
+      callbacks.onComplete();
+      return;
+    }
+    this.executing = true;
     // Create adapter to handle streaming vs non-streaming
     const adapter = new CallbackAdapter(callbacks, isStreaming);
     const adaptedCallbacks = adapter.adaptedCallbacks;
@@ -463,31 +486,74 @@ export class ExecutionEngine {
     this.errorHandler.resetCancel();
     try {
       // Initialize messages with the prompt
-      let messages = this.initializeMessages(prompt, initialMessages);
+      let messages = role === 'reflection' || role === 'operator' || role?.startsWith('operator-')
+        ? operatorTaskMessages(prompt, initialMessages)
+        : this.initializeMessages(prompt, initialMessages);
 
       let done = false;
-      let step = 0;
+      const budget = new ExecutionBudget();
+      let outcome: ExecutionOutcome = { status: 'completed', reason: 'MODEL_FINAL' };
+      let finishRepair = false;
+      const stop = (reason: ExecutionOutcome['reason']) => {
+        outcome = { status: 'failed', reason, message: `Execution stopped: ${reason}.` };
+      };
+      const repair = () => {
+        const reason = budget.repair();
+        if (reason) { stop(reason); return false; }
+        return true;
+      };
 
-      while (!done && step++ < MAX_STEPS && !this.errorHandler.isExecutionCancelled()) {
+      while (!done && !this.errorHandler.isExecutionCancelled()) {
+        const requestStop = budget.request();
+        if (requestStop) { stop(requestStop); break; }
         try {
           // Check for cancellation before each major step
           if (this.errorHandler.isExecutionCancelled()) break;
 
           // ── 1. Call LLM with streaming ───────────────────────────────────────
-          const { accumulatedText } = await this.processLlmStream(messages, adaptedCallbacks,role);
+          let response: { accumulatedText: string; toolCallDetected: boolean; nativeToolCall?: NativeToolCall; reasoningContent: string } | undefined;
+          let providerAttempt = 0;
+          while (true) {
+            try { response = await this.processLlmStream(messages, adaptedCallbacks, role); break; }
+            catch (error) {
+              if (this.errorHandler.isExecutionCancelled()) break;
+              const retryable = this.errorHandler.isRetryableError(error);
+              const status = (error as { status?: number })?.status;
+              if ((!retryable && (!isStreaming || providerAttempt > 0 || typeof status === 'number' && status >= 400 && status < 500)) || providerAttempt >= 5) throw error;
+              adaptedCallbacks.onFallbackStarted?.();
+              if (retryable) adaptedCallbacks.onError?.(error);
+              const delay = retryable ? this.errorHandler.calculateBackoffTime(error, providerAttempt) : 0;
+              if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+              providerAttempt++;
+              const retryStop = budget.request();
+              if (retryStop) { stop(retryStop); break; }
+            }
+          }
+          if (!response) break;
+          const { accumulatedText, nativeToolCall, reasoningContent } = response;
+          // Provider continuation metadata stays in the API history, never the UI.
+          const assistantMessage = (content: string = accumulatedText) => ({ role: 'assistant', content,
+            ...(this.llmProvider.toolCallFormat === 'native' ? { reasoning_content: reasoningContent } : {}) });
           console.log('accumulatedText',accumulatedText, role);
           
           // Check for cancellation after LLM response
           if (this.errorHandler.isExecutionCancelled()) break;
 
+          // Reflection is a tools-free transformation of the captured trace.
+          if (role === 'reflection') {
+            if (nativeToolCall) throw new Error('Reflection cannot execute tools');
+            done = true; break;
+          }
+
           // Providers currently surface invalid native tool arguments as text.
           // This is a failed invocation, not a successful final response.
           if (/^Error: Failed to parse tool call\. Please try again\.$/m.test(accumulatedText)) {
+            if (!repair()) break;
             messages.push(
-              { role: "assistant", content: accumulatedText },
-              { role: "user", content: 'The provider could not parse your tool arguments. Continue the original task and emit exactly one complete tool call. For native function calls, use valid JSON with an input string and an explicit requires_approval boolean; escape double quotes inside selectors. For XML, include all three tags: <tool>, <input>, and <requires_approval>. Do not report the task complete before the tool succeeds.' }
+              assistantMessage(),
+              { role: "user", content: this.llmProvider.toolCallFormat === 'native' ? 'The provider could not parse your function arguments. Use exactly one native function call with valid JSON containing input:string and requires_approval:boolean. Escape quotes using JSON syntax. Do not emit XML or claim success before the tool succeeds.' : 'The provider could not parse your tool arguments. Continue the original task and emit exactly one complete tool call with tool, input and requires_approval tags; structured tool input must be valid JSON. Do not report the task complete before the tool succeeds.' }
             );
-            messages = trimHistory(messages);
+            messages = this.llmProvider.toolCallFormat === 'native' ? trimNativeHistory(messages) : trimHistory(messages);
             continue;
           }
 
@@ -501,7 +567,8 @@ export class ExecutionEngine {
           const interruptedToolMatch = accumulatedText.match(interruptedToolRegex);
 
           // Handle incomplete tool calls with missing requires_approval tag
-          if (incompleteApprovalMatch && !accumulatedText.includes("<requires_approval>")) {
+          if (this.llmProvider.toolCallFormat !== 'native' && !nativeToolCall && incompleteApprovalMatch && !accumulatedText.includes("<requires_approval>")) {
+            if (!repair()) break;
             const toolName = incompleteApprovalMatch[1].trim();
             const toolInput = incompleteApprovalMatch[2].trim();
 
@@ -509,7 +576,7 @@ export class ExecutionEngine {
 
             // Add a message to prompt the LLM to use the complete format
             messages.push(
-              { role: "assistant", content: accumulatedText },
+              assistantMessage(),
               {
                 role: "user",
                 content: `Error: Incomplete tool call format. You provided <tool>${toolName}</tool> and <input>${toolInput}</input> but no <requires_approval> tag. Please use the complete format with all three required tags:
@@ -524,10 +591,11 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
             continue; // Continue to the next iteration
           }
           // Handle interrupted tool calls
-          else if (interruptedToolMatch &&
+          else if (this.llmProvider.toolCallFormat !== 'native' && !nativeToolCall && interruptedToolMatch &&
               !interruptedToolMatch[0].includes("</requires_approval>") &&
               (interruptedToolMatch[0].endsWith("<requires") ||
                interruptedToolMatch[0].endsWith("<requires_approval"))) {
+            if (!repair()) break;
 
             const toolName = interruptedToolMatch[1].trim();
             const toolInput = interruptedToolMatch[2].trim();
@@ -536,7 +604,7 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
 
             // Instead of assuming approval, ask the LLM to complete the tool call properly
             messages.push(
-              { role: "assistant", content: accumulatedText },
+              assistantMessage(),
               {
                 role: "user",
                 content: `Error: Your tool call was interrupted. Please provide the complete tool call with all three required tags:
@@ -553,7 +621,9 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
 
           // ── 2. Parse for tool invocation ─────────────────────────────────────
           // Only look for complete tool calls with all three required tags
-          const toolMatch = accumulatedText.match(
+          const toolMatch = nativeToolCall
+            ? ['', nativeToolCall.name, nativeToolCall.input, String(nativeToolCall.requiresApproval)]
+            : this.llmProvider.toolCallFormat === 'native' ? null : accumulatedText.match(
             /<tool>(.*?)<\/tool>\s*<input>([\s\S]*?)<\/input>\s*<requires_approval>(.*?)<\/requires_approval>/
           );
 
@@ -563,14 +633,15 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
           // 2. Tool and input tags without requires_approval tag
           const missingApprovalMatch = accumulatedText.match(/<tool>(.*?)<\/tool>\s*<input>([\s\S]*?)<\/input>(?!\s*<requires_approval>)/);
 
-          if (missingInputMatch !== null && toolMatch === null) {
+          if (missingInputMatch !== null && toolMatch === null && this.llmProvider.toolCallFormat !== 'native') {
+            if (!repair()) break;
             // Handle tool call missing input tag
             const toolName = missingInputMatch[1].trim();
             adaptedCallbacks.onToolOutput(`⚠️ Incomplete tool call detected: ${toolName} (missing input and requires_approval tags)`);
 
             // Add a message to prompt the LLM to complete the tool call with all required tags
             messages.push(
-              { role: "assistant", content: accumulatedText },
+              assistantMessage(),
               {
                 role: "user",
                 content: `Error: Incomplete tool call. You provided <tool>${toolName}</tool> but are missing the <input> and <requires_approval> tags. Please provide the complete tool call with all three required tags:
@@ -583,7 +654,8 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
               }
             );
             continue; // Continue to the next iteration
-          } else if (missingApprovalMatch !== null && toolMatch === null) {
+          } else if (missingApprovalMatch !== null && toolMatch === null && this.llmProvider.toolCallFormat !== 'native') {
+            if (!repair()) break;
             // Handle tool call missing requires_approval tag
             const toolName = missingApprovalMatch[1].trim();
             const toolInput = missingApprovalMatch[2].trim();
@@ -591,7 +663,7 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
 
             // Add a message to prompt the LLM to complete the tool call with all required tags
             messages.push(
-              { role: "assistant", content: accumulatedText },
+              assistantMessage(),
               {
                 role: "user",
                 content: `Error: Incomplete tool call. You provided <tool>${toolName}</tool> and <input>${toolInput}</input> but are missing the <requires_approval> tag. Please provide the complete tool call with all three required tags:
@@ -607,23 +679,37 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
           }
 
           if (!toolMatch) {
+            const declaredFinish = (role === 'operator' || role?.startsWith('operator-')) ? parseFinish(accumulatedText) : undefined;
+            if (declaredFinish) { outcome = declaredFinish; done = true; break; }
             // A malformed/escaped tool call is not a final answer. Ask the
             // model to repair its protocol and keep the execution loop alive.
             if (this.hasMalformedToolIntent(accumulatedText) || this.hasUnfinishedActionNarration(accumulatedText)) {
+              if (!repair()) break;
               const malformedToolCall = this.hasMalformedToolIntent(accumulatedText);
               messages.push(
-                { role: "assistant", content: accumulatedText },
+                assistantMessage(),
                 {
                   role: "user",
-                  content: malformedToolCall
+                  content: this.llmProvider.toolCallFormat === 'native'
+                    ? 'Your intended action did not produce a valid native function call. Continue using the provided functions with JSON input:string and requires_approval:boolean. Do not emit XML tool tags or a progress-only response.'
+                    : malformedToolCall
                     ? `Error: A tool call was intended but its XML is malformed or Markdown-escaped. Continue the original task and emit exactly one valid tool call using this format:\n\n<tool>tool_name</tool>\n<input>arguments here</input>\n<requires_approval>true or false</requires_approval>\n\nDo not escape the angle brackets or underscores. Do not stop until the original task is verified complete.`
                     : `You described a next browser action but did not emit its tool call. Continue the original task now by emitting exactly one valid tool call. Do not provide another progress-only message, and do not stop until the original task is verified complete.`
                 }
               );
-              messages = trimHistory(messages);
+              messages = this.llmProvider.toolCallFormat === 'native' ? trimNativeHistory(messages) : trimHistory(messages);
               continue;
             }
-            // no tool intent ⇒ task complete
+            if (role === 'operator' || role?.startsWith('operator-')) {
+              const finish = parseFinish(accumulatedText);
+              if (finish) { outcome = finish; }
+              else if (!finishRepair) {
+                finishRepair = true;
+                messages.push(assistantMessage(), { role: 'user', content: 'Continue with a tool call if work remains. Otherwise wrap your full answer to the original request in <finish status="completed">...</finish>, or your useful partial answer and blocker in <finish status="blocked">...</finish>. Preserve the requested detail, language, and Markdown formatting; the status wrapper must not replace the answer with an execution recap. Do not claim success without verification.' });
+                messages = this.llmProvider.toolCallFormat === 'native' ? trimNativeHistory(messages) : trimHistory(messages);
+                continue;
+              } else { stop('PROTOCOL_ERROR'); }
+            }
             done = true;
             break;
           }
@@ -641,6 +727,7 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
             done = true;
             break;
           }
+          budget.parsed();
           const tool = this.toolManager.findTool(toolName);
 
           // Check if the LLM has marked this as requiring approval
@@ -649,7 +736,7 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
 
           if (!tool) {
             messages.push(
-              { role: "assistant", content: accumulatedText },
+              assistantMessage(),
               {
                 role: "user",
                 content: `Error: tool "${toolName}" not found. Available: ${this.toolManager.getTools()
@@ -663,6 +750,9 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
           // Check for cancellation before tool execution
           if (this.errorHandler.isExecutionCancelled()) break;
 
+          // Check before announcing execution; a blocked call was not run.
+          const callStop = budget.beforeCall(toolName, toolInput);
+          if (callStop) { stop(callStop); break; }
           // ── 3. Execute tool ──────────────────────────────────────────────────
           adaptedCallbacks.onToolOutput(`🕹️ tool: ${toolName} | args: ${toolInput}`);
 
@@ -674,9 +764,7 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
             startedAt: Date.now()
           };
 
-          if (toolName === 'browser_extract_links' && !/(?:\/url\b|(?:extract|list|collect|find|gather|提取|列出|收集|获取|抓取|整理)[^\n。.!?]{0,35}(?:urls?|links?|链接|网址)|(?:urls?|links?|链接|网址)[^\n。.!?]{0,35}(?:extract|list|collect|find|gather|提取|列出|收集|获取|抓取|整理))/i.test(prompt)) {
-            result = 'The current request does not ask for a page-wide URL list. Skip this tool and continue the original task with focused page observations.';
-          } else if (requiresApproval) {
+          if (requiresApproval) {
             if (adaptedCallbacks.executionContext?.scheduled) throw new Error('APPROVAL_REQUIRED: Run this task manually to review and approve its actions.');
             // Notify the user that approval is required
             adaptedCallbacks.onToolOutput(`⚠️ This action requires approval: ${reason}`);
@@ -704,7 +792,7 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
                 result = await this.executeToolWithContextFallback(
                   toolName,
                   toolInput,
-                  () => tool.func(toolInput, context)
+                  () => { budget.called(); return tool.func(toolInput, context); }
                 );
               } else {
                 // User rejected, skip execution
@@ -721,13 +809,15 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
             result = await this.executeToolWithContextFallback(
               toolName,
               toolInput,
-              () => tool.func(toolInput)
+              () => { budget.called(); return tool.func(toolInput); }
             );
             console.log("tool func result: " ,result)
           }
 
           traceEvent.endedAt = Date.now();
-          traceEvent.result = this.normalizeToolResult(result);
+          const decodedResult = decodeToolResult(result);
+          const repairInstruction = [budget.record(toolName, toolInput, decodedResult), budget.guidance()].filter(Boolean).join('\n');
+          traceEvent.result = decodedResult;
           adaptedCallbacks.onToolEvent?.(traceEvent);
 
           // Signal that tool execution is complete
@@ -738,40 +828,20 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
           // Check for cancellation after tool execution
           if (this.errorHandler.isExecutionCancelled()) break;
 
-          // ── 4. Record turn & prune history ───────────────────────────────────
-          messages.push(
-            { role: "assistant", content: accumulatedText }
-          );
-
-          // Add the tool result to the message history
-          try {
-            // Try to parse the result as JSON to handle special formats
-            const parsedResult = JSON.parse(result);
-
-            // Handle screenshot references
-            if (parsedResult.type === "screenshotRef" && parsedResult.id) {
-              // Create a message for the LLM with the screenshot reference
-              // The actual screenshot display is handled by agentController.ts
-              messages.push({
-                role: "user",
-                content: `Tool result: Screenshot captured (${parsedResult.id}). ${parsedResult.note || ''} Based on this image, please answer the user's original question: "${prompt}". Don't just describe the image - focus on answering the specific question or completing the task the user asked for.`
-              });
-            } else {
-              // For other JSON results, stringify them nicely
-              messages.push({
-                role: "user",
-                content: `Tool result: ${JSON.stringify(parsedResult, null, 2)}`
-              });
-            }
-          } catch (error) {
-            // If not valid JSON, add as plain text
-            const repairInstruction = this.isToolFailure(result)
-              ? `\nThe tool did not accomplish the step. If an action selector failed, inspect the relevant element with one focused DOM or accessibility observation and update any stale memory. If a page read failed or omitted needed content, try one suitable alternative read tool. Reuse successful observations for an unchanged page and continue the original task until success is verified.`
-              : '';
-            messages.push({ role: "user", content: `Tool result: ${result}${repairInstruction}` });
+          // Preserve the native protocol in history as an assistant/tool pair.
+          const payload = decodedResult.data as { type?: string; id?: string; note?: string } | undefined;
+          const feedback = decodedResult.ok && payload && typeof payload === 'object' && payload.type === 'screenshotRef' && payload.id
+            ? `Screenshot captured (${payload.id}). ${payload.note || ''} Answer the original request: "${prompt}". ${repairInstruction}`
+            : `${JSON.stringify(decodedResult)}\n${repairInstruction}`;
+          if (nativeToolCall) {
+            const id = nativeToolCall.id || `call-${traceEvent.executionId}`;
+            messages.push({ ...assistantMessage(), content: accumulatedText || null, tool_calls: [{ id, type: 'function', function: { name: toolName, arguments: JSON.stringify({ input: toolInput, requires_approval: llmRequiresApproval }) } }] },
+              { role: 'tool', tool_call_id: id, content: feedback });
+          } else {
+            messages.push(assistantMessage(), { role: 'user', content: `Tool result: ${feedback}` });
           }
 
-          messages = trimHistory(messages);
+          messages = this.llmProvider.toolCallFormat === 'native' ? trimNativeHistory(messages) : trimHistory(messages);
         } catch (error) {
           // If an error occurs during execution, check if it was due to cancellation
           if (this.errorHandler.isExecutionCancelled()) break;
@@ -783,79 +853,24 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
         adaptedCallbacks.onLlmOutput(
           `\n\nExecution cancelled by user.`
         );
-      } else if (step >= MAX_STEPS) {
-        adaptedCallbacks.onLlmOutput(
-          `Stopped: exceeded maximum of ${MAX_STEPS} steps.`
-        );
+        outcome = { status: 'cancelled', reason: 'CANCELLED' };
       }
-      adaptedCallbacks.onExecutionEnd?.(this.errorHandler.isExecutionCancelled() ? 'cancelled' : step >= MAX_STEPS ? 'failed' : 'completed', step >= MAX_STEPS ? 'Maximum execution steps exceeded.' : undefined);
+      if (outcome.status === 'failed') adaptedCallbacks.onLlmOutput(outcome.message || outcome.reason);
+      adaptedCallbacks.onExecutionOutcome?.(outcome);
+      adaptedCallbacks.onExecutionEnd?.(outcome.status === 'blocked' ? 'failed' : outcome.status, outcome.status === 'completed' || outcome.status === 'cancelled' ? undefined : outcome.message || outcome.reason);
       adaptedCallbacks.onComplete();
     } catch (err: any) {
-      // Check if this is a retryable error (rate limit or overloaded)
-      if (this.errorHandler.isRetryableError(err)) {
-        console.log("Retryable error detected:", err);
-        // For retryable errors, notify but don't complete processing
-        // This allows the fallback mechanism to retry while maintaining UI state
-        if (adaptedCallbacks.onError) {
-          adaptedCallbacks.onError(err);
-        } else {
-          adaptedCallbacks.onLlmOutput(this.errorHandler.formatErrorMessage(err));
-        }
-
-        // Notify about fallback before re-throwing
-        if (adaptedCallbacks.onFallbackStarted) {
-          adaptedCallbacks.onFallbackStarted();
-        }
-
-        // Get retry attempt from error if available, or default to 0
-        const retryAttempt = (err as any).retryAttempt || 0;
-
-        // Maximum number of retry attempts
-        const MAX_RETRY_ATTEMPTS = 5;
-
-        if (retryAttempt < MAX_RETRY_ATTEMPTS && !isStreaming) {
-          // Only retry in non-streaming mode
-          // Calculate backoff time using the ErrorHandler
-          const backoffTime = this.errorHandler.calculateBackoffTime(err, retryAttempt);
-
-          // Wait before retrying
-          await new Promise(resolve => setTimeout(resolve, backoffTime));
-
-          // Notify that we're retrying
-          const errorType = this.errorHandler.isOverloadedError(err) ? 'server overload' : 'rate limit';
-          adaptedCallbacks.onToolOutput(`Retrying after ${errorType} error (attempt ${retryAttempt + 1} of ${MAX_RETRY_ATTEMPTS})...`);
-
-          // Increment retry attempt for the next try
-          (err as any).retryAttempt = retryAttempt + 1;
-
-          // Recursive retry with the same parameters
-          return this.executePrompt(prompt, callbacks, initialMessages, isStreaming, role);
-        } else if (retryAttempt >= MAX_RETRY_ATTEMPTS) {
-          // We've exceeded the maximum number of retry attempts
-          adaptedCallbacks.onLlmOutput(
-            `Maximum retry attempts (${MAX_RETRY_ATTEMPTS}) exceeded. Please try again later.`
-          );
-          adaptedCallbacks.onExecutionEnd?.('failed', 'Maximum retry attempts exceeded.');
-          adaptedCallbacks.onComplete();
-        } else {
-          // In streaming mode, re-throw to trigger fallback
-          throw err;
-        }
-      } else {
-        // For other errors, show error message
-        adaptedCallbacks.onLlmOutput(
-          `Fatal error: ${err instanceof Error ? err.message : String(err)}`
-        );
-
-        // In streaming mode, re-throw to trigger fallback WITHOUT completing
-        if (isStreaming) {
-          throw err;
-        } else {
-          // Only complete processing if we're not going to fallback
-          adaptedCallbacks.onExecutionEnd?.('failed', err instanceof Error ? err.message : String(err));
-          adaptedCallbacks.onComplete();
-        }
-      }
+      const message = err instanceof Error ? err.message : String(err);
+      const cancelled = this.errorHandler.isExecutionCancelled();
+      const outcome: ExecutionOutcome = cancelled
+        ? { status: 'cancelled', reason: 'CANCELLED' }
+        : { status: 'failed', reason: 'EXECUTION_ERROR', message };
+      if (!cancelled) adaptedCallbacks.onLlmOutput(`Fatal error: ${message}`);
+      adaptedCallbacks.onExecutionOutcome?.(outcome);
+      adaptedCallbacks.onExecutionEnd?.(outcome.status === 'cancelled' ? 'cancelled' : 'failed', cancelled ? undefined : message);
+      adaptedCallbacks.onComplete();
+    } finally {
+      this.executing = false;
     }
   }
 
@@ -863,15 +878,4 @@ The <requires_approval> tag is mandatory. Set it to "true" for purchases, data d
     try { return JSON.parse(input); } catch { return input; }
   }
 
-  private normalizeToolResult(result: string): ToolTraceEvent['result'] {
-    const safeResult = typeof result === 'string' ? result : String(result ?? '');
-    try {
-      const parsed = JSON.parse(safeResult);
-      if (parsed && typeof parsed === 'object' && 'ok' in parsed) return parsed;
-      return { ok: true, data: parsed };
-    } catch {
-      const failed = /^error\b|^Error\b|^Action cancelled/i.test(safeResult.trim());
-      return { ok: !failed, data: failed ? undefined : safeResult, error: failed ? { code: 'UNKNOWN', message: safeResult, repairable: false } : undefined };
-    }
-  }
 }

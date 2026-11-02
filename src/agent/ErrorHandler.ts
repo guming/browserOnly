@@ -33,14 +33,14 @@ export class ErrorHandler {
    * Check if an error is a rate limit error
    */
   isRateLimitError(error: any): boolean {
-    return error?.error?.type === 'rate_limit_error';
+    return error?.error?.type === 'rate_limit_error' || error?.status === 429;
   }
   
   /**
    * Check if an error is an overloaded error
    */
   isOverloadedError(error: any): boolean {
-    return error?.error?.type === 'overloaded_error';
+    return error?.error?.type === 'overloaded_error' || error?.status === 503;
   }
   
   /**
@@ -55,11 +55,11 @@ export class ErrorHandler {
    */
   formatErrorMessage(error: any): string {
     if (this.isRateLimitError(error)) {
-      return `Rate limit error: ${error.error.message}`;
+      return `Rate limit error: ${error.error?.message || error.message || 'Please retry later'}`;
     }
     
     if (this.isOverloadedError(error)) {
-      return `Anthropic servers overloaded: ${error.error.message}. Retrying...`;
+      return `Anthropic servers overloaded: ${error.error?.message || error.message || 'Please retry later'}. Retrying...`;
     }
     
     return `Error: ${error instanceof Error ? error.message : String(error)}`;

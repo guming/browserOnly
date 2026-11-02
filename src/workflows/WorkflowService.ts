@@ -1,3 +1,4 @@
+import { workflowPageSnapshot } from "./WorkflowPageReader";
 import { executeReplayStep } from './ReplayStepExecutor';
 import type { Page } from 'playwright-crx';
 import type { BrowserTool } from '../agent/tools/types';
@@ -67,7 +68,7 @@ export class WorkflowService {
       'browser_navigate', 'browser_wait_for_navigation', 'browser_navigate_back',
       'browser_navigate_forward', 'browser_click', 'browser_type',
       'browser_handle_dialog', 'browser_press_key', 'browser_keyboard_type',
-      'browser_query', 'browser_extract_links', 'browser_get_title', 'browser_read_text',
+      'browser_query', 'browser_control_state', 'browser_extract_fields', 'browser_extract_links', 'browser_get_title', 'browser_read_text',
       'browser_screenshot', 'browser_snapshot_dom', 'browser_accessible_tree',
       'browser_get_active_tab', 'browser_get_overview',
       'browser_get_section', 'browser_get_summary',
@@ -94,44 +95,32 @@ export class WorkflowService {
       }
     }
 
-    const readMain = async (): Promise<string> => withStablePageRead(async currentPage => {
-      const selectors = ['main', 'article', '[role="main"]', '#content', '#main', '.content', '.main-content'];
-      for (const selector of selectors) {
-        const locator = currentPage.locator(selector).first();
-        if (await locator.count()) {
-          const text = (await locator.innerText()).trim();
-          if (text) return text.slice(0, WORKFLOW_MAX_RETURN_CHARS);
-        }
-      }
-      return (await currentPage.locator('body').innerText()).trim().slice(0, WORKFLOW_MAX_RETURN_CHARS);
+    const snapshot = async (mode: 'main' | 'all') => withStablePageRead(async currentPage => {
+      const result = await currentPage.evaluate(workflowPageSnapshot, { mode, limit: WORKFLOW_MAX_RETURN_CHARS }) as ReturnType<typeof workflowPageSnapshot>;
+      if (!result.ready) throw new Error('PAGE_NOT_READY: The workflow page has no document body yet. Wait for the mailbox content before reading.');
+      return result;
     });
-    const getOverview = async (): Promise<string> => withStablePageRead(async currentPage => {
-      const title = await currentPage.title();
-      const headings = await currentPage.locator('h1, h2').allInnerTexts();
-      const bodyText = await currentPage.locator('body').innerText();
-      const wordCount = bodyText.trim() ? bodyText.trim().split(/\s+/).length : 0;
-      return JSON.stringify({
-        title,
-        url: getPage().url(),
-        wordCount,
-        estimatedReadingTime: Math.max(1, Math.ceil(wordCount / 200)),
-        sections: headings.map((text: string) => text.trim()).filter(Boolean),
-      });
-    });
-    const getSummary = async (input: string): Promise<string> => withStablePageRead(async currentPage => {
+    const readMain = async (): Promise<string> => (await snapshot('main')).text;
+    const readText = async (): Promise<string> => (await snapshot('all')).text;
+    const getOverview = async (): Promise<string> => {
+      const page = await snapshot('all');
+      const wordCount = page.text.trim() ? page.text.trim().split(/\s+/).length : 0;
+      return JSON.stringify({ title: page.title, url: page.url, wordCount,
+        estimatedReadingTime: Math.max(1, Math.ceil(wordCount / 200)), sections: page.headings });
+    };
+    const getSummary = async (input: string): Promise<string> => {
       const requestedLength = Number.parseInt(input, 10);
-      const maxLength = Number.isFinite(requestedLength) && requestedLength > 0 ? requestedLength : 500;
-      const title = await currentPage.title();
-      const body = (await currentPage.locator('body').innerText()).trim();
-      return `${title}\n\n${body.slice(0, maxLength)}`;
-    });
+      const maxLength = Number.isFinite(requestedLength) && requestedLength > 0 ? Math.min(WORKFLOW_MAX_RETURN_CHARS, requestedLength) : 500;
+      const page = await snapshot('all');
+      return `${page.title}\n\n${page.text.slice(0, maxLength)}`;
+    };
 
     tools.push({ name: 'browser_read_main_for_workflow', description: 'Workflow-only main content.', func: readMain });
     tools.push({ name: 'browser_compare_selected_tabs', description: 'Compare the selected web tabs.', func: input => compareSelectedTabs(parseToolInput(input), options.context?.windowId) });
     tools.push({ name: 'browser_get_overview', description: 'Workflow-safe page overview.', func: getOverview });
 
     for (const name of ['browser_read_text', 'browser_read_text_enhanced']) {
-      tools.push({ name, description: `Workflow-safe text reader (${name}).`, func: readMain });
+      tools.push({ name, description: `Workflow-safe text reader (${name}).`, func: readText });
     }
     for (const name of ['browser_get_summary']) {
       tools.push({ name, description: `Workflow-safe page summary (${name}).`, func: getSummary });

@@ -42,90 +42,46 @@ describe('Interaction Tools', () => {
   });
 
   describe('browserClick', () => {
-    it('should click element by CSS selector', async () => {
-      const tool = browserClick(mockPage);
-      mockPage.click.mockResolvedValue(undefined);
-
-      const result = await tool.func('.cta-button');
-
-      expect(result).toBe('Clicked selector: .cta-button');
-      expect(mockPage.click).toHaveBeenCalledWith('.cta-button');
+    let locator: any;
+    beforeEach(() => {
+      locator = { and: jest.fn().mockReturnThis(), count: jest.fn().mockResolvedValue(1), click: jest.fn().mockResolvedValue(undefined), evaluate: jest.fn().mockResolvedValue({ disabled: false, checked: true }), evaluateAll: jest.fn().mockResolvedValue([{ text: 'Choice' }]) };
+      mockPage.locator = jest.fn().mockReturnValue(locator);
+      mockPage.getByText = jest.fn().mockReturnValue(locator);
+      mockPage.getByRole = jest.fn().mockReturnValue(locator);
     });
-
-    it('should click element by text content', async () => {
-      const tool = browserClick(mockPage);
-      const mockGetByText = {
-        click: jest.fn().mockResolvedValue(undefined)
-      };
-      mockPage.getByText.mockReturnValue(mockGetByText);
-
-      const result = await tool.func('Get Started');
-
-      expect(result).toBe('Clicked element containing text: Get Started');
-      expect(mockPage.getByText).toHaveBeenCalledWith('Get Started');
-      expect(mockGetByText.click).toHaveBeenCalled();
+    it('keeps legacy CSS and text inputs usable with unique visible targeting', async () => {
+      expect(JSON.parse(await browserClick(mockPage).func('.cta-button')).ok).toBe(true);
+      expect(mockPage.locator).toHaveBeenCalledWith('.cta-button');
+      expect(JSON.parse(await browserClick(mockPage).func('Get Started')).data.verified).toBe(false);
+      expect(mockPage.getByText).toHaveBeenCalledWith('Get Started', { exact: true });
+      expect(locator.click).toHaveBeenCalledTimes(2);
     });
-
-    it('should detect CSS selectors correctly', async () => {
-      const tool = browserClick(mockPage);
-      mockPage.click.mockResolvedValue(undefined);
-
-      // Test various CSS selector patterns
-      await tool.func('#myId');
-      expect(mockPage.click).toHaveBeenCalledWith('#myId');
-
-      await tool.func('.myClass');
-      expect(mockPage.click).toHaveBeenCalledWith('.myClass');
-
-      await tool.func('[data-test="button"]');
-      expect(mockPage.click).toHaveBeenCalledWith('[data-test="button"]');
-
-      await tool.func('button.primary');
-      expect(mockPage.click).toHaveBeenCalledWith('button.primary');
+    it('returns ambiguity and never clicks any matching target', async () => {
+      locator.count.mockResolvedValue(20);
+      const result = JSON.parse(await browserClick(mockPage).func('Choice'));
+      expect(result.error.code).toBe('AMBIGUOUS_TARGET');
+      expect(result.meta.totalCount).toBe(20);
+      expect(locator.click).not.toHaveBeenCalled();
     });
-
-    it('should handle click errors gracefully', async () => {
-      const tool = browserClick(mockPage);
-      mockPage.click.mockRejectedValue(new Error('Element not found'));
-
-      const result = await tool.func('.nonexistent-element');
-
-      expect(result).toContain('Error clicking \'.nonexistent-element\'');
-      expect(result).toContain('Element not found');
+    it('does not retry a click whose response is uncertain', async () => {
+      locator.click.mockRejectedValue(new Error('Connection closed after click'));
+      const result = JSON.parse(await browserClick(mockPage).func('Choice'));
+      expect(result.data.dispatched).toBe(true);
+      expect(result.error.repairable).toBe(false);
+      expect(locator.click).toHaveBeenCalledTimes(1);
     });
-
-    it('should fall back from an exact class selector when the class list changes', async () => {
+    it('verifies a requested explicit state and rejects invalid conditions before clicking', async () => {
       const tool = browserClick(mockPage);
-      mockPage.click
-        .mockRejectedValueOnce(new Error('stale exact class selector'))
-        .mockResolvedValueOnce(undefined);
-
-      const result = await tool.func('a[class="p-o-btn addcart"]');
-
-      expect(result).toBe('Clicked selector: a[class="p-o-btn addcart"]');
-      expect(mockPage.click).toHaveBeenNthCalledWith(2, 'a.p-o-btn.addcart');
+      expect(JSON.parse(await tool.func('{"text":"Choice","verify":{"state":"checked","expected":true}}')).data).toMatchObject({ verified: true, dispatched: false, alreadySatisfied: true });
+      expect(JSON.parse(await tool.func('{"text":"Choice","verify":{"state":"checked","expected":"true"}}')).error.code).toBe('INVALID_ARGUMENT');
+      expect(locator.click).not.toHaveBeenCalled();
     });
-
-    it('should handle text-based click errors', async () => {
-      const tool = browserClick(mockPage);
-      const mockGetByText = {
-        click: jest.fn().mockRejectedValue(new Error('Text not found'))
-      };
-      mockPage.getByText.mockReturnValue(mockGetByText);
-
-      const result = await tool.func('Nonexistent Text');
-
-      expect(result).toContain('Error clicking \'Nonexistent Text\'');
-      expect(result).toContain('Text not found');
-    });
-
-    it('should work with withActivePage utility', async () => {
-      const tool = browserClick(mockPage);
-      mockPage.click.mockResolvedValue(undefined);
-
-      await tool.func('.test-button');
-
-      expect(utilsMock.withActivePage).toHaveBeenCalledWith(mockPage, expect.any(Function));
+    it('reports unknown state without repeating the action', async () => {
+      locator.evaluate.mockResolvedValue({ disabled: false, checked: null });
+      const result = JSON.parse(await browserClick(mockPage).func('{"text":"Choice","verify":{"state":"checked","expected":true,"timeoutMs":0}}'));
+      expect(result.error.code).toBe('VERIFICATION_UNKNOWN');
+      expect(result.error.repairable).toBe(false);
+      expect(locator.click).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -339,6 +295,11 @@ describe('Interaction Tools', () => {
   });
 
   describe('Tool Integration', () => {
+    let target: any;
+    beforeEach(() => {
+      target = { and: jest.fn().mockReturnThis(), count: jest.fn().mockResolvedValue(1), click: jest.fn().mockResolvedValue(undefined), evaluate: jest.fn().mockResolvedValue({ disabled: false }) };
+      mockPage.locator = jest.fn().mockReturnValue(target);
+    });
     it('should handle multiple interactions in sequence', async () => {
       const clickTool = browserClick(mockPage);
       const typeTool = browserType(mockPage);
@@ -350,7 +311,7 @@ describe('Interaction Tools', () => {
       const clickResult = await clickTool.func('input[name="username"]');
       const typeResult = await typeTool.func('input[name="username"]|testuser');
 
-      expect(clickResult).toBe('Clicked selector: input[name="username"]');
+      expect(JSON.parse(clickResult).data.dispatched).toBe(true);
       expect(typeResult).toBe('Typed "testuser" into input[name="username"]');
     });
 
@@ -371,13 +332,13 @@ describe('Interaction Tools', () => {
       const clickTool = browserClick(mockPage);
       const typeTool = browserType(mockPage);
       
-      mockPage.click.mockRejectedValue(mockErrorScenarios.elementNotFound);
+      target.click.mockRejectedValue(mockErrorScenarios.elementNotFound);
       mockPage.fill.mockRejectedValue(mockErrorScenarios.elementNotFound);
 
       const clickResult = await clickTool.func('.nonexistent');
       const typeResult = await typeTool.func('input|text');
 
-      expect(clickResult).toContain('Error clicking');
+      expect(JSON.parse(clickResult).error.code).toBe('ACTION_UNCERTAIN');
       expect(typeResult).toContain('Error typing into');
     });
   });

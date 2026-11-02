@@ -1,3 +1,4 @@
+import { OPERATOR_FINISH_INSTRUCTIONS } from "./prompts/constants";
 import {
   createModePrompts,
   ModePrompts,
@@ -80,6 +81,7 @@ If a request matches any Special Command, skip planning and tool selection. Imme
     `\n\n## CURRENT PAGE CONTEXT\n${this.currentPageContext}\n` : "";
 
   return `${basePrompt}
+${mode === 'operator' ? OPERATOR_FINISH_INSTRUCTIONS : ''}
 
 You have access to these tools:
 
@@ -100,7 +102,7 @@ Treat the latest user message as the only active task. Earlier requests and tool
 
 ────────────────────────────────────────
 Always wait for each tool result before the next step.  
-Think step-by-step and finish with a concise summary.`;
+Return the requested deliverable directly, with enough detail and Markdown structure for the task. Keep internal execution notes out of the answer unless a blocker or limitation needs explaining.`;
 }
   
   /**

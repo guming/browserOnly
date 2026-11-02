@@ -23,7 +23,6 @@ import type { ActionInvocation } from '../actions';
 import { MonitorListView } from './components/monitors/MonitorListView';
 import { TestsListView } from '../testing/TestsListView';
 import { recognizeImageText } from './ocrImage';
-import { RememberActions } from './components/memory/RememberActions';
 
 export function SidePanel() {
   const [activeView, setActiveView] = useState<WorkspaceView>('tasks');
@@ -425,7 +424,6 @@ export function SidePanel() {
       tabId
     });
 
-    addSystemMessage("Reflecting on this session to learn useful patterns...");
   };
 
   // Function to navigate to the options page
@@ -595,7 +593,6 @@ export function SidePanel() {
               });
             }} />
             {activeView === 'tasks' && showWorkflowPicker && <WorkflowPicker pageUrl={currentTabUrl} onClose={() => setShowWorkflowPicker(false)} onWorkflow={workflow => { setShowWorkflowPicker(false); if (workflow.variables.length) { setActiveView('workflows'); setChatWorkflowId(workflow.id); setChatWorkflowMode('run'); return; } const targetTabId = currentSelectedTabId ?? tabId; if (typeof targetTabId === 'number') chrome.runtime.sendMessage({ action: 'runWorkflow', workflowId: workflow.id, versionId: workflow.activeVersionId, ownerTabId: targetTabId, ownerWindowId: windowId, executionMode: workflow.executionMode }); }} onTemplate={template => { setShowWorkflowPicker(false); const candidate = instantiateTemplate(template); const targetTabId = currentSelectedTabId ?? tabId; if (candidate.workflow.variables.length) { setTemplateRun(candidate); setActiveView('workflows'); return; } if (typeof targetTabId === 'number') chrome.runtime.sendMessage({ action: 'runWorkflow', workflowId: candidate.workflow.id, versionId: candidate.version.id, transientWorkflow: candidate.workflow, transientVersion: candidate.version, ownerTabId: targetTabId, ownerWindowId: windowId, executionMode: candidate.workflow.executionMode }); }} />}
-            <div className={activeView === 'tasks' ? '' : 'hidden'}><RememberActions tabId={currentSelectedTabId ?? tabId ?? undefined} readable={/^https?:/i.test(currentTabUrl)} /></div>
             {activeView === 'tasks' && <PromptForm
               pageActions={<PageActionBar
                 readable={tabStatus !== 'detached' && /^https?:/i.test(currentTabUrl)}

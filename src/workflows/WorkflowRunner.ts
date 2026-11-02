@@ -1,3 +1,4 @@
+import { decodeToolResult } from "../agent/ToolResult";
 import { ReplayFailure } from './ReplayLocatorResolver';
 import type { BrowserTool } from '../agent/tools/types';
 import type { WorkflowAssertion, WorkflowRun, WorkflowStep, WorkflowStepRun, WorkflowVersion } from './types';
@@ -108,9 +109,10 @@ export class WorkflowRunner {
           );
           if (!approved) throw new Error('Action rejected by user');
         }
-        const replayAction = version.replayFormat === 'steps-v2' && ['browser_click', 'browser_type'].includes(step.toolName) && options.executeReplay;
+        const structuredClick = step.toolName === 'browser_click' && (typeof input === 'object' && input !== null || typeof input === 'string' && input.trimStart().startsWith('{'));
+        const replayAction = !structuredClick && version.replayFormat === 'steps-v2' && ['browser_click', 'browser_type', 'browser_select'].includes(step.toolName) && options.executeReplay;
         if (this.cancelled) throw new Error('Workflow cancelled');
-        const candidates = replayAction ? [input] : step.locator ? locatorCandidates(step.locator, input) : [input];
+        const candidates = replayAction || structuredClick ? [input] : step.locator ? locatorCandidates(step.locator, input) : [input];
         // A write may have happened even when its response was lost; never replay it blindly.
         const maxAttempts = step.risk === 'read'
           ? Math.max(1, Math.min(3, step.retryPolicy?.maxAttempts ?? 1)) : 1;
@@ -132,13 +134,13 @@ export class WorkflowRunner {
               },
             } : undefined;
             result = await withTimeout(replayAction ? options.executeReplay!(step, String(candidate), this.abortController.signal) : tool.func(typeof candidate === 'string' ? candidate : JSON.stringify(candidate), toolContext), step.timeoutMs, () => { if (toolContext || replayAction) this.abortController.abort(); });
-            if (!/^error\b|^Error\b|^Action cancelled/i.test(result.trim())) break;
+            if (decodeToolResult(result).ok) break;
             lastError = new Error(result);
           } catch (error) {
             lastError = error;
           }
         }
-        if ((!result && lastError || /^error\b|^Action cancelled/i.test(result.trim()))
+        if ((!result && lastError || !decodeToolResult(result).ok)
           && (!replayAction || lastError instanceof ReplayFailure && lastError.phase === 'locate')
           && step.onFailure === 'repair' && ['browser_query', 'browser_click', 'browser_type'].includes(step.toolName)
           && typeof input === 'string' && options.repairQuery && !this.cancelled) {
@@ -162,7 +164,7 @@ export class WorkflowRunner {
             if (this.cancelled) throw new Error('Workflow cancelled');
             const repairedStep = { ...step, locator: { css: repaired.split('|', 1)[0], fallbackOrder: ['css' as const] } };
             const repairedResult = await withTimeout(replayAction ? options.executeReplay!(repairedStep, repaired, this.abortController.signal) : tool.func(repaired), step.timeoutMs, () => { if (replayAction) this.abortController.abort(); });
-            if (!/^error\b|^Action cancelled/i.test(repairedResult.trim())) {
+            if (decodeToolResult(repairedResult).ok) {
               result = repairedResult;
               stepRun.executionMode = 'repaired';
               if (version.replayFormat !== 'steps-v2') run.llmCalls += 1;
@@ -174,7 +176,7 @@ export class WorkflowRunner {
           if (checks.every(Boolean)) result = 'Action result verified after response failure';
         }
         if (!result && lastError) throw lastError;
-        if (/^error\b|^Action cancelled/i.test(result.trim())) throw new Error(result);
+        if (!decodeToolResult(result).ok) throw new Error(result);
         if (this.cancelled) throw new Error('Workflow cancelled');
         if (step.toolName === 'browser_extract_structured') stepRun.extractionResult = JSON.parse(result);
         if (step.toolName === 'browser_inspect_office_table') {

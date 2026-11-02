@@ -3,7 +3,7 @@ jest.mock('../../src/agent/tools', () => ({
   getAllTools: jest.fn(() => [
     'browser_get_title', 'browser_read_text',
     'browser_get_overview', 'browser_get_section', 'browser_get_summary',
-    'browser_query',
+    'browser_query', 'browser_control_state', 'browser_extract_fields',
   ].map(name => ({ name, description: name, func: jest.fn() }))),
 }));
 jest.mock('../../src/agent/tools/memoryTools', () => ({
@@ -32,7 +32,7 @@ describe('WorkflowService tool registration', () => {
     const registeredTools = runner.run.mock.calls[0][2].tools as Array<{ name: string }>;
     const names = registeredTools.map(tool => tool.name);
     for (const name of [
-      'browser_get_title', 'browser_read_text',
+      'browser_get_title', 'browser_read_text', 'browser_control_state', 'browser_extract_fields',
       'browser_get_overview', 'browser_get_section', 'browser_get_summary',
     ]) {
       expect(names.filter(candidate => candidate === name)).toHaveLength(1);
@@ -40,4 +40,20 @@ describe('WorkflowService tool registration', () => {
     expect(names).not.toContain('browser_read_text_ast');
     expect(names).not.toContain('browser_get_summary_ast');
   });
+});
+
+it('reads the workflow page through a single DOM snapshot without locator auto-waiting', async () => {
+  const page = {
+    url: jest.fn(() => 'https://mail.google.com/mail/u/0/#inbox'),
+    locator: jest.fn(() => { throw new Error('Auto-waiting a stale SPA container is not a snapshot read'); }),
+    evaluate: jest.fn().mockResolvedValue({ ready: true, title: 'Inbox', url: 'https://mail.google.com/mail/u/0/#inbox', text: 'Latest message\nActual mail content', headings: ['Inbox'] }),
+  } as any;
+  const version: WorkflowVersion = { id: 'v', workflowId: 'w', version: 1, source: 'recording', steps: [], finalAssertions: [], createdAt: 1 };
+  const runner = { run: jest.fn().mockResolvedValue({ status: 'succeeded' }) } as any;
+  await new WorkflowService().run('w', version, page, { runner });
+  const tools = runner.run.mock.calls[0][2].tools;
+  await expect(tools.find((tool: any) => tool.name === 'browser_read_text').func('')).resolves.toBe('Latest message\nActual mail content');
+  expect(page.locator).not.toHaveBeenCalled();
+  expect(page.evaluate).toHaveBeenCalledTimes(1);
+  expect(page.evaluate.mock.calls[0][1]).toMatchObject({ mode: 'all' });
 });

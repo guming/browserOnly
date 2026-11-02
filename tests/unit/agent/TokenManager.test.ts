@@ -119,7 +119,7 @@ describe('TokenManager', () => {
       expect(result.length).toBe(1);
     });
 
-    it('should preserve all user messages', () => {
+    it('preserves the task anchor and recent suffix within the budget', () => {
       const messages = [
         createMessage('user', 'first user message'),
         createMessage('assistant', 'a'.repeat(4000)), // Large assistant message
@@ -130,12 +130,9 @@ describe('TokenManager', () => {
       
       const result = trimHistory(messages, 100);
       
-      // Should keep all user messages
       const userMessages = result.filter(m => m.role === 'user');
-      expect(userMessages.length).toBe(3);
-      expect(userMessages[0].content).toBe('first user message');
-      expect(userMessages[1].content).toBe('second user message');
-      expect(userMessages[2].content).toBe('third user message');
+      expect(userMessages.map(message => message.content)).toEqual(['first user message', 'third user message']);
+      expect(contextTokenCount(result)).toBeLessThanOrEqual(100);
     });
 
     it('should always keep the first message', () => {
@@ -289,10 +286,9 @@ describe('TokenManager', () => {
       const resultTokens = contextTokenCount(result);
       expect(resultTokens).toBeLessThan(15000); // Allow some buffer for user message preservation
       
-      // Should preserve all user messages
-      const originalUserMessages = messages.filter(m => m.role === 'user');
-      const resultUserMessages = result.filter(m => m.role === 'user');
-      expect(resultUserMessages.length).toBe(originalUserMessages.length);
+      expect(result[0]).toEqual(messages[0]);
+      expect(result[result.length - 1]).toEqual(messages[messages.length - 1]);
+      expect(contextTokenCount(result)).toBeLessThanOrEqual(12000);
     });
 
     it('should handle messages with very long content', () => {
@@ -304,9 +300,9 @@ describe('TokenManager', () => {
       
       const result = trimHistory(messages, 1000);
       
-      // Should preserve user messages even if they're long
-      const userMessages = result.filter(m => m.role === 'user');
-      expect(userMessages.length).toBe(2);
+      expect(result[0].role).toBe('user');
+      expect(String(result[0].content)).toContain('earlier context trimmed');
+      expect(contextTokenCount(result)).toBeLessThanOrEqual(1000);
     });
 
     it('should handle alternating user/assistant pattern', () => {

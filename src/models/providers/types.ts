@@ -25,8 +25,10 @@ export interface ProviderOptions {
   dangerouslyAllowBrowser?: boolean;
 }
 
+export interface NativeToolCall { id?: string; name: string; input: string; requiresApproval: boolean }
 export interface StreamChunk {
-  type: "text" | "reasoning" | "usage";
+  type: "text" | "reasoning" | "usage" | "tool_call";
+  toolCall?: NativeToolCall;
   text?: string;
   reasoning?: string;
   inputTokens?: number;
@@ -38,6 +40,7 @@ export interface StreamChunk {
 export type ApiStream = AsyncGenerator<StreamChunk, void, unknown>;
 
 export interface LLMProvider {
+  readonly toolCallFormat?: 'native' | 'xml';
   createMessage(systemPrompt: string, messages: any[], tools?: any[]): ApiStream;
   getModel(): { id: string; info: ModelInfo };
 }

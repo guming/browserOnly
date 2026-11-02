@@ -42,3 +42,27 @@ it('preserves current-page tasks for reuse on a different active page', () => {
   expect(result.workflow.executionMode).toBe('current_tab');
   expect(result.workflow.startUrl).toBeUndefined();
 });
+
+it('saves recorded read-only analysis as a goal rather than pretending reads reproduce reasoning', () => {
+  const trace = ['browser_read_text', 'browser_extract_fields'].map(toolName => ({ executionId: toolName, toolName, input: '', startedAt: 1, result: { ok: true } }));
+  const { version } = compileTrace(trace, 'mail.google.com', '邮件总结', 'https://mail.google.com/mail/u/0/#inbox', '找到最新的5封邮件，总结内容，过滤掉广告和营销类邮件', 'current-tab');
+  expect(version.runStrategy).toBe('goal');
+  expect(version.taskInstruction).toContain('过滤掉广告');
+  expect(version.entryContext).toEqual({ kind: 'current_page' });
+});
+it('keeps actionable recordings and explicit legacy rules as deterministic replay', () => {
+  const trace = [{ executionId: 'click', toolName: 'browser_click', input: 'Menu', startedAt: 1, result: { ok: true } }];
+  expect(compileTrace(trace, 'example.com', 'Open menu', 'https://example.com', 'Open menu', 'current-tab').version.runStrategy).toBe('steps');
+  const reads = [{ ...trace[0], toolName: 'browser_read_text' }];
+  expect(compileTrace(reads, 'example.com').version.runStrategy).toBe('steps');
+});
+
+it('keeps navigation as part of a read-only goal instead of dropping the analysis', () => {
+  const trace = [
+    { executionId: 'nav', toolName: 'browser_navigate', input: 'https://mail.google.com/', startedAt: 1, result: { ok: true } },
+    { executionId: 'read', toolName: 'browser_read_text', input: '', startedAt: 2, result: { ok: true } },
+  ];
+  const result = compileTrace(trace, 'mail.google.com', 'Summarize', 'https://mail.google.com/', 'Summarize the latest messages');
+  expect(result.version.runStrategy).toBe('goal');
+  expect(result.version.entryContext).toEqual({ kind: 'url', url: 'https://mail.google.com/' });
+});

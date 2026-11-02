@@ -2,8 +2,9 @@ import { ExecutionCallbacks } from '../agent/ExecutionEngine';
 import { normalizeDomain } from '../tracking/domainUtils';
 import { MemoryService, AgentMemory } from '../tracking/memoryService';
 import { executePrompt } from './agentController';
-import { getTabState, getWindowForTab, getAgentForWindow } from './tabManager';
+import { getWindowForTab, getAgentForWindow } from './tabManager';
 import { logWithTimestamp, handleError, sendUIMessage } from './utils';
+import { redactValue } from '../workflows/TraceRecorder';
 import type { ToolTraceEvent } from '../workflows/types';
 
 type ReflectionSource = { domain: string; task: string; runId: string; toolSequence: string[] };
@@ -14,11 +15,19 @@ export function clearReflectionSource(tabId: number): void {
 }
 
 export function recordReflectionSource(tabId: number, domain: string, task: string, trace: ToolTraceEvent[]): void {
-  const actionNames = new Set(['browser_click', 'browser_type', 'browser_keyboard_type', 'browser_press_key']);
+  const reusableTools = new Set([
+    'browser_click', 'browser_type', 'browser_keyboard_type', 'browser_press_key',
+    'browser_navigate', 'browser_navigate_back', 'browser_navigate_forward',
+    'browser_read_text', 'browser_read_text_enhanced', 'browser_read_main', 'browser_read_main_for_workflow',
+    'browser_query', 'browser_snapshot_dom', 'browser_accessible_tree',
+    'browser_extract_links', 'browser_extract_fields', 'browser_control_state',
+    'browser_get_summary', 'browser_get_overview', 'browser_get_section', 'browser_get_title',
+  ]);
   const toolSequence = trace
-    .filter(event => event.result?.ok === true && actionNames.has(event.toolName))
+    .filter(event => event.result?.ok === true && reusableTools.has(event.toolName))
     .map(event => {
-      const input = String(event.input ?? '');
+      const safeValue = redactValue(event.input);
+      const input = typeof safeValue === 'string' ? safeValue : safeValue == null ? '' : JSON.stringify(safeValue);
       const safeInput = event.toolName === 'browser_type'
         ? `${input.split('|')[0]}|[text]`
         : event.toolName === 'browser_keyboard_type' ? '[text]' : input;
@@ -38,7 +47,9 @@ export function recordReflectionSource(tabId: number, domain: string, task: stri
 export async function saveReflectionMemory(content: string, domain: string, tabId: number): Promise<void> {
   try {
     // Normalize the domain to ensure consistency
-    const normalizedDomain = normalizeDomain(domain);
+    const source = reflectionSources.get(tabId);
+    if (!source) throw new Error("No completed browser task is available to reflect on.");
+    const normalizedDomain = source.domain;
     
     await processReflectionOutput(content, normalizedDomain, tabId);
     // No UI message here - processReflectionOutput will handle notifications
@@ -71,7 +82,6 @@ export async function triggerReflection(tabId?: number): Promise<void> {
         throw error;
       }
     }
-    const tabState = getTabState(activeTabId);
     const source = reflectionSources.get(activeTabId);
     if (!source) {
       sendUIMessage('updateOutput', { type: 'system', content: 'No completed browser task is available to reflect on.' }, activeTabId);
@@ -106,34 +116,15 @@ export async function triggerReflection(tabId?: number): Promise<void> {
       return;
     }
     
-    // Get the current URL to extract the domain
-    let domain = "unknown";
-    try {
-      const tab = await chrome.tabs.get(activeTabId);
-      if (tab.url) {
-        const url = new URL(tab.url);
-        // Normalize the domain to ensure consistency
-        domain = normalizeDomain(url.hostname);
-      }
-    } catch (error) {
-      handleError(error, 'getting tab URL for reflection');
-    }
-    
-    // Notify the UI that reflection has started
+    // Reflection consumes the captured task, not the page currently displayed.
+    const domain = source.domain;
     sendUIMessage('updateOutput', {
-      type: 'system',
-      content: `🧠 Reflecting on this session to learn useful patterns for ${domain}...`
+      type: 'system', content: `🧠 Reflecting on this completed task to learn useful patterns for ${domain}...`
     }, activeTabId, windowId);
-    
-    // Create a reflection prompt
-    if (source.domain !== domain) {
-      sendUIMessage('updateOutput', { type: 'system', content: 'The current website differs from the completed task. Return to that website before reflecting.' }, activeTabId);
-      return;
-    }
     const reflectionPrompt = `Summarize only this completed browser task as one reusable task description.\nOriginal request: ${source.task}\nVerified tool steps: ${JSON.stringify(source.toolSequence)}\nReturn only JSON: {"taskDescription":"brief task description"}. Do not invent steps or use earlier conversation history.`;
     
     // Execute the reflection prompt with callbacks, marking it as a reflection prompt
-    executePrompt(reflectionPrompt, activeTabId, true);
+    await executePrompt(reflectionPrompt, activeTabId, true, 'reflection');
   } catch (error) {
     logWithTimestamp(`Error during reflection: ${error instanceof Error ? error.message : String(error)}`, 'error');
   }
@@ -336,7 +327,7 @@ async function correctReflectionJSON(malformedJson: string, error: Error, domain
     // We're using a direct call to the agent's executePrompt method
     // This is a special case for correction, not a regular user prompt
     const { executePromptWithFallback } = await import('../agent/AgentCore');
-    await executePromptWithFallback(agent, correctionPrompt, correctionCallbacks, []);
+    await executePromptWithFallback(agent, correctionPrompt, correctionCallbacks, [], 'reflection');
     
   } catch (correctionError) {
     logWithTimestamp(`Error during JSON correction: ${correctionError instanceof Error ? correctionError.message : String(correctionError)}`, 'error');

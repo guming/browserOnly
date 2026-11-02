@@ -2,10 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ConfigManager } from '../../../background/configManager';
 import { createProvider } from '../../../models/providers/factory';
 import { normalizeDomain } from '../../../tracking/domainUtils';
-import { MemoryService } from '../../../tracking/memoryService';
+import { WorkflowStore } from '../../../workflows/WorkflowStore';
+import { compileUserActions, type UserRecordedAction } from '../../../workflows/UserActionCompiler';
 
-type RecordedStep = { kind: 'click' | 'input' | 'change' | 'navigate'; label: string; element?: string };
-type Session = { tabId: number; origin: string; domain: string; token: string; steps: RecordedStep[]; recording: boolean };
+type RecordedStep = UserRecordedAction;
+type Session = { tabId: number; currentUrl: string; startUrl: string; domain: string; token: string; steps: RecordedStep[]; recording: boolean };
 type RecorderWindow = Window & { __browserOnlyRecorder?: { stop: () => void } };
 
 // This function runs in the page's isolated extension world and must be self-contained.
@@ -29,21 +30,32 @@ export function installRecorder(token: string) {
   const send = (kind: RecordedStep['kind'], element: Element) => {
     const label = describe(element);
     if (!label) return;
-    const parts = [element.tagName.toLowerCase()];
-    for (const attr of ['role', 'type', 'data-testid', 'id', 'name']) {
-      const value = element.getAttribute(attr);
-      if (value && /^[a-zA-Z][a-zA-Z0-9_-]{0,39}$/.test(value) && !sensitive.test(value) && !/\d{6,}/.test(value)) parts.push(`${attr}=${value}`);
+    const safe = (value: string | null) => value && /^[a-zA-Z][a-zA-Z0-9_-]{0,39}$/.test(value) && !sensitive.test(value) && !/\d{6,}/.test(value) ? value : undefined;
+    const id = safe(element.id);
+    const testId = safe(element.getAttribute('data-testid'));
+    const name = safe(element.getAttribute('name'));
+    let selector = id ? `#${id}` : testId ? `[data-testid="${testId}"]` : name ? `${element.tagName.toLowerCase()}[name="${name}"]` : '';
+    if (!selector) {
+      const path: string[] = [];
+      for (let node: Element | null = element; node && node !== document.documentElement; node = node.parentElement) {
+        const siblings = node.parentElement ? Array.from(node.parentElement.children).filter(child => child.tagName === node!.tagName) : [];
+        path.unshift(`${node.tagName.toLowerCase()}:nth-of-type(${siblings.indexOf(node) + 1})`);
+        if (node.parentElement?.id && safe(node.parentElement.id)) { path.unshift(`#${node.parentElement.id}`); break; }
+      }
+      selector = path.join(' > ');
     }
-    void chrome.runtime.sendMessage({ action: 'userMemoryStep', token, step: { kind, label, element: parts.join(' ') } }).catch(() => undefined);
+    const role = safe(element.getAttribute('role')) || (element.matches('button') ? 'button' : element.matches('a') ? 'link' : undefined);
+    void chrome.runtime.sendMessage({ action: 'userMemoryStep', token, step: { kind, label, selector, role, testId } }).catch(() => undefined);
   };
   const click = (event: Event) => {
     if (!event.isTrusted || !(event.target instanceof Element)) return;
-    const target = event.target.closest('button, a, [role="button"], [role="link"], input[type="submit"], input[type="button"], [tabindex]:not([tabindex="-1"])');
+    const target = event.target.closest('button, a, [role="button"], [role="link"], input[type="submit"], input[type="button"], input[type="checkbox"], input[type="radio"], [tabindex]:not([tabindex="-1"])');
     if (target) send('click', target);
   };
   const change = (event: Event) => {
     if (!event.isTrusted || !(event.target instanceof Element)) return;
-    if (event.target.matches('input, textarea, select')) send(event.target.matches('select, input[type="checkbox"], input[type="radio"]') ? 'change' : 'input', event.target);
+    if (event.target.matches('select')) send('change', event.target);
+    else if (event.target.matches('input:not([type="checkbox"]):not([type="radio"]), textarea')) send('input', event.target);
   };
   document.addEventListener('click', click, true);
   document.addEventListener('change', change, true);
@@ -55,7 +67,7 @@ function stopRecorder() { (window as RecorderWindow).__browserOnlyRecorder?.stop
 function stepText(step: RecordedStep): string {
   if (step.kind === 'navigate') return `Open website ${step.label}`;
   const action = `${step.kind === 'click' ? 'Click' : step.kind === 'change' ? 'Change' : 'Enter a value in'} “${step.label}”`;
-  return step.element ? `${action} [element: ${step.element}]` : action;
+  return step.selector ? `${action} [${step.selector}]` : action;
 }
 
 async function suggestName(steps: RecordedStep[]): Promise<string> {
@@ -80,10 +92,10 @@ export function RememberActions({ tabId, readable }: { tabId?: number; readable:
       const current = session.current;
       if (!current || !current.recording || sender.tab?.id !== current.tabId || message?.action !== 'userMemoryStep' || message.token !== current.token) return;
       const step = message.step as RecordedStep;
-      if (!step || !['click', 'input', 'change'].includes(step.kind) || typeof step.label !== 'string' || !step.label || step.label.length > 60 || (step.element !== undefined && (typeof step.element !== 'string' || step.element.length > 250))) return;
+      if (!step || !['click', 'input', 'change'].includes(step.kind) || typeof step.label !== 'string' || !step.label || step.label.length > 60 || typeof step.selector !== 'string' || !step.selector || step.selector.length > 250) return;
       if (current.steps.length >= 100) return;
       const previous = current.steps[current.steps.length - 1];
-      if (previous?.kind === step.kind && previous.label === step.label && previous.element === step.element) return;
+      if (step.kind === 'input' && previous?.kind === 'input' && previous.selector === step.selector) return;
       current.steps.push(step); setSteps([...current.steps]);
     };
     const updated = (id: number, info: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
@@ -97,9 +109,10 @@ export function RememberActions({ tabId, readable }: { tabId?: number; readable:
         setNotice('This page cannot be recorded. Return to a website or click Done to save the captured steps.');
         return;
       }
-      if (url.origin !== current.origin) {
-        current.origin = url.origin;
-        if (current.steps.length < 100) current.steps.push({ kind: 'navigate', label: url.hostname });
+      const nextUrl = `${url.origin}${url.pathname}`;
+      if (nextUrl !== current.currentUrl) {
+        current.currentUrl = nextUrl;
+        if (current.steps.length < 100) current.steps.push({ kind: 'navigate', label: url.hostname, url: nextUrl });
         setSteps([...current.steps]);
       }
       if (info.status === 'complete') {
@@ -131,7 +144,7 @@ export function RememberActions({ tabId, readable }: { tabId?: number; readable:
     try {
       const tab = await chrome.tabs.get(tabId); const url = new URL(tab.url || '');
       if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Open a website to record your actions.');
-      const current: Session = { tabId, origin: url.origin, domain: normalizeDomain(url.hostname), token: crypto.randomUUID(), steps: [], recording: true };
+      const current: Session = { tabId, currentUrl: `${url.origin}${url.pathname}`, startUrl: `${url.origin}${url.pathname}`, domain: normalizeDomain(url.hostname), token: crypto.randomUUID(), steps: [], recording: true };
       session.current = current;
       await chrome.scripting.executeScript({ target: { tabId }, func: installRecorder, args: [current.token] });
       setSteps([]); setName(''); setPhase('recording');
@@ -152,10 +165,10 @@ export function RememberActions({ tabId, readable }: { tabId?: number; readable:
     const current = session.current; if (!current || !name.trim() || busy) return;
     setBusy(true); setNotice('');
     try {
-      const memory = { domain: current.domain, taskDescription: name.trim().slice(0, 160), toolSequence: current.steps.map(stepText), createdAt: Date.now(), source: 'manual' as const, status: 'active' as const, lastVerifiedAt: Date.now() };
-      const service = MemoryService.getInstance();
-      if (await service.findSimilarMemory(memory) !== null) throw new Error('A memory with this name already exists. Choose another name.');
-      await service.storeMemory(memory);
+      const { workflow, version } = compileUserActions(current.steps, name.trim().slice(0, 160), current.startUrl, current.domain);
+      const service = WorkflowStore.getInstance();
+      await service.saveVersion(version);
+      await service.saveWorkflow(workflow);
       session.current = null; setPhase('saved');
     } catch (error) { setNotice(`Could not save: ${error instanceof Error ? error.message : String(error)}`); }
     finally { setBusy(false); }
@@ -163,11 +176,11 @@ export function RememberActions({ tabId, readable }: { tabId?: number; readable:
   const button = 'min-h-8 rounded-md border border-slate-300 bg-white px-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50';
   const primary = 'min-h-8 rounded-md bg-[#315a78] px-3 text-xs font-semibold text-white hover:bg-[#274a64] disabled:opacity-50';
   return <div className="mb-2 text-xs" aria-live="polite">
-    {(phase === 'idle' || phase === 'saved') && <button type="button" onClick={() => void start()} disabled={!readable || busy} className={button}>◯ &nbsp;Remember my actions</button>}
+    {(phase === 'idle' || phase === 'saved') && <button type="button" onClick={() => void start()} disabled={!readable || busy} className={button}>◯ &nbsp;Record workflow</button>}
     {phase === 'recording' && <div className="rounded-lg border border-stone-200 bg-stone-50 p-3"><div className="flex items-center gap-2 font-semibold text-stone-800"><span className="h-2 w-2 rounded-full bg-red-500" />Recording your actions</div><p className="mt-1 text-stone-500">Use the page as usual. Input values are not recorded. Control labels are sent to your configured model to suggest a name. {steps.length} steps captured.</p><div className="mt-2 flex gap-2"><button type="button" onClick={() => void finish()} disabled={busy} className={primary}>Done</button><button type="button" onClick={() => void cancel()} className={button}>Cancel</button></div></div>}
-    {phase === 'summarizing' && <p className="rounded-lg bg-stone-50 p-3 text-stone-600">Preparing your memory…</p>}
+    {phase === 'summarizing' && <p className="rounded-lg bg-stone-50 p-3 text-stone-600">Preparing your workflow…</p>}
     {phase === 'review' && <div className="rounded-lg border border-stone-200 bg-stone-50 p-3"><label className="font-semibold text-stone-800" htmlFor="remember-task-name">What should this be called?</label><input id="remember-task-name" value={name} maxLength={160} onChange={event => setName(event.target.value)} className="mt-2 w-full rounded-md border border-stone-300 bg-white px-2 py-2 text-sm" placeholder="Describe the task" /><p className="mt-2 text-stone-500">{session.current?.domain} · {steps.length} steps · Completion not verified</p><details className="mt-2 text-stone-600"><summary className="cursor-pointer">View steps</summary><ol className="mt-2 list-inside list-decimal space-y-1">{steps.map((step, i) => <li key={i}>{stepText(step)}</li>)}</ol></details><div className="mt-3 flex gap-2"><button type="button" onClick={() => void save()} disabled={!name.trim() || busy} className={primary}>Save</button><button type="button" onClick={() => void cancel()} disabled={busy} className={button}>Discard</button></div></div>}
-    {phase === 'saved' && <p className="mt-2 text-[#315a78]">Saved. The assistant can use this when you ask for a similar task. <button type="button" className="font-semibold underline hover:text-[#274a64]" onClick={() => void chrome.tabs.create({ url: chrome.runtime.getURL('options.html#memory') })}>View in Memory</button></p>}
+    {phase === 'saved' && <p className="mt-2 text-[#315a78]">Saved as a draft workflow. Review its steps and fill in required inputs in Automations before running.</p>}
     {notice && <p role="status" className="mt-2 text-amber-700">{notice}</p>}
   </div>;
 }

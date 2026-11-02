@@ -12,18 +12,7 @@ import { MemoryService } from "../tracking/memoryService";
 import { ConfigManager } from "./configManager";
 import { TaskModelRoutingService } from "../models/routing/TaskModelRoutingService";
 import { saveReflectionMemory, recordReflectionSource, clearReflectionSource } from "./reflectionController";
-import { 
-  resetStreamingState, 
-  addToStreamingBuffer, 
-  getStreamingBuffer, 
-  setStreamingBuffer,
-  clearStreamingBuffer, 
-  finalizeStreamingSegment, 
-  startNewSegment, 
-  getCurrentSegmentId, 
-  incrementSegmentId,
-  signalStreamingComplete
-} from "./streamingManager";
+import { createStreamingSession } from "./streamingManager";
 import { 
   getCurrentTabId, 
   getTabState, 
@@ -884,7 +873,8 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
     // Always enable streaming
     const useStreaming = true;
     
-    // Reset streaming buffer and segment ID
+    // Scope UI streaming state to this execution, never to another window/task.
+    const { resetStreamingState, addToStreamingBuffer, getStreamingBuffer, setStreamingBuffer, clearStreamingBuffer, finalizeStreamingSegment, startNewSegment, getCurrentSegmentId, incrementSegmentId, signalStreamingComplete } = createStreamingSession();
     resetStreamingState();
     
     // Get the structured message history
@@ -944,8 +934,7 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
         // If this is a reflection prompt, directly save the memory
         if (isReflectionPrompt) {
           try {
-            const url = await updatedTabState.page.evaluate(() => globalThis.location?.href || '');
-            await saveReflectionMemory(content, new URL(url).hostname, targetTabId);
+            await saveReflectionMemory(content, currentDomain, targetTabId);
           } catch (error) {
             logWithTimestamp(`Error in domain extraction for reflection: ${error instanceof Error ? error.message : String(error)}`, 'error');
           }
@@ -1083,6 +1072,10 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
             .catch(error => logWithTimestamp(`Could not mark failed memory step: ${String(error)}`, 'warn'));
         }
       },
+      onExecutionOutcome: (outcome) => {
+        executionStatus = outcome.status === 'blocked' ? 'failed' : outcome.status;
+        if (outcome.status !== 'completed') logWithTimestamp(`Operator ended: ${outcome.reason}: ${outcome.message || ''}`, 'warn');
+      },
       onExecutionEnd: (status) => { executionStatus = status; },
       onComplete: () => {
         // Get the window ID for this tab
@@ -1116,7 +1109,7 @@ Note: Focus on the actual content from the tabs that were successfully analyzed.
         const trace = traceRecorder.finish();
         if (!isReflectionPrompt) {
           clearReflectionSource(targetTabId);
-          if (executionStatus === 'completed' && taskMode === 'operator' && currentDomain) {
+          if (executionStatus === 'completed' && (taskMode === 'operator' || taskMode === undefined && role === 'operator') && currentDomain) {
             recordReflectionSource(targetTabId, currentDomain, originalTaskInstruction, trace);
           }
         }

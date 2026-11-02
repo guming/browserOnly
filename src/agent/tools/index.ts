@@ -1,3 +1,5 @@
+import { browserExtractFields } from "./structuredReadTools";
+export { browserExtractFields } from "./structuredReadTools";
 import type { Page } from "playwright-crx";
 
 // Import all tools from their respective modules
@@ -66,7 +68,8 @@ import {
 import { 
   browserGetTitle, 
   browserSnapshotDom, 
-  browserQuery, 
+  browserQuery,
+  browserControlState,
   browserAccessibleTree, 
   browserReadText, 
   browserExtractLinks,
@@ -122,6 +125,7 @@ export {
   browserGetTitle,
   browserSnapshotDom,
   browserQuery,
+  browserControlState,
   browserAccessibleTree,
   browserReadText,
   browserScreenshot,
@@ -215,6 +219,8 @@ export function getAllTools(page: Page) {
     browserGetTitle(page),
     browserSnapshotDom(page),
     browserQuery(page),
+    browserControlState(page),
+    browserExtractFields(page),
     browserAccessibleTree(page),
     browserExtractLinks(page),
     browserReadText(page),

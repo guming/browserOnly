@@ -1,3 +1,4 @@
+import { parseTarget, resolveTarget, readTargetState, targetFailure } from "./semanticLocator";
 import { DynamicTool } from "langchain/tools";
 import type { Page } from "playwright-crx";
 import { ToolFactory } from "./types";
@@ -346,26 +347,28 @@ export const browserExtractLinks: ToolFactory = (page: Page) =>
             };
             for (const anchor of Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href]'))) {
               add(anchor.getAttribute('href')!, (anchor.innerText || anchor.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim());
-              if (links.length >= limit) break;
+
             }
-            if (links.length < limit) {
+            {
               const bodyText = document.body?.innerText || document.documentElement?.innerText || '';
               const rawUrls = bodyText.match(/https?:\/\/[^\s<>"'`]+/g) ?? [];
               for (const raw of rawUrls) {
                 const cleaned = raw.replace(/[.,;:!?)}\]]+$/, '');
                 add(cleaned, 'URL from page text');
-                if (links.length >= limit) break;
+
               }
             }
-            return { links, totalInDom: document.querySelectorAll('a[href]').length };
-          }, { scope, limit }) as { links: Array<{ text: string; url: string }>; totalInDom: number };
-          if (!data.links.length) return `No ${scope === 'all' ? '' : `${scope} `}HTTP(S) links found on this page.`;
-          const rows = data.links.map((link, index) => `${index + 1}. ${link.text || '(no link text)'}\n   ${link.url}`);
-          const suffix = data.links.length === limit ? `\n\nShowing first ${limit} unique links; page has ${data.totalInDom} anchor elements.` : `\n\n${data.links.length} unique links.`;
-          return `${rows.join('\n')}\n${suffix}`;
+            return { links: links.slice(0, limit), totalCount: links.length };
+          }, { scope, limit }) as { links: Array<{ text: string; url: string }>; totalCount: number };
+          // Keep complete records and valid JSON within the observation budget.
+          const result = { ok: true, data: data.links, meta: { scope: 'current_dom', returnedCount: data.links.length, totalCount: data.totalCount, truncated: data.links.length < data.totalCount } };
+          while (JSON.stringify(result).length > MAX_RETURN_CHARS && result.data.length) {
+            result.data.pop(); result.meta.returnedCount = result.data.length; result.meta.truncated = true;
+          }
+          return JSON.stringify(result);
         });
       } catch (error) {
-        return `Error extracting page links: ${error instanceof Error ? error.message : String(error)}`;
+        return JSON.stringify({ ok: false, error: { code: 'PAGE_UNAVAILABLE', message: String(error), repairable: true } });
       }
     },
   });
@@ -790,3 +793,15 @@ export const browserScreenshot: ToolFactory = (page: Page) =>
       }
     },
   });
+
+/** Read one control, never a full-page DOM dump. */
+export const browserControlState: ToolFactory = page => new DynamicTool({
+  name: 'browser_control_state',
+  description: 'Read one unique visible control state: checked, selected, expanded, disabled. Input CSS/text string or JSON {text}|{role,name?,scope?,exact?}|{selector,scope?}. Unknown states are null. Multiple matches return a count and at most five candidates; refine the target instead of guessing.',
+  func: async (input: string) => {
+    try {
+      const target = parseTarget(input);
+      return await withActivePage(page, async active => JSON.stringify({ ok: true, data: await readTargetState(await resolveTarget(active, target)) }));
+    } catch (error) { return targetFailure(error); }
+  },
+});

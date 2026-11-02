@@ -152,7 +152,7 @@ export interface ToolTraceEvent {
   executionId: string;
   toolName: string;
   input: unknown;
-  result?: { ok: boolean; data?: unknown; error?: { code: string; message: string; repairable: boolean } };
+  result?: { ok: boolean; data?: unknown; meta?: Record<string, unknown>; error?: { code: string; message: string; repairable: boolean } };
   startedAt: number;
   endedAt?: number;
   tabId?: number;

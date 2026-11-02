@@ -46,6 +46,15 @@ describe('PromptManager', () => {
     promptManager = new PromptManager(mockTools);
   });
 
+  it('requires finish declarations only for Operator and preserves memory guidance', () => {
+    const operator = promptManager.getSystemPrompt('operator');
+    expect(operator).toContain('<finish status="completed">');
+    expect(operator).toContain('<finish status="blocked">');
+    expect(operator).toContain('lookup_memories');
+    expect(promptManager.getSystemPrompt('books')).not.toContain('OPERATOR COMPLETION');
+    expect(promptManager.getSystemPrompt('researcher')).not.toContain('OPERATOR COMPLETION');
+  });
+
   describe('Constructor', () => {
     it('should initialize with provided tools', () => {
       expect(promptManager).toBeInstanceOf(PromptManager);
@@ -55,7 +64,7 @@ describe('PromptManager', () => {
       const emptyPromptManager = new PromptManager([]);
       const systemPrompt = emptyPromptManager.getSystemPrompt('operator');
       
-      expect(systemPrompt).toContain('You are a browser-automation assistant called **BrowserOnly 🤖️**');
+      expect(systemPrompt).toContain('You are a browser automation assistant called **BrowserOnly**');
       // The prompt contains "browser_click" in the instructions, not in tool descriptions
       expect(systemPrompt).toContain('browser_click');
     });
@@ -133,7 +142,7 @@ describe('PromptManager', () => {
     it('should generate system prompt with tool descriptions', () => {
       const systemPrompt = promptManager.getSystemPrompt('operator');
 
-      expect(systemPrompt).toContain('You are a browser-automation assistant called **BrowserOnly 🤖️**');
+      expect(systemPrompt).toContain('You are a browser automation assistant called **BrowserOnly**');
       expect(systemPrompt).toContain('browser_click: Click on an element using CSS selector');
       expect(systemPrompt).toContain('browser_type: Type text into an input field');
       expect(systemPrompt).toContain('browser_navigate: Navigate to a URL');
@@ -155,7 +164,7 @@ describe('PromptManager', () => {
       expect(systemPrompt).toContain('Identify domain');
       expect(systemPrompt).toContain('lookup_memories');
       expect(systemPrompt).toContain('Apply memory');
-      expect(systemPrompt).toContain('Observe');
+      expect(systemPrompt).toContain('Choose one focused observation tool');
       expect(systemPrompt).toContain('Analyze → Act');
     });
 
@@ -178,7 +187,11 @@ describe('PromptManager', () => {
     });
 
     it('should detect macOS and use Command key', () => {
-      const systemPrompt = promptManager.getSystemPrompt('operator');
+      let systemPrompt = '';
+      jest.isolateModules(() => {
+        const { PromptManager: PlatformPromptManager } = require('../../../src/agent/PromptManager');
+        systemPrompt = new PlatformPromptManager(mockTools).getSystemPrompt('operator');
+      });
 
       expect(systemPrompt).toContain('macOS');
       expect(systemPrompt).toContain('Command');
@@ -191,8 +204,11 @@ describe('PromptManager', () => {
         writable: true
       });
 
-      const windowsPromptManager = new PromptManager(mockTools);
-      const systemPrompt = windowsPromptManager.getSystemPrompt('operator');
+      let systemPrompt = '';
+      jest.isolateModules(() => {
+        const { PromptManager: PlatformPromptManager } = require('../../../src/agent/PromptManager');
+        systemPrompt = new PlatformPromptManager(mockTools).getSystemPrompt('operator');
+      });
 
       expect(systemPrompt).toContain('Windows');
       expect(systemPrompt).toContain('Control');
@@ -211,8 +227,11 @@ describe('PromptManager', () => {
         writable: true
       });
 
-      const linuxPromptManager = new PromptManager(mockTools);
-      const systemPrompt = linuxPromptManager.getSystemPrompt('operator');
+      let systemPrompt = '';
+      jest.isolateModules(() => {
+        const { PromptManager: PlatformPromptManager } = require('../../../src/agent/PromptManager');
+        systemPrompt = new PlatformPromptManager(mockTools).getSystemPrompt('operator');
+      });
 
       expect(systemPrompt).toContain('Linux');
       expect(systemPrompt).toContain('Control');
@@ -266,7 +285,7 @@ describe('PromptManager', () => {
       promptManager.updateTools([]);
       const systemPrompt = promptManager.getSystemPrompt('operator');
 
-      expect(systemPrompt).toContain('You are a browser-automation assistant');
+      expect(systemPrompt).toContain('You are a browser automation assistant');
       // The prompt will still contain "browser_click" in the instructions
       expect(systemPrompt).toContain('browser_click');
     });
@@ -314,7 +333,7 @@ describe('PromptManager', () => {
       const systemPrompt = promptManager.getSystemPrompt('operator');
 
       // Verify all components are present
-      expect(systemPrompt).toContain('BrowserOnly 🤖️');
+      expect(systemPrompt).toContain('BrowserOnly');
       expect(systemPrompt).toContain('CURRENT PAGE CONTEXT');
       expect(systemPrompt).toContain('https://google.com');
       expect(systemPrompt).toContain('search_input: Input search query');
@@ -418,7 +437,7 @@ describe('PromptManager', () => {
       expect(systemPrompt).toContain(longDescription);
     });
 
-    it('should handle undefined navigator gracefully', () => {
+    it('reuses the imported platform instructions when navigator later becomes unavailable', () => {
       // Temporarily remove navigator
       const originalNavigator = global.navigator;
       delete (global as any).navigator;
@@ -432,7 +451,7 @@ describe('PromptManager', () => {
       expect(() => {
         const tempPromptManager = new PromptManager(mockTools);
         tempPromptManager.getSystemPrompt('operator');
-      }).toThrow();
+      }).not.toThrow();
 
       // Restore navigator
       global.navigator = originalNavigator;

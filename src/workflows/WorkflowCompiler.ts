@@ -48,9 +48,15 @@ export function compileTrace(trace: ToolTraceEvent[], domain: string, name = 'Re
       }, ...recordedSteps]
     : recordedSteps;
 
+  // Repeating observations cannot reproduce the model's summary/classification.
+  // Default new read-only Operator recordings with a saved goal to goal execution.
+  // Existing saved/manual Replay rules are not changed here.
+  const readOnlyTools = new Set(['browser_get_title', 'browser_get_active_tab', 'browser_query', 'browser_snapshot_dom', 'browser_accessible_tree', 'browser_read_text', 'browser_read_text_enhanced', 'browser_read_main_for_workflow', 'browser_get_summary', 'browser_get_overview', 'browser_get_section', 'browser_extract_links', 'browser_extract_fields', 'browser_control_state']);
+  const navigationTools = new Set(['browser_navigate', 'browser_wait_for_navigation', 'browser_navigate_back', 'browser_navigate_forward', 'browser_get_active_tab']);
+  const readOnlyGoal = !!taskInstruction?.trim() && recordedSteps.some(step => readOnlyTools.has(step.toolName ?? '')) && recordedSteps.every(step => readOnlyTools.has(step.toolName ?? '') || navigationTools.has(step.toolName ?? ''));
   const version: WorkflowVersion = {
     id: id('version'), workflowId: id('workflow'), version: 1,
-    source: 'recording', runStrategy: contextMode === 'standalone' ? 'goal' : 'steps', taskInstruction: taskInstruction === undefined ? undefined : String(redactValue(taskInstruction)), replayFormat: taskInstruction !== undefined ? 'steps-v2' : undefined, entryContext, steps, finalAssertions: [], createdAt
+    source: 'recording', runStrategy: contextMode === 'standalone' || readOnlyGoal ? 'goal' : 'steps', taskInstruction: taskInstruction === undefined ? undefined : String(redactValue(taskInstruction)), replayFormat: taskInstruction !== undefined ? 'steps-v2' : undefined, entryContext, steps, finalAssertions: [], createdAt
   };
   const workflow: Workflow = {
     id: version.workflowId, name, description: `Recorded on ${domain}`,

@@ -45,3 +45,26 @@ test('cancellation during final action cannot report successful completion', asy
   options.executeReplay.mockImplementation(async () => { runner.cancel(); return 'Clicked'; });
   expect((await runner.run('w', version, options)).status).toBe('cancelled');
 });
+
+test.each(['browser_extract_fields', 'browser_extract_links'])('%s structured failures cannot produce a successful workflow', async name => {
+  const { runner } = setup();
+  const tool = { name, func: jest.fn().mockResolvedValue(JSON.stringify({ ok: false, error: { code: 'INVALID_ARGUMENT', message: 'Invalid selector', repairable: true } })) };
+  const run = await runner.run('w', { ...version, replayFormat: undefined, steps: [{ ...step, toolName: name, risk: 'read' }] }, { tools: [tool] });
+  expect(run.status).toBe('failed');
+});
+test('structured successful reads remain replayable', async () => {
+  const { runner } = setup();
+  const tool = { name: 'browser_extract_fields', func: jest.fn().mockResolvedValue('{"ok":true,"data":[]}') };
+  const run = await runner.run('w', { ...version, replayFormat: undefined, steps: [{ ...step, toolName: tool.name, risk: 'read' }] }, { tools: [tool] });
+  expect(run.status).toBe('succeeded');
+});
+
+test.each([false, true])('structured clicks preserve scope and verification for JSON string=%s', async asString => {
+  const { runner, options } = setup();
+  const input = { text: '京东自营', scope: '[role="menu"]', verify: { state: 'checked', expected: true } };
+  options.tools[0].func.mockResolvedValue('{"ok":true,"data":{"dispatched":true,"verified":true}}');
+  const run = await runner.run('w', { ...version, steps: [{ ...step, input: asString ? JSON.stringify(input) : input, locator: { css: '.stale', fallbackOrder: ['css'] } }] }, options);
+  expect(run.status).toBe('succeeded');
+  expect(options.executeReplay).not.toHaveBeenCalled();
+  expect(options.tools[0].func).toHaveBeenCalledWith(JSON.stringify(input), undefined);
+});

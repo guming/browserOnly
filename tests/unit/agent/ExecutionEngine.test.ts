@@ -107,7 +107,7 @@ describe('ExecutionEngine', () => {
       mockCallbacks.onExecutionEnd = jest.fn();
       mockProvider.createMessage.mockReturnValueOnce((async function* () {
         yield { type: 'text', text: '<tool>browser_click</tool><input>button</input><requires_approval>true</requires_approval>' };
-      })()).mockReturnValueOnce((async function* () { yield { type: 'text', text: 'Done' }; })());
+      })()).mockReturnValueOnce((async function* () { yield { type: 'text', text: '<finish status="completed">Done</finish>' }; })());
       (global as any).chrome.tabs.query.mockResolvedValue([{ id: 999 }]);
       await executionEngine.executePrompt('Submit', mockCallbacks, [], false, 'operator');
       expect(jest.requireMock('../../../src/agent/approvalManager').requestApproval).toHaveBeenCalledWith(2, 'browser_click', 'button', expect.any(String), 3, { runId: 'run-1', workflowId: 'w1', executionTabId: 2, ownerTabId: 1 });
@@ -119,6 +119,252 @@ describe('ExecutionEngine', () => {
       mockProvider.createMessage.mockReturnValue((async function* () { throw new Error('Provider unavailable'); yield; })());
       await executionEngine.executePrompt('Research', mockCallbacks, [], false, 'operator');
       expect(mockCallbacks.onExecutionEnd).toHaveBeenCalledWith('failed', 'Provider unavailable');
+    });
+
+    const streamText = (text: string) => (async function* () { yield { type: 'text', text }; })();
+    const invocation = (name: string, input = '{}') => `<tool>${name}</tool><input>${input}</input><requires_approval>false</requires_approval>`;
+
+    it('executes link extraction regardless of request wording', async () => {
+      const extract = jest.fn().mockResolvedValue('{"ok":true,"data":[]}');
+      toolManager.addTools([{ name: 'browser_extract_links', description: '', func: extract }]);
+      mockProvider.createMessage
+        .mockImplementationOnce(() => streamText(invocation('browser_extract_links', 'all')))
+        .mockImplementationOnce(() => streamText('<finish status="completed">Links checked.</finish>'));
+      mockCallbacks.onExecutionOutcome = jest.fn();
+      await executionEngine.executePrompt('把这些整理一下', mockCallbacks, [], false, 'operator');
+      expect(extract).toHaveBeenCalledTimes(1);
+      expect(mockCallbacks.onExecutionOutcome).toHaveBeenCalledWith(expect.objectContaining({ status: 'completed' }));
+    });
+
+    it.each([
+      ['blocked', 'I cannot execute browser_click because requires_approval was denied.'],
+      ['completed', 'The last instruction was: Now let me click the search button. It has been verified.'],
+    ])('accepts a valid %s finish even when its summary mentions protocol or action words', async (status, message) => {
+      mockCallbacks.onExecutionOutcome = jest.fn();
+      mockProvider.createMessage.mockImplementation(() => streamText(`<finish status="${status}">${message}</finish>`));
+      await executionEngine.executePrompt('Read', mockCallbacks, [], false, 'operator');
+      expect(mockProvider.createMessage).toHaveBeenCalledTimes(1);
+      expect(mockCallbacks.onExecutionOutcome).toHaveBeenCalledWith(expect.objectContaining({ status, message }));
+    });
+
+    it('keeps completed actions and history across fresh rate-limit errors', async () => {
+      jest.spyOn(errorHandler, 'calculateBackoffTime').mockReturnValue(0);
+      let calls = 0;
+      mockProvider.createMessage.mockImplementation((_system: string, messages: any[]) => {
+        calls++;
+        if (calls === 1) return streamText(invocation('browser_screenshot'));
+        expect(messages.some(message => String(message.content).includes('Screenshot taken successfully'))).toBe(true);
+        if (calls < 4) { const error = new Error('Rate limit exceeded'); (error as any).error = { type: 'rate_limit_error', message: error.message }; throw error; }
+        return streamText('<finish status="completed">Verified.</finish>');
+      });
+      await executionEngine.executePrompt('Read', mockCallbacks, [], false, 'operator');
+      expect(mockToolFunctions[0]).toHaveBeenCalledTimes(1);
+      expect(mockProvider.createMessage).toHaveBeenCalledTimes(4);
+    });
+
+    it('caps fresh provider errors without recursive restarts', async () => {
+      jest.spyOn(errorHandler, 'calculateBackoffTime').mockReturnValue(0);
+      mockCallbacks.onExecutionEnd = jest.fn();
+      mockProvider.createMessage.mockImplementation(() => { const error = new Error('Rate limit exceeded'); (error as any).error = { type: 'rate_limit_error', message: error.message }; throw error; });
+      await executionEngine.executePrompt('Read', mockCallbacks, [], false, 'operator');
+      expect(mockProvider.createMessage).toHaveBeenCalledTimes(6);
+      expect(mockCallbacks.onExecutionEnd).toHaveBeenCalledWith('failed', 'Rate limit exceeded');
+    });
+
+    it.each([false, true])('hides chunked finish markup from presentation in streaming=%s', async isStreaming => {
+      mockProvider.createMessage.mockImplementation(() => (async function* () {
+        for (const text of ['<fi', 'nish status="completed">', 'Verified.', '</finish>']) yield { type: 'text', text };
+      })());
+      await executionEngine.executePrompt('Read', mockCallbacks, [], isStreaming, 'operator');
+      expect(mockCallbacks.onLlmOutput).toHaveBeenCalledWith('Verified.');
+      expect((mockCallbacks.onLlmOutput as jest.Mock).mock.calls.flat().join('')).not.toContain('<finish');
+      expect((mockCallbacks.onLlmChunk as jest.Mock).mock.calls.flat().join('')).not.toContain('<fi');
+    });
+
+    it('anchors a new Operator request ahead of obsolete window tasks', async () => {
+      const current = '解释当前 MountainCar 页面中的例子';
+      const historical = [{ role: 'user', content: '在京东搜索肽敏舒并加入购物车' }, { role: 'assistant', content: 'Next: lookup_memories www.jd.com then add to cart' }, { role: 'user', content: current }];
+      mockProvider.createMessage.mockImplementation((_system: string, messages: any[]) => {
+        expect(messages[0]).toEqual({ role: 'user', content: current });
+        expect(messages.filter(message => message.content === '在京东搜索肽敏舒并加入购物车')).toHaveLength(0);
+        expect(messages).toEqual([{ role: 'user', content: current }]);
+        expect(JSON.stringify(messages)).not.toContain('www.jd.com');
+        expect(messages[messages.length - 1].content).toBe(current);
+        return streamText('<finish status="completed">MountainCar explained.</finish>');
+      });
+      mockCallbacks.onExecutionOutcome = jest.fn();
+      await executionEngine.executePrompt(current, mockCallbacks, historical, false, 'operator');
+      expect(mockCallbacks.onExecutionOutcome).toHaveBeenCalledWith(expect.objectContaining({ status: 'completed' }));
+      expect(mockProvider.createMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it('preserves the complete Markdown answer inside the status wrapper', async () => {
+      const answer = '这是强化学习教材的首页。\n\n## 主要内容\n\n- 基础概念与方法。\n- 项目、练习与下载入口。\n\n| 类型 | 内容 |\n| --- | --- |\n| 教材 | 强化学习 |';
+      mockProvider.createMessage.mockImplementation(() => streamText(`<finish status="completed">${answer}</finish>`));
+      mockCallbacks.onExecutionOutcome = jest.fn();
+      await executionEngine.executePrompt('总结当前页面', mockCallbacks, [], true, 'operator');
+      expect(mockCallbacks.onLlmOutput).toHaveBeenCalledWith(answer);
+      expect(mockCallbacks.onExecutionOutcome).toHaveBeenCalledWith(expect.objectContaining({ status: 'completed', message: answer }));
+    });
+
+    it('executes native calls without parsing selector text as XML and retains API history', async () => {
+      mockProvider.toolCallFormat = 'native';
+      const input = 'span[data-value="</input>"]';
+      mockProvider.createMessage
+        .mockImplementationOnce(() => (async function* () {
+          yield { type: 'text', text: '<tool>browser_read_text_enhanced</tool>' };
+          yield { type: 'tool_call', toolCall: { id: 'native-one', name: 'browser_screenshot', input, requiresApproval: false } };
+          yield { type: 'usage', inputTokens: 10, outputTokens: 3 };
+        })())
+        .mockImplementationOnce((_system: string, messages: any[]) => {
+          expect(messages[messages.length - 2].tool_calls[0]).toMatchObject({ id: 'native-one', function: { name: 'browser_screenshot', arguments: JSON.stringify({ input, requires_approval: false }) } });
+          expect(messages[messages.length - 1]).toMatchObject({ role: 'tool', tool_call_id: 'native-one' });
+          return streamText('<finish status="completed">Screenshot verified.</finish>');
+        });
+      mockCallbacks.onExecutionOutcome = jest.fn();
+      await executionEngine.executePrompt('Read', mockCallbacks, [], false, 'operator');
+      expect(mockToolFunctions[0]).toHaveBeenCalledWith(input, undefined);
+      expect(mockProvider.createMessage).toHaveBeenCalledTimes(2);
+      expect(mockCallbacks.onExecutionOutcome).toHaveBeenCalledWith(expect.objectContaining({ status: 'completed' }));
+      expect((mockCallbacks.onToolOutput as jest.Mock).mock.calls.flat().join('')).not.toContain('Incomplete tool call');
+    });
+
+    it('never executes hand-written XML on a native-only provider', async () => {
+      mockProvider.toolCallFormat = 'native';
+      mockProvider.createMessage.mockImplementationOnce(() => streamText(invocation('browser_screenshot')))
+        .mockImplementationOnce((_system: string, messages: any[]) => {
+          expect(messages[messages.length - 1].content).toContain('native function');
+          return streamText('<finish status="blocked">Tool protocol unavailable.</finish>');
+        });
+      await executionEngine.executePrompt('Read', mockCallbacks, [], false, 'operator');
+      expect(mockToolFunctions[0]).not.toHaveBeenCalled();
+    });
+
+    it('does not let a second task reset a running execution', async () => {
+      let release!: () => void;
+      const gate = new Promise<void>(resolve => { release = resolve; });
+      mockProvider.createMessage.mockImplementation(() => (async function* () {
+        await gate; yield { type: 'text', text: '<finish status="completed">First finished.</finish>' };
+      })());
+      const first = executionEngine.executePrompt('First', mockCallbacks, [], false, 'operator');
+      const second = { ...mockCallbacks, onExecutionOutcome: jest.fn(), onComplete: jest.fn() };
+      await executionEngine.executePrompt('Second', second, [], false, 'operator');
+      expect(second.onExecutionOutcome).toHaveBeenCalledWith(expect.objectContaining({ reason: 'EXECUTION_BUSY', status: 'blocked' }));
+      expect(mockProvider.createMessage).toHaveBeenCalledTimes(1);
+      release(); await first;
+    });
+
+    it('passes streamed reasoning back on native tool turns and preserves it through rate-limit retries', async () => {
+      mockProvider.toolCallFormat = 'native';
+      jest.spyOn(errorHandler, 'calculateBackoffTime').mockReturnValue(0);
+      const reasoning = 'fixture-part-one\nfixture-part-two';
+      mockProvider.createMessage
+        .mockImplementationOnce(() => (async function* () {
+          yield { type: 'reasoning', reasoning: 'fixture-part-one\n' };
+          yield { type: 'reasoning', reasoning: 'fixture-part-two' };
+          yield { type: 'tool_call', toolCall: { id: 'thinking-call', name: 'browser_screenshot', input: '{}', requiresApproval: false } };
+        })())
+        .mockImplementationOnce((_system: string, messages: any[]) => {
+          expect(messages[messages.length - 2].reasoning_content).toBe(reasoning);
+          const error = new Error('Rate limited'); (error as any).status = 429; throw error;
+        })
+        .mockImplementationOnce((_system: string, messages: any[]) => {
+          expect(messages[messages.length - 2].reasoning_content).toBe(reasoning);
+          return streamText('<finish status="completed">Verified.</finish>');
+        });
+      mockCallbacks.onExecutionOutcome = jest.fn();
+      await executionEngine.executePrompt('Read', mockCallbacks, [], true, 'operator');
+      expect(mockProvider.createMessage).toHaveBeenCalledTimes(3);
+      expect(mockToolFunctions[0]).toHaveBeenCalledTimes(1);
+      expect(mockCallbacks.onExecutionOutcome).toHaveBeenCalledWith(expect.objectContaining({ status: 'completed' }));
+      expect((mockCallbacks.onLlmOutput as jest.Mock).mock.calls.flat().join('')).not.toContain(reasoning);
+      expect((mockCallbacks.onLlmChunk as jest.Mock).mock.calls.flat().join('')).not.toContain(reasoning);
+    });
+
+    it('does not retry a provider 400 as a streaming fallback', async () => {
+      mockCallbacks.onExecutionEnd = jest.fn();
+      mockProvider.createMessage.mockImplementation(() => { const error = new Error('400 Invalid request'); (error as any).status = 400; throw error; });
+      await executionEngine.executePrompt('Read', mockCallbacks, [], true, 'operator');
+      expect(mockProvider.createMessage).toHaveBeenCalledTimes(1);
+      expect(mockCallbacks.onFallbackStarted).not.toHaveBeenCalled();
+      expect(mockCallbacks.onExecutionEnd).toHaveBeenCalledWith('failed', '400 Invalid request');
+    });
+
+    it('reflects only the captured task with no browser tools and waits for memory processing', async () => {
+      const prompt = 'Summarize completed read steps as JSON';
+      mockProvider.createMessage.mockImplementation((system: string, messages: any[], tools: any[]) => {
+        expect(system).toContain('Do not execute browser tools');
+        expect(tools).toEqual([]);
+        expect(messages).toEqual([{ role: 'user', content: prompt }]);
+        return streamText('{"taskDescription":"Summarize a repository"}');
+      });
+      let saved = false;
+      mockCallbacks.onLlmOutput = jest.fn(async () => { await Promise.resolve(); saved = true; });
+      mockCallbacks.onComplete = jest.fn(() => { expect(saved).toBe(true); });
+      await executionEngine.executePrompt(prompt, mockCallbacks, [{ role: 'user', content: 'Old JD task' }], false, 'reflection');
+      expect(mockProvider.createMessage).toHaveBeenCalledTimes(1);
+      expect(mockCallbacks.onComplete).toHaveBeenCalledTimes(1);
+      expect(mockToolFunctions[0]).not.toHaveBeenCalled();
+    });
+
+    it('never executes an unexpected native tool event during reflection', async () => {
+      mockProvider.toolCallFormat = 'native';
+      mockProvider.createMessage.mockImplementation(() => (async function* () {
+        yield { type: 'tool_call', toolCall: { id: 'bad', name: 'browser_click', input: 'Buy', requiresApproval: false } };
+      })());
+      mockCallbacks.onExecutionEnd = jest.fn();
+      await executionEngine.executePrompt('Reflect', mockCallbacks, [], false, 'reflection');
+      expect(mockToolFunctions[2]).not.toHaveBeenCalled();
+      expect(mockCallbacks.onExecutionEnd).toHaveBeenCalledWith('failed', 'Reflection cannot execute tools');
+    });
+
+    it('maps blocked to failed and never reports a completed candidate', async () => {
+      mockCallbacks.onExecutionEnd = jest.fn();
+      mockCallbacks.onExecutionOutcome = jest.fn();
+      mockProvider.createMessage.mockImplementation(() => streamText('<finish status="blocked">Page unavailable.</finish>'));
+      await executionEngine.executePrompt('Read page', mockCallbacks, [], false, 'operator');
+      expect(mockCallbacks.onExecutionOutcome).toHaveBeenCalledWith(expect.objectContaining({ status: 'blocked', reason: 'MODEL_BLOCKED' }));
+      expect(mockCallbacks.onExecutionEnd).toHaveBeenCalledWith('failed', 'Page unavailable.');
+    });
+
+    it('requires an operator finish declaration once, while experts retain ordinary prose', async () => {
+      mockCallbacks.onExecutionOutcome = jest.fn();
+      mockProvider.createMessage.mockImplementation(() => streamText('I stopped.'));
+      await executionEngine.executePrompt('Read page', mockCallbacks, [], false, 'operator');
+      expect(mockProvider.createMessage).toHaveBeenCalledTimes(2);
+      expect(mockCallbacks.onExecutionOutcome).toHaveBeenLastCalledWith(expect.objectContaining({ reason: 'PROTOCOL_ERROR', status: 'failed' }));
+      mockProvider.createMessage.mockClear();
+      await executionEngine.executePrompt('Explain', mockCallbacks, [], false, 'books');
+      expect(mockProvider.createMessage).toHaveBeenCalledTimes(1);
+      expect(mockCallbacks.onExecutionOutcome).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'completed' }));
+    });
+
+    it('bounds repeated protocol errors and repeated tool failures', async () => {
+      mockCallbacks.onExecutionOutcome = jest.fn();
+      mockProvider.createMessage.mockImplementation(() => streamText('<tool>browser_query</tool>'));
+      await executionEngine.executePrompt('Read', mockCallbacks, [], false, 'operator');
+      expect(mockProvider.createMessage).toHaveBeenCalledTimes(4);
+      expect(mockCallbacks.onExecutionOutcome).toHaveBeenLastCalledWith(expect.objectContaining({ reason: 'PROTOCOL_REPAIR_LIMIT' }));
+      mockProvider.createMessage.mockClear();
+      mockToolFunctions[0].mockResolvedValue('No nodes matched selector');
+      mockProvider.createMessage.mockImplementation(() => streamText(invocation('browser_screenshot')));
+      await executionEngine.executePrompt('Read', mockCallbacks, [], false, 'operator');
+      expect(mockToolFunctions[0]).toHaveBeenCalledTimes(2);
+      expect(mockCallbacks.onExecutionOutcome).toHaveBeenLastCalledWith(expect.objectContaining({ reason: 'REPEATED_FAILURE' }));
+    });
+
+    it('allows a summary after call 50 but stops a 51st tool call', async () => {
+      mockCallbacks.onExecutionOutcome = jest.fn();
+      let request = 0;
+      mockProvider.createMessage.mockImplementation(() => streamText(++request <= 50 ? invocation('browser_screenshot') : '<finish status="completed">Verified.</finish>'));
+      await executionEngine.executePrompt('Read', mockCallbacks, [], false, 'operator');
+      expect(mockToolFunctions[0]).toHaveBeenCalledTimes(50);
+      expect(mockCallbacks.onExecutionOutcome).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'completed' }));
+      mockToolFunctions[0].mockClear();
+      mockProvider.createMessage.mockImplementation(() => streamText(invocation('browser_screenshot')));
+      await executionEngine.executePrompt('Read', mockCallbacks, [], false, 'operator');
+      expect(mockToolFunctions[0]).toHaveBeenCalledTimes(50);
+      expect(mockCallbacks.onExecutionOutcome).toHaveBeenLastCalledWith(expect.objectContaining({ reason: 'TOOL_BUDGET' }));
     });
 
     it('should execute a simple prompt without tools', async () => {
@@ -175,7 +421,7 @@ describe('ExecutionEngine', () => {
           yield { type: 'text', text: '<tool>browser_screenshot</tool>\n<input>{}</input>\n<requires_approval>false</requires_approval>' };
         })())
         .mockImplementationOnce(() => (async function* () {
-          yield { type: 'text', text: 'The screenshot was captured and the task is complete.' };
+          yield { type: 'text', text: '<finish status="completed">The screenshot was captured and the task is complete.</finish>' };
         })());
 
       await executionEngine.executePrompt('Take a screenshot', mockCallbacks, [], false, 'operator');
@@ -198,7 +444,7 @@ describe('ExecutionEngine', () => {
           })();
         })
         .mockImplementationOnce(() => (async function* () {
-          yield { type: 'text', text: 'Screenshot captured.' };
+          yield { type: 'text', text: '<finish status="completed">Screenshot captured.</finish>' };
         })());
 
       await executionEngine.executePrompt('Take a screenshot', mockCallbacks, [], false, 'operator');
@@ -217,7 +463,7 @@ describe('ExecutionEngine', () => {
           yield { type: 'text', text: '<tool>browser_screenshot</tool>\n<input>{}</input>\n<requires_approval>false</requires_approval>' };
         })())
         .mockImplementationOnce(() => (async function* () {
-          yield { type: 'text', text: 'The requested browser task is verified complete.' };
+          yield { type: 'text', text: '<finish status="completed">The requested browser task is verified complete.</finish>' };
         })());
 
       await executionEngine.executePrompt('Continue the browser task', mockCallbacks, [], false, 'operator');

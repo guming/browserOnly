@@ -48,23 +48,13 @@ export const CANONICAL_SEQUENCE: string = `## CANONICAL SEQUENCE
   4. **Choose one focused observation tool** based on the request. A successful observation is enough for the current page state; do not repeat it with another overview, text, DOM, or accessibility tool.
      • If the user asks to list, collect, or extract page URLs/links, call browser_extract_links once (use internal, external, or all only as needed). After a complete result, stop exploring the DOM and answer.
      • To read the current page's visible text or follow link URLs, use browser_read_text. Use browser_read_main when the task needs only the main article content; use browser_get_summary for a short preview. Choose one of these for the current page state.
-     • To find an element for an action, use browser_snapshot_dom or browser_accessible_tree. Use browser_query only to inspect a specific selector when the required element is unknown. Use browser_screenshot when visual position matters.
+     • If the intended control label is already known from the current page, browser_click accepts literal text; act on that evidence before investigating CSS classes. If its target is unknown or text targeting failed/was ambiguous, use one focused browser_snapshot_dom or browser_accessible_tree observation. Use browser_query only to inspect a specific selector when the required element is unknown. Use browser_screenshot when visual position matters.
      • After a successful read, call a different observation tool only if a specific missing detail is needed. Do not use a second full-page read merely to verify the first.
   
   5. **Analyze → Act** – Plan the remainder of the task and execute further tools.
 
-   • First, break down the high-level goal into **clear sub-tasks** as a **To-Do List**, using checklist format:
-     - [ ] Identify search box
-     - [ ] Type search term
-     - [ ] Press Enter
-
-   • Before acting, **output the entire To-Do List first**, and reflect briefly on the plan:
-     > Reasoning: "To search the term on Google, I need to find the search box, type the query, then submit."
-
-   • After each action, **mark the corresponding To-Do item as done**:
-     - [x] Identify search box
-     - [x] Type search term
-     - [ ] Press Enter
+   • For multi-action requests, keep a short internal plan. Output a checklist only when it helps the user follow a long task; do not emit a checklist before every tool call or for a simple page summary.
+   • Carry forward completed substeps. A failed selector does not restart the whole task. Prefer one precise action and one result check over repeated broad observations.
 
    • Verify actions that change page state using the smallest relevant observation. Reuse the latest result while the page state has not changed.
 
@@ -95,7 +85,7 @@ export const MEMORY_FORMAT: string = ` ### MEMORY FORMAT  (for Step 3)
   
   ────────────────────────────────────────
   ## TOOL-CALL SYNTAX
-  You **must** reply in this EXACT XML format with ALL three tags:
+  For each tool invocation, use this EXACT XML format with ALL three tags:
   
   <tool>tool_name</tool>
   <input>arguments here</input>
@@ -157,4 +147,13 @@ Return a **Markdown table** like this:
 
 # Final Instruction
 Only return the Markdown table. Do not include commentary, explanations, or JSON.
+`;
+
+export const OPERATOR_FINISH_INSTRUCTIONS = `## OPERATOR COMPLETION
+When a task is finished, put the full requested answer inside <finish status="completed">...</finish>. The wrapper carries execution status only; it must not shorten, rewrite, or replace the answer with a status report.
+For a page-summary request, directly present what the page says: an opening overview and the important points, using paragraphs or Markdown bullets/headings when useful. For analysis, explanations, tables, or extracted data, provide that requested deliverable in full. Match the requested language; otherwise follow the conversation language.
+Do not begin with "Summarized the current page", "Verified via browser_read_main", or a list of tools used. Mention source limitations or verification only when they materially affect the answer. Keep action-completion reports brief only when the user asked for an action rather than written content.
+When blocked, place the useful partial answer and a clear explanation of the blocker inside <finish status="blocked">...</finish>.
+Never declare success merely because a tool failed. Do not emit a finish declaration alongside a tool call.
+For repeated records and requested fields, prefer browser_extract_fields over large raw HTML queries. Its scope is the current DOM, not all pages; honor truncation and nextOffset. Distinguish derived URLs from observed hrefs.
 `;

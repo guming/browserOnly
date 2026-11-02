@@ -2,9 +2,9 @@ import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { RememberActions, installRecorder } from '../../src/sidepanel/components/memory/RememberActions';
 
-const storeMemory = jest.fn();
-const findSimilarMemory = jest.fn();
-jest.mock('../../src/tracking/memoryService', () => ({ MemoryService: { getInstance: () => ({ storeMemory, findSimilarMemory }) } }));
+const saveWorkflow = jest.fn();
+const saveVersion = jest.fn();
+jest.mock('../../src/workflows/WorkflowStore', () => ({ WorkflowStore: { getInstance: () => ({ saveWorkflow, saveVersion }) } }));
 jest.mock('../../src/background/configManager', () => ({ ConfigManager: { getInstance: () => ({ getProviderConfig: async () => ({ provider: 'openai', apiKey: '' }) }) } }));
 jest.mock('../../src/models/providers/factory', () => ({ createProvider: async () => ({ createMessage: async function* () { yield { type: 'text', text: 'Export orders' }; } }) }));
 
@@ -14,7 +14,7 @@ describe('RememberActions', () => {
   let updated: (id: number, info: any, tab: any) => void;
   let created: (tab: any) => void;
   beforeEach(() => {
-    storeMemory.mockReset().mockResolvedValue(1); findSimilarMemory.mockReset().mockResolvedValue(null);
+    saveWorkflow.mockReset().mockResolvedValue(undefined); saveVersion.mockReset().mockResolvedValue(undefined);
     const event = () => ({ addListener: jest.fn(), removeListener: jest.fn() });
     (globalThis as any).chrome = {
       runtime: { onMessage: { addListener: (listener: typeof receive) => { receive = listener; }, removeListener: jest.fn() } },
@@ -24,39 +24,58 @@ describe('RememberActions', () => {
   });
   it('records only messages from the selected tab and saves the reviewed demonstration', async () => {
     render(<RememberActions tabId={2} readable />);
-    fireEvent.click(screen.getByText(/Remember my actions/));
+    fireEvent.click(screen.getByText(/Record workflow/));
     await screen.findByText(/Recording your actions/);
     act(() => {
-      receive({ action: 'userMemoryStep', token, step: { kind: 'click', label: 'Export' } }, { tab: { id: 3 } });
-      receive({ action: 'userMemoryStep', token, step: { kind: 'click', label: 'Export', element: 'button id=export' } }, { tab: { id: 2 } });
+      receive({ action: 'userMemoryStep', token, step: { kind: 'click', label: 'Export', selector: '#export' } }, { tab: { id: 3 } });
+      receive({ action: 'userMemoryStep', token, step: { kind: 'click', label: 'Export', selector: '#export' } }, { tab: { id: 2 } });
     });
     fireEvent.click(screen.getByText('Done'));
     await screen.findByDisplayValue('Export orders');
     expect(screen.getByText(/1 steps/)).toBeTruthy();
     fireEvent.click(screen.getByText('Save'));
-    await waitFor(() => expect(storeMemory).toHaveBeenCalledWith(expect.objectContaining({ domain: 'example.com', taskDescription: 'Export orders', toolSequence: ['Click “Export” [element: button id=export]'], status: 'active' })));
+    await waitFor(() => expect(saveWorkflow).toHaveBeenCalledWith(expect.objectContaining({ name: 'Export orders', status: 'draft' })));
+    expect(saveVersion).toHaveBeenCalledWith(expect.objectContaining({ steps: [expect.objectContaining({ toolName: 'browser_click', input: '#export' })] }));
   });
   it('continues across websites and into a tab opened by the recorded page', async () => {
     render(<RememberActions tabId={2} readable />);
-    fireEvent.click(screen.getByText(/Remember my actions/));
+    fireEvent.click(screen.getByText(/Record workflow/));
     await screen.findByText(/Recording your actions/);
     act(() => {
       updated(2, { url: 'https://other.example/path?secret=123', status: 'complete' }, { url: 'https://other.example/path?secret=123' });
       created({ id: 4, openerTabId: 2, url: 'https://third.example/', status: 'complete' });
-      receive({ action: 'userMemoryStep', token, step: { kind: 'click', label: 'Continue' } }, { tab: { id: 4 } });
+      receive({ action: 'userMemoryStep', token, step: { kind: 'click', label: 'Continue', selector: '#continue' } }, { tab: { id: 4 } });
     });
     fireEvent.click(screen.getByText('Done'));
     await screen.findByDisplayValue('Export orders');
     fireEvent.click(screen.getByText('Save'));
-    await waitFor(() => expect(storeMemory).toHaveBeenCalledWith(expect.objectContaining({ domain: 'example.com', toolSequence: ['Open website other.example', 'Open website third.example', 'Click “Continue”'] })));
+    await waitFor(() => expect(saveVersion).toHaveBeenCalledWith(expect.objectContaining({ steps: [expect.objectContaining({ toolName: 'browser_navigate', input: 'https://other.example/path' }), expect.objectContaining({ toolName: 'browser_navigate', input: 'https://third.example/' }), expect.objectContaining({ toolName: 'browser_click', input: '#continue' })] })));
   });
   it('does not save an empty recording', async () => {
     render(<RememberActions tabId={2} readable />);
-    fireEvent.click(screen.getByText(/Remember my actions/));
+    fireEvent.click(screen.getByText(/Record workflow/));
     await screen.findByText(/Recording your actions/);
     fireEvent.click(screen.getByText('Done'));
     await screen.findByText(/No supported actions/);
-    expect(storeMemory).not.toHaveBeenCalled();
+    expect(saveWorkflow).not.toHaveBeenCalled();
+  });
+  it('keeps repeated clicks and turns field input into a workflow variable', async () => {
+    render(<RememberActions tabId={2} readable />);
+    fireEvent.click(screen.getByText(/Record workflow/));
+    await screen.findByText(/Recording your actions/);
+    act(() => {
+      receive({ action: 'userMemoryStep', token, step: { kind: 'click', label: 'Next', selector: '#next' } }, { tab: { id: 2 } });
+      receive({ action: 'userMemoryStep', token, step: { kind: 'click', label: 'Next', selector: '#next' } }, { tab: { id: 2 } });
+      receive({ action: 'userMemoryStep', token, step: { kind: 'input', label: 'Search field', selector: 'input[name="q"]' } }, { tab: { id: 2 } });
+    });
+    fireEvent.click(screen.getByText('Done'));
+    await screen.findByDisplayValue('Export orders');
+    fireEvent.click(screen.getByText('Save'));
+    await waitFor(() => expect(saveVersion).toHaveBeenCalled());
+    const version = saveVersion.mock.calls[0][0];
+    expect(version.steps.map((step: any) => step.toolName)).toEqual(['browser_click', 'browser_click', 'browser_type']);
+    expect(version.steps[2].input).toBe('input[name="q"]|{{input_3}}');
+    expect(saveWorkflow.mock.calls[0][0].variables).toEqual([expect.objectContaining({ key: 'input_3', required: true })]);
   });
 });
 
@@ -75,8 +94,8 @@ describe('page action capture', () => {
     handlers.click?.({ isTrusted: true, target: document.querySelector('#product') } as unknown as Event);
     const steps = sendMessage.mock.calls.map(call => call[0].step);
     expect(steps).toHaveLength(2);
-    expect(steps[0]).toEqual(expect.objectContaining({ kind: 'input', element: 'input type=search name=keyword' }));
-    expect(steps[1]).toEqual(expect.objectContaining({ kind: 'click', element: 'a id=product' }));
+    expect(steps[0]).toEqual(expect.objectContaining({ kind: 'input', selector: 'input[name="keyword"]' }));
+    expect(steps[1]).toEqual(expect.objectContaining({ kind: 'click', selector: '#product' }));
     expect(JSON.stringify(steps)).not.toContain('私人搜索内容');
     add.mockRestore();
   });

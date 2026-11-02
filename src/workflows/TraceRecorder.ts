@@ -28,7 +28,7 @@ export class TraceRecorder {
     return {
       ...event,
       input: redactValue(event.input),
-      result: event.result ? { ...event.result, data: redactValue(event.result.data) } : undefined
+      result: event.result ? { ...event.result, data: redactValue(event.result.data), meta: redactValue(event.result.meta) as Record<string, unknown> | undefined } : undefined
     };
   }
 }
