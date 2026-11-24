@@ -220,8 +220,8 @@ function showToolbar(): void {
   const shadow = host.attachShadow({ mode: 'closed' });
   const button = document.createElement('button');
   button.type = 'button';
-  button.textContent = 'Translate';
-  button.setAttribute('aria-label', 'Translate selected text');
+  button.textContent = 'Translate with BrowserOnly';
+  button.setAttribute('aria-label', 'Translate selected text with BrowserOnly');
   button.style.cssText = [
     'all:initial',
     'box-sizing:border-box',
